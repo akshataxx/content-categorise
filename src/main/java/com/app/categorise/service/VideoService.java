@@ -26,16 +26,12 @@ public class VideoService {
         System.out.println("Downloading video from: " + videoUrl);
 
         // use yt-dlp to download video
-        try {
-            ProcessRunner.runCommand("yt-dlp", "-o", "video.mp4", videoUrl);
-        } catch (Exception e) {
-            System.out.println("yt-dlp failed");
-            e.printStackTrace();
-            throw e;
-        }
+        ProcessRunner.runCommand("yt-dlp", "--use-extractors", "TikTok", "-t", "mp4", "-o", videoFile, videoUrl);
+
+        System.out.println("yt-dlp succeeded");
 
         // use ffmpeg to extract audio
-        ProcessRunner.runCommand("ffmpeg", "-i", videoFile, "-vn", "-acodec", "mp3",audioFile);
+        ProcessRunner.runCommand("ffmpeg", "-i", videoFile, "-vn", "-acodec", "mp3", audioFile);
 
         return new File(audioFile);
     }

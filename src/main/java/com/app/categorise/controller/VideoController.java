@@ -1,6 +1,7 @@
 package com.app.categorise.controller;
 
 import com.app.categorise.service.VideoService;
+import com.app.categorise.util.ProcessRunner;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
@@ -29,6 +30,8 @@ public class VideoController {
         try {
             File audio = videoService.downloadAndExtractAudio(videoUrl);
 
+            System.out.println("Transcribing audio...");
+
             String transcript = videoService.transcribeAudio(audio);
 
             audio.delete();
@@ -36,6 +39,7 @@ public class VideoController {
             return transcript;
         } catch (Exception e) {
             e.printStackTrace();
+            System.out.println("Error: " + e.getMessage());
             return "Error: " + e.getMessage();
         }
     }

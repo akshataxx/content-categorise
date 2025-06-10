@@ -1,5 +1,6 @@
 package com.app.categorise.service;
 
+import com.app.categorise.repository.TranscriptRepository;
 import com.app.categorise.util.ProcessRunner;
 import org.springframework.stereotype.Service;
 
@@ -17,6 +18,12 @@ import java.io.InputStreamReader;
 
 @Service
 public class VideoService {
+
+    private final TranscriptRepository repository;
+
+    public VideoService(TranscriptRepository repository){
+        this.repository = repository;
+    }
 
     // download video and extract audio
     public File downloadAndExtractAudio(String videoUrl)throws Exception {

@@ -1,6 +1,8 @@
 package com.app.categorise.service;
 
+import com.app.categorise.repository.TranscriptRepository;
 import com.app.categorise.util.ProcessRunner;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
@@ -17,6 +19,15 @@ import java.io.InputStreamReader;
 
 @Service
 public class VideoService {
+
+    private final TranscriptRepository repository;
+
+    public VideoService(TranscriptRepository repository){
+        this.repository = repository;
+    }
+
+    @Value("${openai.api.key}")
+    private String openAiApiKey;
 
     // download video and extract audio
     public File downloadAndExtractAudio(String videoUrl)throws Exception {
@@ -41,7 +52,7 @@ public class VideoService {
         // Use curl to send audio file to Whisper API
         ProcessBuilder pb = new ProcessBuilder(
                 "curl", "https://api.openai.com/v1/audio/transcriptions",
-                "-H", "Authorization: Bearer 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",
+                "-H", "Authorization: Bearer "+ openAiApiKey,
                 "-F", "file=@" + audioFile.getAbsolutePath(),
                 "-F", "model=whisper-1"
         );

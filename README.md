@@ -1,4 +1,5 @@
 ## To get started 
+In `src/main/resources/application-secrets.properties` add your open api key under `openai.api.key`.
 
 ### Install MongoDB
 ```declarative

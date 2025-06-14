@@ -3,12 +3,14 @@ package com.app.categorise.controller;
 import com.app.categorise.service.VideoService;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.File;
 import java.util.Map;
 
 @RestController
+@RequestMapping("/video")
 public class VideoController {
     private final VideoService videoService;
 
@@ -22,24 +24,25 @@ public class VideoController {
      * @return the transcript of video
      */
 
-    @PostMapping("/video/url")
+    @PostMapping("/url")
     public String handleVideo(@RequestBody Map<String, String> request) {
         System.out.println("POST /video/url received ");
         String videoUrl = request.get("videoUrl");
         try {
             File audio = videoService.downloadAndExtractAudio(videoUrl);
-
             System.out.println("Transcribing audio...");
+            String transcript = videoService.transcribeAudio(audio, videoUrl);
+            System.out.println("Transcript: " + transcript);
 
-            String transcript = videoService.transcribeAudio(audio);
+            if (!audio.delete()) {
+                System.out.println("Failed to delete audio file");
+            }
 
-            audio.delete();
-            new File("video.mp4").delete();
             return transcript;
         } catch (Exception e) {
             e.printStackTrace();
             System.out.println("Error: " + e.getMessage());
-            return "Error: " + e.getMessage();
+            return e.getMessage();
         }
     }
 }

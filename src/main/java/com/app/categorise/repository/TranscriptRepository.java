@@ -1,11 +1,14 @@
 package com.app.categorise.repository;
 
-import com.app.categorise.entity.TranscriptEntity;
-import org.springframework.data.jpa.repository.JpaRepository;
-
+import com.app.categorise.entity.Transcript;
 import java.util.List;
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.stereotype.Repository;
 
-public interface TranscriptRepository extends JpaRepository<TranscriptEntity, Long> {
+@Repository
+public interface TranscriptRepository extends MongoRepository<Transcript, Long> {
 
-    List<TranscriptEntity> findByCategory(String category);
+    Transcript findByVideoUrl(String videoUrl);
+
+    List<Transcript> findByCategoriesContaining(String category);
 }

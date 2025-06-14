@@ -32,5 +32,5 @@ build/
 ### VS Code ###
 .vscode/
 
-### Exclude application.properties file
-src/main/resources/application.properties
+### Exclude application-secrets.properties file
+src/main/resources/application-secrets.properties

@@ -32,21 +32,12 @@ public class VideoService {
 
     // Download video and extract audio
     public File downloadAndExtractAudio(String videoUrl) throws Exception {
-        String videoFile = "video.mp4";
         String audioFile = "audio.mp3";
 
-        // use yt-dlp to download video
-        ProcessRunner.runCommand("yt-dlp", "--use-extractors", "TikTok", "-t", "mp4", "-o", videoFile, videoUrl);
+        // Use yt-dlp to download the audio, it will use ffmpeg to extract audio
+        ProcessRunner.runCommand("yt-dlp", "--use-extractors", "TikTok", "-x", "--audio-format", "mp3", "--audio-quality", "5", "-o", audioFile, videoUrl);
 
-        System.out.println("Extracting audio...");
-
-        // use ffmpeg to extract audio
-        ProcessRunner.runCommand("ffmpeg", "-i", videoFile, "-vn", "-acodec", "mp3", audioFile);
-
-        boolean deleted = new File(videoFile).delete();
-        if (!deleted) {
-            System.out.println("Failed to delete video file");
-        }
+        System.out.println("audio should be extracted...");
 
         return new File(audioFile);
     }

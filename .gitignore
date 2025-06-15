@@ -34,3 +34,5 @@ build/
 
 ### Exclude application-secrets.properties file
 src/main/resources/application-secrets.properties
+
+.DS_Store

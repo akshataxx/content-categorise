@@ -3,6 +3,7 @@ package com.app.categorise.service;
 import com.app.categorise.client.whisper.WhisperClient;
 import com.app.categorise.entity.Transcript;
 import com.app.categorise.dto.TikTokMetadata;
+import com.app.categorise.model.ProcessedVideoFiles;
 import com.app.categorise.repository.TranscriptRepository;
 import com.app.categorise.util.ProcessRunner;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,11 +40,10 @@ public class VideoService {
      *         </ul>
      * @throws Exception If the download or extraction process fails.
      */
-    public List<File> extractAudioAndMetadata(String videoUrl) throws Exception {
+    public ProcessedVideoFiles extractAudioAndMetadata(String videoUrl) throws Exception {
         String baseName = "output";
         String outputTemplate = baseName + ".%(ext)s";
 
-        // Use yt-dlp to download the audio, it will use ffmpeg to extract audio
         ProcessRunner.runCommand(
                 "yt-dlp",
                 "--use-extractors", "TikTok",
@@ -56,7 +56,7 @@ public class VideoService {
         File audioFile = new File(baseName + ".mp3");
         File metadataFile = new File(baseName + ".info.json");
 
-        return List.of(audioFile, metadataFile);
+        return new ProcessedVideoFiles(audioFile, metadataFile);
     }
 
     // Transcribe audio using OpenAI Whisper API

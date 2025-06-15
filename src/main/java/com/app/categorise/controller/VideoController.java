@@ -2,6 +2,7 @@ package com.app.categorise.controller;
 
 import com.app.categorise.entity.Transcript;
 import com.app.categorise.dto.TikTokMetadata;
+import com.app.categorise.model.ProcessedVideoFiles;
 import com.app.categorise.service.VideoService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -36,22 +37,11 @@ public class VideoController {
             throw new IllegalArgumentException("Missing 'videoUrl' in request body");
         }
 
-        List<File> files = videoService.extractAudioAndMetadata(videoUrl);
-        File audioFile = files.get(0);
-        File metadataFile = files.get(1);
-
-        try {
-            String textTranscript = videoService.transcribeAudio(audioFile);
-            TikTokMetadata metadata = videoService.extractMetadata(metadataFile);
+        try (ProcessedVideoFiles files = videoService.extractAudioAndMetadata(videoUrl)) {
+            String textTranscript = videoService.transcribeAudio(files.getAudioFile());
+            TikTokMetadata metadata = videoService.extractMetadata(files.getMetadataFile());
             Transcript transcript = videoService.saveTranscript(videoUrl, textTranscript, metadata);
             return ResponseEntity.ok(transcript);
-        } finally {
-            if (!audioFile.delete()) {
-                System.err.println("Failed to delete audio file: " + audioFile.getAbsolutePath());
-            }
-            if (!metadataFile.delete()) {
-                System.err.println("Failed to delete metadata file: " + metadataFile.getAbsolutePath());
-            }
         }
     }
 }

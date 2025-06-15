@@ -59,24 +59,16 @@ public class VideoService {
 
     // Transcribe audio using OpenAI Whisper API
     public String transcribeAudio(File audioFile, String videoUrl) {
-        String jsonResponse = whisperClient.transcribeAudio(audioFile);
+        String transcriptText = whisperClient.transcribeAudio(audioFile);
 
-        String transcriptText;
-        try {
-            ObjectMapper mapper = new ObjectMapper();
-            JsonNode node = mapper.readTree(jsonResponse);
-            transcriptText = node.get("text").asText();
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to parse transcript JSON", e);
-        }
+        Transcript transcript = createAndSaveTranscript(videoUrl, transcriptText);
+        return transcript.getTranscript();
+    }
 
-        // TODO: move to a new function
+    private Transcript createAndSaveTranscript(String videoUrl, String transcriptText) {
         Transcript transcript = new Transcript();
         transcript.setVideoUrl(videoUrl);
         transcript.setTranscript(transcriptText);
-
-        transcriptRepository.save(transcript);
-
-        return transcriptText;
+        return transcriptRepository.save(transcript);
     }
 }

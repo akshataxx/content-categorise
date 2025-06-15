@@ -1,23 +1,26 @@
 package com.app.categorise.client;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClient;
 
 import java.io.File;
+import java.io.IOException;
 
 @Component
 public class WhisperClient {
 
-    private final RestTemplate restTemplate;
+    private final RestClient restClient;
     private final String apiKey;
 
-    public WhisperClient(RestTemplate restTemplate, @Value("${openai.api.key}") String apiKey) {
-        this.restTemplate = restTemplate;
+    public WhisperClient(RestClient restClient, @Value("${openai.api.key}") String apiKey) {
+        this.restClient = restClient;
         this.apiKey = apiKey;
     }
 
@@ -32,12 +35,29 @@ public class WhisperClient {
         body.add("file", new FileSystemResource(audioFile));
         body.add("model", "whisper-1");
 
-        HttpEntity<MultiValueMap<String, Object>> request = new HttpEntity<>(body, headers);
+        try {
+            String response = restClient
+                    .post()
+                    .uri(url)
+                    .headers(h -> h.addAll(headers))
+                    .body(body)
+                    .retrieve()
+                    .body(String.class);
 
-        ResponseEntity<String> response = restTemplate.exchange(
-                url, HttpMethod.POST, request, String.class
-        );
+            JsonNode node = parseJson(response);
+            return node.get("text").asText();
 
-        return response.getBody();
+        } catch (Exception e) {
+            throw new RuntimeException("Error during Whisper transcription", e);
+        }
+    }
+
+    private JsonNode parseJson(String json) {
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            return mapper.readTree(json);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to parse JSON response", e);
+        }
     }
 }

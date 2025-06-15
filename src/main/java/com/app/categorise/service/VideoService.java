@@ -4,15 +4,9 @@ import com.app.categorise.entity.Transcript;
 import com.app.categorise.repository.TranscriptRepository;
 import com.app.categorise.util.ProcessRunner;
 import com.app.categorise.client.*;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.time.LocalDateTime;
 
 /**
  * handles logic to

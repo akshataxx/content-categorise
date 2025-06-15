@@ -1,5 +1,6 @@
 package com.app.categorise.service;
 
+import com.app.categorise.client.openai.OpenAIClient;
 import com.app.categorise.client.whisper.WhisperClient;
 import com.app.categorise.models.entity.Transcript;
 import com.app.categorise.models.dto.TikTokMetadata;
@@ -10,6 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import java.io.File;
 import java.time.Instant;
+import java.util.List;
 
 /**
  * handles logic to
@@ -25,9 +27,16 @@ public class VideoService {
     private final TranscriptRepository transcriptRepository;
     private final WhisperClient whisperClient;
 
-    public VideoService(TranscriptRepository transcriptRepository, WhisperClient whisperClient){
+    private final CategorisationService categorisationService;
+
+    public VideoService(
+            TranscriptRepository transcriptRepository,
+            WhisperClient whisperClient,
+            CategorisationService categorisationService
+    ){
         this.transcriptRepository = transcriptRepository;
         this.whisperClient = whisperClient;
+        this.categorisationService = categorisationService;
     }
 
     /**
@@ -76,6 +85,11 @@ public class VideoService {
         transcript.setAccount(metadata.getAccount());
         transcript.setIdentifierId(metadata.getIdentifierId());
         transcript.setIdentifier(metadata.getIdentifier());
+
+        // Categorise using OpenAI
+        List<String> categories = categorisationService.classify(transcriptText, metadata.getTitle(), metadata.getDescription());
+        transcript.setCategories(categories);
+
         return transcriptRepository.save(transcript);
     }
 

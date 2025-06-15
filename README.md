@@ -37,5 +37,12 @@ This project follows a layered architecture using standard Java/Spring concepts:
 | `models.dto`      | Data Transfer Objects used to external structure API requests and responses. Helps decouple internal models from external representations. |
 | `models.internal` | Objects used for intermediate representations of data. Not persisted to the database.                                                      |
 
+## 📘 API Docs (Springdoc OpenAPI)
+
+This project uses [Springdoc OpenAPI](https://springdoc.org/) to auto-generate API docs.
+
+- Swagger UI: [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
+- OpenAPI JSON: [http://localhost:8080/v3/api-docs](http://localhost:8080/v3/api-docs)
+
 ## Mocking openai api
 Since OpenAI API is expensive, the clients have mock implementations to return dummy responses. To enable mocking, set `spring.profiles.active=dev` in `src/main/resources/application-secrets.properties`. Set it to `prod` to disable mocking

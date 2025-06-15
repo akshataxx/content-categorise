@@ -1,7 +1,6 @@
 package com.app.categorise.service;
 
 import com.app.categorise.client.whisper.WhisperClient;
-import com.app.categorise.client.whisper.WhisperClientImpl;
 import com.app.categorise.entity.Transcript;
 import com.app.categorise.dto.TikTokMetadata;
 import com.app.categorise.repository.TranscriptRepository;
@@ -9,6 +8,7 @@ import com.app.categorise.util.ProcessRunner;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import java.io.File;
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -68,7 +68,15 @@ public class VideoService {
         Transcript transcript = new Transcript();
         transcript.setVideoUrl(videoUrl);
         transcript.setTranscript(transcriptText);
+        // Set metadata information
         transcript.setDescription(metadata.getDescription());
+        transcript.setTitle(metadata.getTitle());
+        transcript.setDuration(metadata.getDuration());
+        transcript.setUploadedAt(Instant.ofEpochSecond(metadata.getUploadedEpoch()));
+        transcript.setAccountId(metadata.getAccountId());
+        transcript.setAccount(metadata.getAccount());
+        transcript.setIdentifierId(metadata.getIdentifierId());
+        transcript.setIdentifier(metadata.getIdentifier());
         return transcriptRepository.save(transcript);
     }
 

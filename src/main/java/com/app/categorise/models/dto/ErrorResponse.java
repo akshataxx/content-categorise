@@ -1,4 +1,4 @@
-package com.app.categorise.dto;
+package com.app.categorise.models.dto;
 
 import java.time.Instant;
 

@@ -1,4 +1,4 @@
-package com.app.categorise.entity;
+package com.app.categorise.models.entity;
 
 
 import lombok.ToString;

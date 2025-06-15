@@ -1,4 +1,4 @@
-package com.app.categorise.model;
+package com.app.categorise.models.internal;
 
 import java.io.File;
 
@@ -29,4 +29,3 @@ public class ProcessedVideoFiles implements AutoCloseable {
         }
     }
 }
-

@@ -1,8 +1,8 @@
 package com.app.categorise.controller;
 
-import com.app.categorise.entity.Transcript;
-import com.app.categorise.dto.TikTokMetadata;
-import com.app.categorise.model.ProcessedVideoFiles;
+import com.app.categorise.models.entity.Transcript;
+import com.app.categorise.models.dto.TikTokMetadata;
+import com.app.categorise.models.internal.ProcessedVideoFiles;
 import com.app.categorise.service.VideoService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -10,8 +10,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.io.File;
-import java.util.List;
 import java.util.Map;
 
 @RestController

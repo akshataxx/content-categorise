@@ -1,16 +1,15 @@
 package com.app.categorise.service;
 
 import com.app.categorise.client.whisper.WhisperClient;
-import com.app.categorise.entity.Transcript;
-import com.app.categorise.dto.TikTokMetadata;
-import com.app.categorise.model.ProcessedVideoFiles;
+import com.app.categorise.models.entity.Transcript;
+import com.app.categorise.models.dto.TikTokMetadata;
+import com.app.categorise.models.internal.ProcessedVideoFiles;
 import com.app.categorise.repository.TranscriptRepository;
 import com.app.categorise.util.ProcessRunner;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import java.io.File;
 import java.time.Instant;
-import java.util.List;
 
 /**
  * handles logic to

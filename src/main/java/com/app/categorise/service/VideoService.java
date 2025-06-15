@@ -37,8 +37,6 @@ public class VideoService {
         // Use yt-dlp to download the audio, it will use ffmpeg to extract audio
         ProcessRunner.runCommand("yt-dlp", "--use-extractors", "TikTok", "-x", "--audio-format", "mp3", "--audio-quality", "5", "-o", audioFile, videoUrl);
 
-        System.out.println("audio should be extracted...");
-
         return new File(audioFile);
     }
 

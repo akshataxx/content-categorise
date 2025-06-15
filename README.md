@@ -1,7 +1,11 @@
-## To get started 
+## 🚀 To get started 
 
 ### Add your openai api key
-In `src/main/resources/application-secrets.properties` add your key under `openai.api.key`.
+Add your key in `application-secrets.properties`:
+
+```properties
+openai.api.key=<YOUR_API_KEY>
+```
 
 ### Install MongoDB
 ```declarative
@@ -20,7 +24,7 @@ brew install yt-dlp
 brew install ffmpeg
 ```
 
-## 📦 Project Structure Overview
+## 🧱 Project Structure Overview
 
 This project follows a layered architecture using standard Java/Spring concepts:
 
@@ -44,5 +48,13 @@ This project uses [Springdoc OpenAPI](https://springdoc.org/) to auto-generate A
 - Swagger UI: [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
 - OpenAPI JSON: [http://localhost:8080/v3/api-docs](http://localhost:8080/v3/api-docs)
 
-## Mocking openai api
-Since OpenAI API is expensive, the clients have mock implementations to return dummy responses. To enable mocking, set `spring.profiles.active=dev` in `src/main/resources/application-secrets.properties`. Set it to `prod` to disable mocking
+## 🧩 Development Mode (Mocking OpenAI API)
+
+To avoid real OpenAI API calls (and cost), the app includes a mock implementation used in development mode.
+
+Set the profile in `application-secrets.properties`:
+
+```properties
+spring.profiles.active=dev   # ➜ enables mock client (returns dummy responses)
+spring.profiles.active=prod  # ➜ uses actual OpenAI API
+```

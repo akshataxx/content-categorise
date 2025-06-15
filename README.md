@@ -1,5 +1,7 @@
 ## To get started 
-In `src/main/resources/application-secrets.properties` add your open api key under `openai.api.key`.
+
+### Add your openai api key
+In `src/main/resources/application-secrets.properties` add your key under `openai.api.key`.
 
 ### Install MongoDB
 ```declarative
@@ -17,3 +19,6 @@ This will:
 brew install yt-dlp
 brew install ffmpeg
 ```
+
+## Mocking openai api
+Since OpenAI API is expensive, the clients have mock implementations to return dummy responses. To enable mocking, set `spring.profiles.active=dev` in `src/main/resources/application-secrets.properties`. Set it to `prod` to disable mocking

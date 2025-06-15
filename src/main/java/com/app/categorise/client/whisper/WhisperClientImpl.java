@@ -1,8 +1,9 @@
-package com.app.categorise.client;
+package com.app.categorise.client.whisper;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
@@ -14,12 +15,13 @@ import java.io.File;
 import java.io.IOException;
 
 @Component
-public class WhisperClient {
+@Profile("prod")
+public class WhisperClientImpl implements WhisperClient {
 
     private final RestClient restClient;
     private final String apiKey;
 
-    public WhisperClient(RestClient restClient, @Value("${openai.api.key}") String apiKey) {
+    public WhisperClientImpl(RestClient restClient, @Value("${openai.api.key}") String apiKey) {
         this.restClient = restClient;
         this.apiKey = apiKey;
     }

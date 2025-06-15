@@ -1,4 +1,4 @@
-package com.app.categorise.entity;
+package com.app.categorise.models.entity;
 
 
 import lombok.ToString;
@@ -6,7 +6,6 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.MongoId;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.List;
 
 /**

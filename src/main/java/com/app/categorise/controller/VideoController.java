@@ -1,18 +1,21 @@
 package com.app.categorise.controller;
 
-import com.app.categorise.entity.Transcript;
-import com.app.categorise.dto.TikTokMetadata;
+import com.app.categorise.models.entity.Transcript;
+import com.app.categorise.models.dto.TikTokMetadata;
+import com.app.categorise.models.internal.ProcessedVideoFiles;
 import com.app.categorise.service.VideoService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.io.File;
-import java.util.List;
 import java.util.Map;
 
 @RestController
+@Tag(name = "Video", description = "Operations related to processing video URLs")
 @RequestMapping("/video")
 public class VideoController {
     private final VideoService videoService;
@@ -26,36 +29,21 @@ public class VideoController {
      * @param request the video url
      * @return the transcript of video
      */
-
+    @Operation(summary = "Submit a video URL", description = "Downloads video, extracts transcript and metadata, and saves to DB")
     @PostMapping("/url")
-    public String handleVideo(@RequestBody Map<String, String> request) {
-        System.out.println("POST /video/url received ");
+    public ResponseEntity<Transcript> handleVideo(@RequestBody Map<String, String> request) throws Exception {
+        System.out.println("POST /video/url received");
+
         String videoUrl = request.get("videoUrl");
-        try {
-            List<File> files = videoService.extractAudioAndMetadata(videoUrl);
-            File audioFile = files.get(0);
-            File metadataFile = files.get(1);
+        if (videoUrl == null || videoUrl.isBlank()) {
+            throw new IllegalArgumentException("Missing 'videoUrl' in request body");
+        }
 
-            System.out.println("Transcribing audio...");
-            String textTranscript = videoService.transcribeAudio(audioFile);
-            System.out.println("Transcript: " + textTranscript);
-            if (!audioFile.delete()) {
-                System.out.println("Failed to delete audio file");
-            }
-
-            TikTokMetadata metadata = videoService.extractMetadata(metadataFile);
-            System.out.println("Metadata: " + metadata);
-            if (!metadataFile.delete()) {
-                System.out.println("Failed to delete metadata file");
-            }
-
+        try (ProcessedVideoFiles files = videoService.extractAudioAndMetadata(videoUrl)) {
+            String textTranscript = videoService.transcribeAudio(files.getAudioFile());
+            TikTokMetadata metadata = videoService.extractMetadata(files.getMetadataFile());
             Transcript transcript = videoService.saveTranscript(videoUrl, textTranscript, metadata);
-
-            return transcript.toString();
-        } catch (Exception e) {
-            e.printStackTrace();
-            System.out.println("Error: " + e.getMessage());
-            return e.getMessage();
+            return ResponseEntity.ok(transcript);
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.app.categorise.service;
 
+import com.app.categorise.client.whisper.WhisperClient;
 import com.app.categorise.client.whisper.WhisperClientImpl;
 import com.app.categorise.entity.Transcript;
 import com.app.categorise.dto.TikTokMetadata;
@@ -22,9 +23,9 @@ import java.util.List;
 public class VideoService {
 
     private final TranscriptRepository transcriptRepository;
-    private final WhisperClientImpl whisperClient;
+    private final WhisperClient whisperClient;
 
-    public VideoService(TranscriptRepository transcriptRepository, WhisperClientImpl whisperClient){
+    public VideoService(TranscriptRepository transcriptRepository, WhisperClient whisperClient){
         this.transcriptRepository = transcriptRepository;
         this.whisperClient = whisperClient;
     }

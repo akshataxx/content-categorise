@@ -47,7 +47,9 @@ public class OpenAIClientImpl implements OpenAIClient {
             System.out.println("OpenAI response: " + response);
 
             String categories = extractCategoriesFromResponse(response);
-            return Arrays.asList(categories.split("\\s*,\\s*"));
+            return Arrays.stream(categories.split(","))
+                    .map(String::trim)
+                    .toList();
 
         } catch (Exception e) {
             throw new RuntimeException("Error classifying transcript via OpenAI", e);
@@ -56,25 +58,34 @@ public class OpenAIClientImpl implements OpenAIClient {
 
     private static Map<String, Object> createClassifyTranscriptRequest(String transcript, String title, String description) {
         String prompt = String.format("""
-            Classify this video based on the following transcript, title, and description.
-
+            You are given the transcript, title, and description of a short-form video (e.g., TikTok or Instagram Reel).
+        
+            Your task is to classify the video into **2 to 4 high-level content categories** based on the provided information.
+        
+            Examples of valid categories include: recipes, meal prep, budgeting, fitness, investing, entertainment, date night, restaurant reviews, dieting, nutrition, gossip, movies, TV, music.
+        
+            Only return the list of categories as a **single comma-separated line**, with no explanations or additional text.
+        
+            ---
             Transcript:
             %s
-
+        
             Title:
             %s
-
+        
             Description:
             %s
-
-            Return only a comma-separated list of 2 to 4 relevant categories.
+        
+            ---
+            Return:
         """, transcript, title, description);
+
 
         Map<String, Object> body = Map.of(
                 "model", "gpt-3.5-turbo",
                 "temperature", 0.2,
                 "messages", new Object[]{
-                        Map.of("role", "system", "content", "You are a helpful assistant that classifies video content into 2 to 4 high-level categories like 'recipes', 'fitness', 'finance', 'entertainment', 'gossip', etc."),
+                        Map.of("role", "system", "content", "You are a helpful assistant that classifies video content into 2 to 4 high-level categories like 'recipes', 'restaurant reviews', 'date night', 'meal prep', 'budget cooking', 'dieting', 'nutrition', 'fitness', 'investing', 'budgeting', 'movies', 'tv', 'music' 'entertainment', 'gossip', etc."),
                         Map.of("role", "user", "content", prompt)
                 }
         );

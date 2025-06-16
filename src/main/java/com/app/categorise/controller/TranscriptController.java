@@ -22,15 +22,18 @@ public class TranscriptController {
         this.transcriptService = transcriptService;
     }
 
+
     /**
-     * Endpoint to filter transcripts based on various optional parameters.
+     * Retrieve a list of transcripts. If {@code id} is provided, will return that
+     * specific transcript if it exists. Otherwise, will return all transcripts that
+     * match the given filters.
      *
-     * @param id Optional transcript ID to filter by.
-     * @param categories Optional list of categories to filter by.
-     * @param account Optional account name to filter by.
-     * @param from Optional start date for filtering transcripts uploaded after this date.
-     * @param to Optional end date for filtering transcripts uploaded before this date.
-     * @return A list of transcripts that match the provided filters.
+     * @param id the ID of the transcript to retrieve
+     * @param categories the categories to filter by
+     * @param account the account to filter by
+     * @param from the lower bound of the {@code Instant} range to filter by
+     * @param to the upper bound of the {@code Instant} range to filter by
+     * @return a list of transcripts
      */
     @GetMapping
     public List<Transcript> findTranscripts(

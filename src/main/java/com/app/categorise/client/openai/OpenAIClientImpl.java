@@ -34,6 +34,27 @@ public class OpenAIClientImpl implements OpenAIClient {
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(apiKey);
 
+        Map<String, Object> body = createClassifyTranscriptRequest(transcript, title, description);
+
+        try {
+            String response = restClient.post()
+                    .uri(url)
+                    .headers(h -> h.addAll(headers))
+                    .body(body)
+                    .retrieve()
+                    .body(String.class);
+
+            System.out.println("OpenAI response: " + response);
+
+            String categories = extractCategoriesFromResponse(response);
+            return Arrays.asList(categories.split("\\s*,\\s*"));
+
+        } catch (Exception e) {
+            throw new RuntimeException("Error classifying transcript via OpenAI", e);
+        }
+    }
+
+    private static Map<String, Object> createClassifyTranscriptRequest(String transcript, String title, String description) {
         String prompt = String.format("""
             Classify this video based on the following transcript, title, and description.
 
@@ -57,23 +78,7 @@ public class OpenAIClientImpl implements OpenAIClient {
                         Map.of("role", "user", "content", prompt)
                 }
         );
-
-        try {
-            String response = restClient.post()
-                    .uri(url)
-                    .headers(h -> h.addAll(headers))
-                    .body(body)
-                    .retrieve()
-                    .body(String.class);
-
-            System.out.println("OpenAI response: " + response);
-
-            String categories = extractCategoriesFromResponse(response);
-            return Arrays.asList(categories.split("\\s*,\\s*"));
-
-        } catch (Exception e) {
-            throw new RuntimeException("Error classifying transcript via OpenAI", e);
-        }
+        return body;
     }
 
     private String extractCategoriesFromResponse(String responseJson) {

@@ -34,29 +34,7 @@ public class OpenAIClientImpl implements OpenAIClient {
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(apiKey);
 
-        String prompt = String.format("""
-            Classify this video based on the following transcript, title, and description.
-
-            Transcript:
-            %s
-
-            Title:
-            %s
-
-            Description:
-            %s
-
-            Return only a comma-separated list of 2 to 4 relevant categories.
-        """, transcript, title, description);
-
-        Map<String, Object> body = Map.of(
-                "model", "gpt-3.5-turbo",
-                "temperature", 0.2,
-                "messages", new Object[]{
-                        Map.of("role", "system", "content", "You are a helpful assistant that classifies video content into 2 to 4 high-level categories like 'recipes', 'fitness', 'finance', 'entertainment', 'gossip', etc."),
-                        Map.of("role", "user", "content", prompt)
-                }
-        );
+        Map<String, Object> body = createClassifyTranscriptRequest(transcript, title, description);
 
         try {
             String response = restClient.post()
@@ -69,11 +47,47 @@ public class OpenAIClientImpl implements OpenAIClient {
             System.out.println("OpenAI response: " + response);
 
             String categories = extractCategoriesFromResponse(response);
-            return Arrays.asList(categories.split("\\s*,\\s*"));
+            return Arrays.stream(categories.split(","))
+                    .map(String::trim)
+                    .map(String::toLowerCase)
+                    .toList();
 
         } catch (Exception e) {
             throw new RuntimeException("Error classifying transcript via OpenAI", e);
         }
+    }
+
+    private static Map<String, Object> createClassifyTranscriptRequest(String transcript, String title, String description) {
+        String systemPrompt = """
+            Only use categories from this approved list: recipes, vegetarian, vegan, meal prep, cooking hacks, food trends, dieting, nutrition, budgeting, investing, fitness, skincare, makeup, fashion, outfit ideas, entertainment, date night, restaurant reviews, gossip, movies, TV, music, tech reviews, gadgets, productivity, travel, travel hacks, life hacks, relationships, parenting, pets, cleaning, organization, home decor, education, study tips, mental health, motivation, career advice, job search, software, ai, crypto.
+            
+            Return only the category list as a comma-separated string, with no explanation or extra text.
+            """;
+
+        String userPrompt = String.format("""
+            You are given the following video metadata:
+            
+            Transcript:
+            %s
+            
+            Title:
+            %s
+            
+            Description:
+            %s
+            
+            ---
+            Return:
+            """, transcript, title, description);
+
+        return Map.of(
+                "model", "gpt-3.5-turbo",
+                "temperature", 0.2,
+                "messages", new Object[]{
+                        Map.of("role", "system", "content", systemPrompt),
+                        Map.of("role", "user", "content", userPrompt)
+                }
+        );
     }
 
     private String extractCategoriesFromResponse(String responseJson) {

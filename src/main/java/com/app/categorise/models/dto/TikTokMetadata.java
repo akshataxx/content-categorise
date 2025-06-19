@@ -32,4 +32,12 @@ public class TikTokMetadata {
     public String getIdentifierId() { return identifierId; }
     public String getIdentifier() { return identifier; }
 
+    public void setDescription(String description) { this.description = description; }
+    public void setTitle(String title) { this.title = title; }
+    public void setDuration(int duration) { this.duration = duration; }
+    public void setUploadedEpoch(long uploadedEpoch) { this.uploadedEpoch = uploadedEpoch; }
+    public void setAccountId(String accountId) { this.accountId = accountId; }
+    public void setAccount(String account) { this.account = account; }
+    public void setIdentifierId(String identifierId) { this.identifierId = identifierId; }
+    public void setIdentifier(String identifier) { this.identifier = identifier; }
 }

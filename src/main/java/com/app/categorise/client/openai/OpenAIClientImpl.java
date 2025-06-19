@@ -49,6 +49,7 @@ public class OpenAIClientImpl implements OpenAIClient {
             String categories = extractCategoriesFromResponse(response);
             return Arrays.stream(categories.split(","))
                     .map(String::trim)
+                    .map(String::toLowerCase)
                     .toList();
 
         } catch (Exception e) {
@@ -57,39 +58,36 @@ public class OpenAIClientImpl implements OpenAIClient {
     }
 
     private static Map<String, Object> createClassifyTranscriptRequest(String transcript, String title, String description) {
-        String prompt = String.format("""
-            You are given the transcript, title, and description of a short-form video (e.g., TikTok or Instagram Reel).
-        
-            Your task is to classify the video into **2 to 4 high-level content categories** based on the provided information.
-        
-            Examples of valid categories include: recipes, meal prep, budgeting, fitness, investing, entertainment, date night, restaurant reviews, dieting, nutrition, gossip, movies, TV, music.
-        
-            Only return the list of categories as a **single comma-separated line**, with no explanations or additional text.
-        
-            ---
+        String systemPrompt = """
+            Only use categories from this approved list: recipes, vegetarian, vegan, meal prep, cooking hacks, food trends, dieting, nutrition, budgeting, investing, fitness, skincare, makeup, fashion, outfit ideas, entertainment, date night, restaurant reviews, gossip, movies, TV, music, tech reviews, gadgets, productivity, travel, travel hacks, life hacks, relationships, parenting, pets, cleaning, organization, home decor, education, study tips, mental health, motivation, career advice, job search, software, ai, crypto.
+            
+            Return only the category list as a comma-separated string, with no explanation or extra text.
+            """;
+
+        String userPrompt = String.format("""
+            You are given the following video metadata:
+            
             Transcript:
             %s
-        
+            
             Title:
             %s
-        
+            
             Description:
             %s
-        
+            
             ---
             Return:
-        """, transcript, title, description);
+            """, transcript, title, description);
 
-
-        Map<String, Object> body = Map.of(
+        return Map.of(
                 "model", "gpt-3.5-turbo",
                 "temperature", 0.2,
                 "messages", new Object[]{
-                        Map.of("role", "system", "content", "You are a helpful assistant that classifies video content into 2 to 4 high-level categories like 'recipes', 'restaurant reviews', 'date night', 'meal prep', 'budget cooking', 'dieting', 'nutrition', 'fitness', 'investing', 'budgeting', 'movies', 'tv', 'music' 'entertainment', 'gossip', etc."),
-                        Map.of("role", "user", "content", prompt)
+                        Map.of("role", "system", "content", systemPrompt),
+                        Map.of("role", "user", "content", userPrompt)
                 }
         );
-        return body;
     }
 
     private String extractCategoriesFromResponse(String responseJson) {

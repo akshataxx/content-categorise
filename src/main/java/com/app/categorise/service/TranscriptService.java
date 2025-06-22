@@ -8,6 +8,11 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Service for managing transcripts.
+ * This service provides methods to find a transcript by ID and filter transcripts based on categories, account, and time range.
+ * It interacts with the TranscriptRepository to perform database operations.
+ */
 @Service
 public class TranscriptService {
 

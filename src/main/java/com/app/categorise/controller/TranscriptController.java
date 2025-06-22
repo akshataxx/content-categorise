@@ -48,6 +48,4 @@ public class TranscriptController {
         }
         return transcriptService.filterTranscripts(categories, account, from, to);
     }
-
-
 }

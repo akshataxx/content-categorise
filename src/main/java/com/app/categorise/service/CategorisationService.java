@@ -6,8 +6,13 @@ import org.springframework.stereotype.Service;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * Service for categorising video content.
+ * This service uses OpenAI to classify video transcripts into high-level categories.
+ * It provides a method to classify a video based on its transcript, title, and description.
+ */
 @Service
-public class CategorisationService {
+public class   CategorisationService {
 
     private final OpenAIClient openAIClient;
 

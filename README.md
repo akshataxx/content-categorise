@@ -28,18 +28,27 @@ brew install ffmpeg
 
 This project follows a layered architecture using standard Java/Spring concepts:
 
-| Package           | Description                                                                                                                                |
-|-------------------|--------------------------------------------------------------------------------------------------------------------------------------------|
-| `controller`      | Handles incoming HTTP requests and maps them to service layer methods.                                                                     |
-| `service`         | Contains core business logic. Interacts with repositories, processes data, and performs orchestration.                                     |
-| `repository`      | Interfaces with the database using Spring Data.                                                                                            |
-| `client`          | Contains code to call external services or APIs (e.g. OpenAI) |
-| `config`          | Configuration classes for beans, properties, and third-party integrations.           |
-| `exception`       | Defines custom exception classes and global error handling using `@RestControllerAdvice` and `@ExceptionHandler`.                          |
-| `util`            | Utility classes or static helper methods for shared logic such as file handling or string manipulation.                                    |
-| `models.entity`   | Represents domain objects that are mapped to the database.                                                                                 |
-| `models.dto`      | Data Transfer Objects used to external structure API requests and responses. Helps decouple internal models from external representations. |
-| `models.internal` | Objects used for intermediate representations of data. Not persisted to the database.                                                      |
+| Package                | Description                                                                                                                                                             |
+|------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `domain`               | Core business logic and rules                                                                                                                                           |
+| `domain.model`         | Pure domain models — represent business concepts (e.g. Transcript, User) with only the fields your app actually needs to work with. No annotations, no framework stuff. |
+| `domain.service`       | Domain service interfaces defining core business operations.                                                                                                            |
+| `domain.repository`    | Repository interfaces for abstracting data access.                                                                                                                      |
+| `data`                 | Data persistence and external service interactions.                                                                                                                     |
+| `data.entity`          | Database entities with MongoDB annotations (e.g. UserEntity, CategoryAliasEntity).                                                                                      |
+| `data.repository`      | MongoDB repository implementations using Spring Data.                                                                                                                   |
+| `data.client`          | Clients for external services (e.g. OpenAI client).                                                                                                                     |
+| `application`          | Coordinates between the domain logic and data access. Implements business use cases and maps data between layers.                                                       |
+| `application.dto`      | Internal Data Transfer Objects used for converting between domain, entity, and API DTOs.                                                                                
+ `application.mapper`   | Maps between domain models, entities, and DTOs.                                                                                                                         |
+| `application.internal` |                                                                                                                                                                         |
+| `ui`                   | Presentation Layer                                                                                                                                                      |
+| `api`                  | HTTP communication layer                                                                                                                                                |
+| `api.controller`       | REST controllers that handle incoming HTTP requests.                                                                                                                    |
+| `util`                 | Utility classes or static helper methods for shared logic such as file handling or string manipulation.                                                                 
+| `exception`            | Defines custom exception classes and global error handling using `@RestControllerAdvice` and `@ExceptionHandler`.                                                       
+| `config`               | Configuration classes for beans, properties, and third-party integrations.                                                                                              
+
 
 ## 📘 API Docs (Springdoc OpenAPI)
 

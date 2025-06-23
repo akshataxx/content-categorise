@@ -1,9 +1,10 @@
 package com.app.categorise.controller;
 
-import com.app.categorise.models.dto.TikTokMetadata;
-import com.app.categorise.models.entity.Transcript;
-import com.app.categorise.models.internal.ProcessedVideoFiles;
-import com.app.categorise.service.VideoService;
+import com.app.categorise.ui.api.controller.VideoController;
+import com.app.categorise.application.dto.TikTokMetadata;
+import com.app.categorise.data.entity.TranscriptEntity;
+import com.app.categorise.application.internal.ProcessedVideoFiles;
+import com.app.categorise.domain.service.VideoService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,7 +34,7 @@ class VideoControllerTest {
     private final String testVideoUrl = "https://example.com/video";
     private final String testTranscript = "This is a test transcript";
     private TikTokMetadata testMetadata;
-    private Transcript testTranscriptObj;
+    private TranscriptEntity testTranscriptObjEntity;
 
     @BeforeEach
     void setUp() {
@@ -47,10 +48,10 @@ class VideoControllerTest {
         testMetadata.setIdentifierId("testChannelId");
         testMetadata.setIdentifier("testChannel");
 
-        testTranscriptObj = new Transcript();
-        testTranscriptObj.setId("testId");
-        testTranscriptObj.setVideoUrl(testVideoUrl);
-        testTranscriptObj.setTranscript(testTranscript);
+        testTranscriptObjEntity = new TranscriptEntity();
+        testTranscriptObjEntity.setId("testId");
+        testTranscriptObjEntity.setVideoUrl(testVideoUrl);
+        testTranscriptObjEntity.setTranscript(testTranscript);
     }
 
     @Test
@@ -64,16 +65,16 @@ class VideoControllerTest {
         when(videoService.transcribeAudio(any(File.class))).thenReturn(testTranscript);
         when(videoService.extractMetadata(any(File.class))).thenReturn(testMetadata);
         when(videoService.saveTranscript(eq(testVideoUrl), eq(testTranscript), eq(testMetadata)))
-            .thenReturn(testTranscriptObj);
+            .thenReturn(testTranscriptObjEntity);
 
         // Act
-        ResponseEntity<Transcript> response = videoController.handleVideo(Map.of("videoUrl", testVideoUrl));
+        ResponseEntity<TranscriptEntity> response = videoController.handleVideo(Map.of("videoUrl", testVideoUrl));
 
         // Assert
         assertNotNull(response);
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(testTranscriptObj.getId(), response.getBody().getId());
+        assertEquals(testTranscriptObjEntity.getId(), response.getBody().getId());
         assertEquals(testVideoUrl, response.getBody().getVideoUrl());
         
         verify(videoService).extractAudioAndMetadata(testVideoUrl);

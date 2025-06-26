@@ -36,7 +36,7 @@ public class TranscriptController {
      * Find transcripts based on various filters.
      * Returns transcript + aliased categories.
      * Calls TranscriptService to get the data
-     * Calls CategoryAliasService to get the user’s aliases
+     * Calls CategoryAliasService to get the user's aliases
      * Uses TranscriptMapper to build the final response
      * @param id
      * @param categories
@@ -71,7 +71,7 @@ public class TranscriptController {
                 : Map.of();
 
         return transcriptEntities.stream()
-                .map(t -> transcriptMapper.toDtoWithAlias(t, aliasMap))
+                .map(t -> transcriptMapper.toDto(t, t.getGroupingKey()))
                 .toList();
     }
 }

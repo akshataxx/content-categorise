@@ -47,10 +47,9 @@ public class TranscriptRepositoryImpl implements CustomTranscriptRepository {
      */
     @Override
     public void updateAliasForUserAndGroupingKey(String userId, String groupingKey, String newAlias) {
-        // This query finds all transcripts where the accountId and canonicalCategory match the criteria.
-        // The 'canonicalCategory' field in TranscriptEntity is used as the store for the groupingKey.
+        // This query finds all transcripts where the accountId and groupingKey match the criteria.
         Query query = new Query(Criteria.where("accountId").is(userId)
-                .and("canonicalCategory").is(groupingKey));
+                .and("groupingKey").is(groupingKey));
         Update update = new Update().set("alias", newAlias);
         mongoTemplate.updateMulti(query, update, TranscriptEntity.class);
     }

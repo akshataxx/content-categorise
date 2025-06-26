@@ -147,6 +147,7 @@ public class VideoService {
         transcriptEntity.setIdentifier(metadata.getIdentifier());
         transcriptEntity.setAlias(finalAlias);
         transcriptEntity.setCanonicalCategory(canonicalCategory); // Store the special category, if it exists
+        transcriptEntity.setGroupingKey(groupingKey);
 
         TranscriptEntity savedEntity = transcriptRepository.save(transcriptEntity);
 

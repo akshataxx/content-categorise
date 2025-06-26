@@ -5,10 +5,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestTemplate;
+import com.app.categorise.domain.model.ClassificationResult;
+import com.fasterxml.jackson.core.JsonProcessingException;
 
 import java.io.IOException;
 import java.util.List;
@@ -19,135 +23,112 @@ import java.util.Arrays;
 @Profile("prod")
 public class OpenAIClientImpl implements OpenAIClient {
 
-    private final RestClient restClient;
+    private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
     private final String apiKey;
+    private final String apiUrl;
 
-    public OpenAIClientImpl(RestClient restClient, @Value("${openai.api.key}") String apiKey) {
-        this.restClient = restClient;
+    public OpenAIClientImpl(
+            @Value("${openai.api.key}") String apiKey,
+            @Value("${openai.api.url}") String apiUrl,
+            RestTemplate restTemplate,
+            ObjectMapper objectMapper
+    ) {
         this.apiKey = apiKey;
+        this.apiUrl = apiUrl;
+        this.restTemplate = restTemplate;
+        this.objectMapper = objectMapper;
+    }
+
+    @Deprecated
+    @Override
+    public List<String> classifyTranscript(String transcript, String title, String description) {
+        // ... this method is now deprecated
+        return List.of();
+    }
+
+    @Deprecated
+    @Override
+    public Map<String, String> generateAliasesForCategories(List<String> canonicalCategories) {
+        // ... this method is now deprecated
+        return Map.of();
     }
 
     @Override
-    public List<String> classifyTranscript(String transcriptEntity, String title, String description) {
-        String url = "https://api.openai.com/v1/chat/completions";
+    public ClassificationResult classifyAndSuggestAlias(String transcript, String title, String description, List<String> canonicalCategoryNames) {
+        String prompt = buildPrompt(transcript, title, description, canonicalCategoryNames);
+        String response = callOpenAI(prompt);
+        return parseResponse(response);
+    }
 
+    /**
+     * Builds the detailed prompt for the OpenAI API call.
+     * This prompt instructs the AI to return a JSON object containing a canonical category, a generic topic, and a suggested alias.
+     * @param transcript The video transcript.
+     * @param title The video title.
+     * @param description The video description.
+     * @param canonicalCategories The list of special, predefined categories to check against.
+     * @return The fully constructed prompt string.
+     */
+    private String buildPrompt(String transcript, String title, String description, List<String> canonicalCategories) {
+        String categoryList = String.join(", ", canonicalCategories.stream().map(c -> "\"" + c + "\"").toArray(String[]::new));
+
+        return "Analyze the following video content. Respond ONLY with a JSON object with three keys: 'canonicalCategory', 'genericTopic', and 'suggestedAlias'.\n" +
+                "1. 'canonicalCategory': If the content primarily belongs to one of the following special categories, ["
+                + categoryList +
+                "], provide that category name. Otherwise, this MUST be null.\n" +
+                "2. 'genericTopic': Provide a single, stable, one-word keyword (e.g., 'tech', 'fashion', 'comedy') that describes the general topic of the video. This should always be present.\n" +
+                "3. 'suggestedAlias': Create a trendy, engaging, and short (1-3 words) alias for the video. This alias should be catchy, like a hashtag.\n\n" +
+                "Title: " + title + "\n" +
+                "Description: " + description + "\n" +
+                "Transcript: " + transcript;
+    }
+
+    private String callOpenAI(String prompt) {
         HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(apiKey);
+        headers.setContentType(MediaType.APPLICATION_JSON);
 
-        Map<String, Object> body = createClassifyTranscriptRequest(transcriptEntity, title, description);
+        String requestBody = "{\"model\": \"gpt-4o\", \"messages\": [{\"role\": \"user\", \"content\": \"" + escapeJson(prompt) + "\"}], \"temperature\": 0.7}";
+
+        HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
 
         try {
-            String response = restClient.post()
-                    .uri(url)
-                    .headers(h -> h.addAll(headers))
-                    .body(body)
-                    .retrieve()
-                    .body(String.class);
-
-            System.out.println("OpenAI response: " + response);
-
-            String categories = extractCategoriesFromResponse(response);
-            return Arrays.stream(categories.split(","))
-                    .map(String::trim)
-                    .map(String::toLowerCase)
-                    .toList();
-
-        } catch (Exception e) {
-            throw new RuntimeException("Error classifying transcriptEntity via OpenAI", e);
-        }
-    }
-
-    public Map<String, String> generateAliasesForCategories(List<String> canonicalCategories) {
-        String url = "https://api.openai.com/v1/chat/completions";
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(apiKey);
-
-        String systemPrompt = """
-                You are a social media trend expert who helps apps generate fun and trendy aliases for generic content categories.
-                        You will be given a list of canonical categories like "recipe", "makeup", or "lifestyle".
-                        Return a JSON map where each canonical category is mapped to a short, fun, trendy display name.
-                        Make sure each alias is unique, catchy, and less than 3 words. Return only the JSON object, nothing else.
-                        Example:
-                        { "recipe": "Big-Back", "makeup": "Glow Up", "lifestyle": "Clean Girl Era" }
-                """;
-
-        String joined = String.join(",", canonicalCategories);
-        String userPrompt = String.format("Categories: %s ", joined);
-
-        Map<String, Object> body = Map.of(
-                "model", "gpt-3.5-turbo",
-                "temperature", 0.2,
-                "messages", new Object[]{
-                        Map.of("role", "system", "content", systemPrompt),
-                        Map.of("role", "user", "content", userPrompt)
-                }
-        );
-
-        try{
-            String response = restClient.post()
-                    .uri(url)
-                    .headers(h -> h.addAll(headers))
-                    .body(body)
-                    .retrieve()
-                    .body(String.class);
-
-            System.out.println("OpenAI response for aliases: " + response);
-
-            ObjectMapper mapper = new ObjectMapper();
-            JsonNode json = mapper.readTree(response);
-            String content = json.path("choices").get(0).path("message").path("content").asText();
-            return mapper.readValue(content, new TypeReference<Map<String, String>>() {});
-
-        } catch (Exception e) {
-            throw new RuntimeException("Error generating aliases via OpenAI", e);
-        }
-
-
-    }
-
-    private static Map<String, Object> createClassifyTranscriptRequest(String transcriptEntity, String title, String description) {
-        String systemPrompt = """
-            Only use categories from this approved list: recipes, vegetarian, vegan, meal prep, cooking hacks, food trends, dieting, nutrition, budgeting, investing, fitness, skincare, makeup, fashion, outfit ideas, entertainment, date night, restaurant reviews, gossip, movies, TV, music, tech reviews, gadgets, productivity, travel, travel hacks, life hacks, relationships, parenting, pets, cleaning, organization, home decor, education, study tips, mental health, motivation, career advice, job search, software, ai, crypto.
-            
-            Return only the category list as a comma-separated string, with no explanation or extra text.
-            """;
-
-        String userPrompt = String.format("""
-            You are given the following video metadata:
-            
-            Transcript:
-            %s
-            
-            Title:
-            %s
-            
-            Description:
-            %s
-            
-            ---
-            Return:
-            """, transcriptEntity, title, description);
-
-        return Map.of(
-                "model", "gpt-3.5-turbo",
-                "temperature", 0.2,
-                "messages", new Object[]{
-                        Map.of("role", "system", "content", systemPrompt),
-                        Map.of("role", "user", "content", userPrompt)
-                }
-        );
-    }
-
-    private String extractCategoriesFromResponse(String responseJson) {
-        try {
-            ObjectMapper mapper = new ObjectMapper();
-            JsonNode root = mapper.readTree(responseJson);
+            ResponseEntity<String> response = restTemplate.postForEntity(apiUrl, entity, String.class);
+            JsonNode root = objectMapper.readTree(response.getBody());
             return root.path("choices").get(0).path("message").path("content").asText();
-        } catch (IOException e) {
+        } catch (Exception e) {
+            // In a real app, you'd want more robust error handling
+            throw new RuntimeException("Failed to call OpenAI API", e);
+        }
+    }
+
+    /**
+     * Parses the JSON response string from OpenAI into a structured ClassificationResult object.
+     * @param jsonResponse The raw JSON string from the API.
+     * @return A {@link ClassificationResult} object.
+     */
+    private ClassificationResult parseResponse(String jsonResponse) {
+        try {
+            JsonNode root = objectMapper.readTree(jsonResponse);
+            String category = root.has("canonicalCategory") && !root.get("canonicalCategory").isNull()
+                    ? root.get("canonicalCategory").asText()
+                    : null;
+            String topic = root.path("genericTopic").asText("general"); // Default topic if missing
+            String alias = root.path("suggestedAlias").asText("default-alias");
+            return new ClassificationResult(category, topic, alias);
+        } catch (JsonProcessingException e) {
             throw new RuntimeException("Failed to parse OpenAI response", e);
         }
+    }
+
+    private String escapeJson(String text) {
+        return text.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\b", "\\b")
+                .replace("\f", "\\f")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
     }
 }

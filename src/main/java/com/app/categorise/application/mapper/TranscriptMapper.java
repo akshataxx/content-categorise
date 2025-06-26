@@ -10,13 +10,18 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Mapper class to convert Transcript entities to DTOs with category aliases.
- * Maps a TranscriptEntity + aliasMap -> TranscriptDtoWithAliases
+ * Mapper class to convert {@link TranscriptEntity} objects to {@link TranscriptDtoWithAliases} objects.
  */
 @Component
 public class TranscriptMapper {
 
-    public TranscriptDtoWithAliases toDtoWithAlias(TranscriptEntity transcriptEntity, Map<String, String> aliasMap) {
+    /**
+     * Converts a TranscriptEntity to a TranscriptDtoWithAliases.
+     * @param transcriptEntity The entity from the database.
+     * @param groupingKey The grouping key determined by the service layer.
+     * @return A DTO ready to be sent to the client.
+     */
+    public TranscriptDtoWithAliases toDto(TranscriptEntity transcriptEntity, String groupingKey) {
         TranscriptDtoWithAliases dto = new TranscriptDtoWithAliases();
         dto.setId(transcriptEntity.getId());
         dto.setVideoUrl(transcriptEntity.getVideoUrl());
@@ -29,12 +34,9 @@ public class TranscriptMapper {
         dto.setAccount(transcriptEntity.getAccount());
         dto.setIdentifierId(transcriptEntity.getIdentifierId());
         dto.setIdentifier(transcriptEntity.getIdentifier());
-
-        // Replace categories with aliases where available
-        List<String> aliasedCategories = transcriptEntity.getCategories().stream()
-                .map(category -> aliasMap.getOrDefault(category, category))
-                .collect(Collectors.toList());
-        dto.setCategories(aliasedCategories);
+        dto.setAlias(transcriptEntity.getAlias());
+        dto.setCanonicalCategory(transcriptEntity.getCanonicalCategory());
+        dto.setGroupingKey(groupingKey);
         dto.setCreatedAt(transcriptEntity.getCreatedAt());
 
         return dto;

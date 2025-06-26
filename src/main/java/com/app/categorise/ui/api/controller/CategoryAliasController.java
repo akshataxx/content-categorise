@@ -1,33 +1,35 @@
 package com.app.categorise.ui.api.controller;
 
-import com.app.categorise.domain.service.CategorisationService;
 import com.app.categorise.domain.service.CategoryAliasService;
+import com.app.categorise.ui.api.dto.RenameAliasRequest;
+import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-import java.util.Map;
-
+/**
+ * REST controller for managing category alias operations.
+ */
 @RestController
-@RequestMapping("/category-alias")
+@RequestMapping("/api/v1/aliases")
 public class CategoryAliasController {
 
-    private final CategorisationService categorisationService;
-    private final CategoryAliasService categoryAliasService;
+    private final CategoryAliasService aliasService;
 
-    public CategoryAliasController(CategorisationService categorisationService,
-                                   CategoryAliasService categoryAliasService) {
-        this.categorisationService = categorisationService;
-        this.categoryAliasService = categoryAliasService;
+    public CategoryAliasController(CategoryAliasService aliasService) {
+        this.aliasService = aliasService;
     }
 
-    @PostMapping("/generate")
-    public ResponseEntity<Void> generateAndSaveAliases(
-            @RequestParam String userId,
-            @RequestBody List<String> canonicalCategories
-    ) {
-        Map<String, String> aliases = categorisationService.generateAliases(canonicalCategories);
-        categoryAliasService.saveAliases(userId, aliases);
+    @PutMapping("/rename")
+    @Operation(summary = "Rename a category alias for a user", description = "Updates the alias for a given canonical category and updates all existing transcripts for that user.")
+    public ResponseEntity<Void> renameAlias(@RequestBody RenameAliasRequest request) {
+        aliasService.renameAlias(
+                request.getUserId(),
+                request.getGroupingKey(),
+                request.getNewAlias()
+        );
         return ResponseEntity.ok().build();
     }
 }

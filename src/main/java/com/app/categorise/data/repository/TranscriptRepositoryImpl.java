@@ -4,6 +4,7 @@ import com.app.categorise.data.entity.TranscriptEntity;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
@@ -39,6 +40,19 @@ public class TranscriptRepositoryImpl implements CustomTranscriptRepository {
         }
 
         return mongoTemplate.find(query, TranscriptEntity.class);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void updateAliasForUserAndGroupingKey(String userId, String groupingKey, String newAlias) {
+        // This query finds all transcripts where the accountId and canonicalCategory match the criteria.
+        // The 'canonicalCategory' field in TranscriptEntity is used as the store for the groupingKey.
+        Query query = new Query(Criteria.where("accountId").is(userId)
+                .and("canonicalCategory").is(groupingKey));
+        Update update = new Update().set("alias", newAlias);
+        mongoTemplate.updateMulti(query, update, TranscriptEntity.class);
     }
 }
 

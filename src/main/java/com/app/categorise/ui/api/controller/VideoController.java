@@ -1,5 +1,6 @@
 package com.app.categorise.ui.api.controller;
 
+import com.app.categorise.application.dto.TranscriptDtoWithAliases;
 import com.app.categorise.data.entity.TranscriptEntity;
 import com.app.categorise.application.dto.TikTokMetadata;
 import com.app.categorise.application.internal.ProcessedVideoFiles;
@@ -31,7 +32,7 @@ public class VideoController {
      */
     @Operation(summary = "Submit a video URL", description = "Downloads video, extracts transcript and metadata, and saves to DB")
     @PostMapping("/url")
-    public ResponseEntity<TranscriptEntity> handleVideo(@RequestBody Map<String, String> request) throws Exception {
+    public ResponseEntity<TranscriptDtoWithAliases> handleVideo(@RequestBody Map<String, String> request) throws Exception {
         System.out.println("POST /video/url received");
 
         String videoUrl = request.get("videoUrl");
@@ -42,8 +43,8 @@ public class VideoController {
         try (ProcessedVideoFiles files = videoService.extractAudioAndMetadata(videoUrl)) {
             String textTranscript = videoService.transcribeAudio(files.getAudioFile());
             TikTokMetadata metadata = videoService.extractMetadata(files.getMetadataFile());
-            TranscriptEntity transcriptEntity = videoService.saveTranscript(videoUrl, textTranscript, metadata);
-            return ResponseEntity.ok(transcriptEntity);
+            TranscriptDtoWithAliases transcriptDto = videoService.processVideoAndCreateTranscript(videoUrl, textTranscript, metadata);
+            return ResponseEntity.ok(transcriptDto);
         }
     }
 }

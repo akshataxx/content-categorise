@@ -3,7 +3,9 @@ package com.app.categorise.domain.service;
 import com.app.categorise.data.client.whisper.WhisperClient;
 import com.app.categorise.data.entity.TranscriptEntity;
 import com.app.categorise.application.dto.TikTokMetadata;
+import com.app.categorise.application.dto.TranscriptDtoWithAliases;
 import com.app.categorise.application.internal.ProcessedVideoFiles;
+import com.app.categorise.application.mapper.TranscriptMapper;
 import com.app.categorise.data.repository.TranscriptRepository;
 import com.app.categorise.util.ProcessRunner;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,6 +13,11 @@ import org.springframework.stereotype.Service;
 import java.io.File;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import com.app.categorise.data.entity.CategoryAliasEntity;
+import com.app.categorise.domain.model.ClassificationResult;
 
 /**
  * handles logic to
@@ -27,15 +34,21 @@ public class VideoService {
     private final WhisperClient whisperClient;
 
     private final CategorisationService categorisationService;
+    private final CategoryAliasService categoryAliasService;
+    private final TranscriptMapper transcriptMapper;
 
     public VideoService(
             TranscriptRepository transcriptRepository,
             WhisperClient whisperClient,
-            CategorisationService categorisationService
+            CategorisationService categorisationService,
+            CategoryAliasService categoryAliasService,
+            TranscriptMapper transcriptMapper
     ){
         this.transcriptRepository = transcriptRepository;
         this.whisperClient = whisperClient;
         this.categorisationService = categorisationService;
+        this.categoryAliasService = categoryAliasService;
+        this.transcriptMapper = transcriptMapper;
     }
 
     /**
@@ -71,11 +84,59 @@ public class VideoService {
         return whisperClient.transcribeAudio(audioFile);
     }
 
-    public TranscriptEntity saveTranscript(String videoUrl, String transcriptText, TikTokMetadata metadata) {
+    /**
+     * Processes a video from its raw text transcript and metadata into a fully categorized transcript with a user-aware alias.
+     * This method orchestrates the core logic:
+     * 1. Calls the AI service to get a classification result (canonical category, generic topic, and suggested alias).
+     * 2. Determines the correct grouping key (prioritizing the canonical category).
+     * 3. Checks if the user has a pre-existing alias for this grouping key. If so, uses it. If not, uses the AI's suggestion and saves it for future use.
+     * 4. Saves the final transcript entity to the database with the correct alias and category info.
+     * 5. Maps the saved entity to a DTO to be returned by the API.
+     *
+     * @param videoUrl The original URL of the video.
+     * @param transcriptText The text transcript of the video.
+     * @param metadata The metadata extracted from the video.
+     * @return A {@link TranscriptDtoWithAliases} containing all the necessary information for the client.
+     */
+    public TranscriptDtoWithAliases processVideoAndCreateTranscript(String videoUrl, String transcriptText, TikTokMetadata metadata) {
+        // Step 1: Classify and get suggestions from AI
+        ClassificationResult classificationResult = categorisationService.classifyAndSuggestAlias(
+                transcriptText, metadata.getTitle(), metadata.getDescription()
+        );
+
+        String canonicalCategory = classificationResult.getCanonicalCategory();
+        String genericTopic = classificationResult.getGenericTopic();
+
+        // Step 2: Determine the grouping key. Prioritize the special canonical category.
+        String groupingKey = (canonicalCategory != null && !canonicalCategory.isBlank())
+                ? canonicalCategory
+                : genericTopic;
+
+        String finalAlias;
+
+        // Step 3: Determine the final alias, checking for user's custom preference using the grouping key
+        if (groupingKey != null) {
+            Optional<CategoryAliasEntity> existingAlias = categoryAliasService.findByUserIdAndGroupingKey(
+                    metadata.getAccountId(), groupingKey
+            );
+
+            if (existingAlias.isPresent()) {
+                finalAlias = existingAlias.get().getAlias();
+            } else {
+                finalAlias = classificationResult.getSuggestedAlias();
+                // Save this new suggestion as the user's default for this groupingKey
+                categoryAliasService.saveAlias(metadata.getAccountId(), groupingKey, finalAlias);
+            }
+        } else {
+            // Fallback if no grouping key can be determined
+            finalAlias = classificationResult.getSuggestedAlias();
+        }
+
+
+        // Step 4: Create and save the transcript entity
         TranscriptEntity transcriptEntity = new TranscriptEntity();
         transcriptEntity.setVideoUrl(videoUrl);
         transcriptEntity.setTranscript(transcriptText);
-        // Set metadata information
         transcriptEntity.setDescription(metadata.getDescription());
         transcriptEntity.setTitle(metadata.getTitle());
         transcriptEntity.setDuration(metadata.getDuration());
@@ -84,12 +145,13 @@ public class VideoService {
         transcriptEntity.setAccount(metadata.getAccount());
         transcriptEntity.setIdentifierId(metadata.getIdentifierId());
         transcriptEntity.setIdentifier(metadata.getIdentifier());
+        transcriptEntity.setAlias(finalAlias);
+        transcriptEntity.setCanonicalCategory(canonicalCategory); // Store the special category, if it exists
 
-        // Categorise using OpenAI
-        List<String> categories = categorisationService.classify(transcriptText, metadata.getTitle(), metadata.getDescription());
-        transcriptEntity.setCategories(categories);
+        TranscriptEntity savedEntity = transcriptRepository.save(transcriptEntity);
 
-        return transcriptRepository.save(transcriptEntity);
+        // Step 5: Map to DTO and return
+        return transcriptMapper.toDto(savedEntity, groupingKey);
     }
 
     public TikTokMetadata extractMetadata(File metadataFile) throws Exception {

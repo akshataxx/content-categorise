@@ -24,6 +24,11 @@ public class TranscriptDtoWithAliases {
     private String account;
     private String identifierId;
     private String identifier;
-    private List<String> categories;  // These will be alias names, not canonical
+    /** The final, user-visible alias for the transcript (e.g., "Big-Back", "Tech-Tok"). */
+    private String alias;
+    /** The special, predefined category if applicable (e.g., "Recipe"). Can be null. */
+    private String canonicalCategory;
+    /** The internal key used for grouping ("Recipe", "tech"). Sent to the client for rename requests. */
+    private String groupingKey;
     private Instant createdAt;
 }

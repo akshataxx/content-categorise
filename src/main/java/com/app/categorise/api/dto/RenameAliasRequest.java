@@ -1,4 +1,4 @@
-package com.app.categorise.ui.api.dto;
+package com.app.categorise.api.dto;
 
 /**
  * DTO for handling requests to rename a category alias.

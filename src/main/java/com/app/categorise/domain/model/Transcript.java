@@ -18,7 +18,7 @@ public class Transcript {
     private List<String> categories;
     private Instant createdAt = Instant.now();
 
-    //business logic methods
+    // Business logic methods
     public boolean hasValidUrl(){
         return videoUrl != null && !videoUrl.isEmpty();
     }

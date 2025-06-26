@@ -1,23 +1,21 @@
 package com.app.categorise.domain.service;
 
-import com.app.categorise.data.client.whisper.WhisperClient;
-import com.app.categorise.data.entity.TranscriptEntity;
 import com.app.categorise.application.dto.TikTokMetadata;
 import com.app.categorise.application.dto.TranscriptDtoWithAliases;
 import com.app.categorise.application.internal.ProcessedVideoFiles;
 import com.app.categorise.application.mapper.TranscriptMapper;
+import com.app.categorise.data.client.whisper.WhisperClient;
+import com.app.categorise.data.entity.CategoryAliasEntity;
+import com.app.categorise.data.entity.TranscriptEntity;
 import com.app.categorise.data.repository.TranscriptRepository;
+import com.app.categorise.domain.model.ClassificationResult;
 import com.app.categorise.util.ProcessRunner;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
+
 import java.io.File;
 import java.time.Instant;
-import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
-import com.app.categorise.data.entity.CategoryAliasEntity;
-import com.app.categorise.domain.model.ClassificationResult;
 
 /**
  * handles logic to

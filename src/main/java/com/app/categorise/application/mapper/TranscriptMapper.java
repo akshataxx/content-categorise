@@ -5,10 +5,6 @@ import com.app.categorise.application.dto.TranscriptDtoWithAliases;
 import com.app.categorise.data.entity.TranscriptEntity;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
-
 /**
  * Mapper class to convert {@link TranscriptEntity} objects to {@link TranscriptDtoWithAliases} objects.
  */

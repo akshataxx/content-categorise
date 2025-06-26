@@ -5,7 +5,7 @@ public class Category {
     private String name;
     // getters and setters
 
-    // business logic methods
+    // Business logic methods
     public boolean isValid() {
         return name != null && !name.isEmpty();
     }

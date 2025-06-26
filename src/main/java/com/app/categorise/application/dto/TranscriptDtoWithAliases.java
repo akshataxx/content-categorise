@@ -3,7 +3,6 @@ package com.app.categorise.application.dto;
 import lombok.Data;
 
 import java.time.Instant;
-import java.util.List;
 
 /**
  * DTO for Transcript with aliases for categories.

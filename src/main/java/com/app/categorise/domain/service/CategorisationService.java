@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
  * It provides a method to classify a video based on its transcript, title, and description.
  */
 @Service
-public class   CategorisationService {
+public class CategorisationService {
 
     private final OpenAIClient openAIClient;
     private final CategoryRepository categoryRepository;

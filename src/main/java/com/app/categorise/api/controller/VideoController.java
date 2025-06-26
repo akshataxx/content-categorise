@@ -1,8 +1,7 @@
-package com.app.categorise.ui.api.controller;
+package com.app.categorise.api.controller;
 
-import com.app.categorise.application.dto.TranscriptDtoWithAliases;
-import com.app.categorise.data.entity.TranscriptEntity;
 import com.app.categorise.application.dto.TikTokMetadata;
+import com.app.categorise.application.dto.TranscriptDtoWithAliases;
 import com.app.categorise.application.internal.ProcessedVideoFiles;
 import com.app.categorise.domain.service.VideoService;
 import io.swagger.v3.oas.annotations.Operation;

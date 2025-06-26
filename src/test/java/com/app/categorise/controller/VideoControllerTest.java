@@ -4,7 +4,7 @@ import com.app.categorise.application.dto.TikTokMetadata;
 import com.app.categorise.application.dto.TranscriptDtoWithAliases;
 import com.app.categorise.application.internal.ProcessedVideoFiles;
 import com.app.categorise.domain.service.VideoService;
-import com.app.categorise.ui.api.controller.VideoController;
+import com.app.categorise.api.controller.VideoController;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

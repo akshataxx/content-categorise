@@ -9,7 +9,7 @@ public class User {
     private String email;
     private String displayName;
 
-    // Business methods
+    // Business logic methods
     public boolean isValidEmail() {
         return email != null && email.contains("@");
     }

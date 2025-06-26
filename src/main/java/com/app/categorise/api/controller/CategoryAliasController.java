@@ -1,7 +1,7 @@
-package com.app.categorise.ui.api.controller;
+package com.app.categorise.api.controller;
 
 import com.app.categorise.domain.service.CategoryAliasService;
-import com.app.categorise.ui.api.dto.RenameAliasRequest;
+import com.app.categorise.api.dto.RenameAliasRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PutMapping;

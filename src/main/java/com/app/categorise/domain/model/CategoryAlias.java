@@ -9,7 +9,7 @@ public class CategoryAlias {
     private String canonicalCategory;
     private String alias;
 
-    // Business methods
+    // Business logic methods
     public boolean isValid() {
         return canonicalCategory != null && !canonicalCategory.isEmpty()
                 && alias != null && !alias.isEmpty();

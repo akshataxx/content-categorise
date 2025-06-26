@@ -1,4 +1,4 @@
-package com.app.categorise.ui.api.controller;
+package com.app.categorise.api.controller;
 
 import com.app.categorise.application.mapper.TranscriptMapper;
 import com.app.categorise.application.dto.TranscriptDtoWithAliases;

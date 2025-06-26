@@ -10,6 +10,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestTemplate;
 import com.app.categorise.domain.model.ClassificationResult;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -23,7 +24,7 @@ import java.util.Arrays;
 @Profile("prod")
 public class OpenAIClientImpl implements OpenAIClient {
 
-    private final RestTemplate restTemplate;
+    private final RestClient restClient;
     private final ObjectMapper objectMapper;
     private final String apiKey;
     private final String apiUrl;
@@ -31,12 +32,12 @@ public class OpenAIClientImpl implements OpenAIClient {
     public OpenAIClientImpl(
             @Value("${openai.api.key}") String apiKey,
             @Value("${openai.api.url}") String apiUrl,
-            RestTemplate restTemplate,
+            RestClient restClient,
             ObjectMapper objectMapper
     ) {
         this.apiKey = apiKey;
         this.apiUrl = apiUrl;
-        this.restTemplate = restTemplate;
+        this.restClient = restClient;
         this.objectMapper = objectMapper;
     }
 
@@ -94,8 +95,14 @@ public class OpenAIClientImpl implements OpenAIClient {
         HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
 
         try {
-            ResponseEntity<String> response = restTemplate.postForEntity(apiUrl, entity, String.class);
-            JsonNode root = objectMapper.readTree(response.getBody());
+            String response = restClient.post()
+                    .uri(apiUrl + "/chat/completions")
+                    .headers(h -> h.addAll(headers))
+                    .body(requestBody)
+                    .retrieve()
+                    .body(String.class);
+
+            JsonNode root = objectMapper.readTree(response);
             return root.path("choices").get(0).path("message").path("content").asText();
         } catch (Exception e) {
             // In a real app, you'd want more robust error handling
@@ -110,6 +117,12 @@ public class OpenAIClientImpl implements OpenAIClient {
      */
     private ClassificationResult parseResponse(String jsonResponse) {
         try {
+            // The model sometimes wraps the JSON in markdown code blocks (e.g., ```json ... ```)
+            // We need to extract the raw JSON string.
+            if (jsonResponse.contains("```")) {
+                jsonResponse = jsonResponse.substring(jsonResponse.indexOf('{'), jsonResponse.lastIndexOf('}') + 1);
+            }
+
             JsonNode root = objectMapper.readTree(jsonResponse);
             String category = root.has("canonicalCategory") && !root.get("canonicalCategory").isNull()
                     ? root.get("canonicalCategory").asText()

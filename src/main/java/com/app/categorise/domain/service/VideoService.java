@@ -96,9 +96,10 @@ public class VideoService {
      * @param videoUrl The original URL of the video.
      * @param transcriptText The text transcript of the video.
      * @param metadata The metadata extracted from the video.
+     * @param userId The ID of the user submitting the video.
      * @return A {@link TranscriptDtoWithAliases} containing all the necessary information for the client.
      */
-    public TranscriptDtoWithAliases processVideoAndCreateTranscript(String videoUrl, String transcriptText, TikTokMetadata metadata) {
+    public TranscriptDtoWithAliases processVideoAndCreateTranscript(String videoUrl, String transcriptText, TikTokMetadata metadata, String userId) {
         // Step 1: Classify and get suggestions from AI
         ClassificationResult classificationResult = categorisationService.classifyAndSuggestAlias(
                 transcriptText, metadata.getTitle(), metadata.getDescription()
@@ -117,7 +118,7 @@ public class VideoService {
         // Step 3: Determine the final alias, checking for user's custom preference using the grouping key
         if (groupingKey != null) {
             Optional<CategoryAliasEntity> existingAlias = categoryAliasService.findByUserIdAndGroupingKey(
-                    metadata.getAccountId(), groupingKey
+                    userId, groupingKey
             );
 
             if (existingAlias.isPresent()) {
@@ -125,7 +126,7 @@ public class VideoService {
             } else {
                 finalAlias = classificationResult.getSuggestedAlias();
                 // Save this new suggestion as the user's default for this groupingKey
-                categoryAliasService.saveAlias(metadata.getAccountId(), groupingKey, finalAlias);
+                categoryAliasService.saveAlias(userId, groupingKey, finalAlias);
             }
         } else {
             // Fallback if no grouping key can be determined
@@ -145,6 +146,7 @@ public class VideoService {
         transcriptEntity.setAccount(metadata.getAccount());
         transcriptEntity.setIdentifierId(metadata.getIdentifierId());
         transcriptEntity.setIdentifier(metadata.getIdentifier());
+        transcriptEntity.setUserId(userId);
         transcriptEntity.setAlias(finalAlias);
         transcriptEntity.setCanonicalCategory(canonicalCategory); // Store the special category, if it exists
         transcriptEntity.setGroupingKey(groupingKey);

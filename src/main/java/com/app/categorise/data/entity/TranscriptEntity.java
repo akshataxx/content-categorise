@@ -29,6 +29,7 @@ public class TranscriptEntity {
     private String alias;
     private String canonicalCategory;
     private String groupingKey;
+    private String userId;
     private Instant createdAt = Instant.now();
 
     public String getId() {
@@ -52,6 +53,7 @@ public class TranscriptEntity {
     public String getCanonicalCategory() { return canonicalCategory; }
     public String getGroupingKey() { return groupingKey; }
     public Instant getCreatedAt() { return createdAt; }
+    public String getUserId() { return userId; }
 
     public void setId(String id) {
         this.id = id;
@@ -92,5 +94,8 @@ public class TranscriptEntity {
     public void setGroupingKey(String groupingKey) { this.groupingKey = groupingKey; }
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+    public void setUserId(String userId) {
+        this.userId = userId;
     }
 }

@@ -17,7 +17,7 @@ import java.util.Map;
 
 @RestController
 @Tag(name = "Video", description = "Operations related to processing video URLs")
-@RequestMapping("/video")
+@RequestMapping("/api/video")
 public class VideoController {
     private final VideoService videoService;
 
@@ -31,19 +31,25 @@ public class VideoController {
      * @return the transcript of video
      */
     @Operation(summary = "Submit a video URL", description = "Downloads video, extracts transcript and metadata, and saves to DB")
-    @PostMapping("/url")
+    @PostMapping("/transcribe")
     public ResponseEntity<TranscriptDtoWithAliases> handleVideo(@RequestBody Map<String, String> request) throws Exception {
-        System.out.println("POST /video/url received");
+        System.out.println("POST /api/video/transcribe received");
 
         String videoUrl = request.get("videoUrl");
+        String userId = request.get("userId");
+
         if (videoUrl == null || videoUrl.isBlank()) {
             throw new IllegalArgumentException("Missing 'videoUrl' in request body");
+        }
+
+        if (userId == null || userId.isBlank()) {
+            throw new IllegalArgumentException("Missing 'userId' in request body");
         }
 
         try (ProcessedVideoFiles files = videoService.extractAudioAndMetadata(videoUrl)) {
             String textTranscript = videoService.transcribeAudio(files.getAudioFile());
             TikTokMetadata metadata = videoService.extractMetadata(files.getMetadataFile());
-            TranscriptDtoWithAliases transcriptDto = videoService.processVideoAndCreateTranscript(videoUrl, textTranscript, metadata);
+            TranscriptDtoWithAliases transcriptDto = videoService.processVideoAndCreateTranscript(videoUrl, textTranscript, metadata, userId);
             return ResponseEntity.ok(transcriptDto);
         }
     }

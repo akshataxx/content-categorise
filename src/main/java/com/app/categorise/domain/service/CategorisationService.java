@@ -7,7 +7,6 @@ import com.app.categorise.domain.model.ClassificationResult;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -24,21 +23,6 @@ public class   CategorisationService {
     public CategorisationService(OpenAIClient openAIClient, CategoryRepository categoryRepository) {
         this.openAIClient = openAIClient;
         this.categoryRepository = categoryRepository;
-    }
-
-    /**
-     * Classifies the given video into 2–4 high-level categories using OpenAI.
-     * @param transcript The transcript of the video
-     * @param title The title of the video
-     * @param description The description of the video
-     * @return A list of relevant categories
-     */
-    public List<String> classify(String transcript, String title, String description) {
-        return openAIClient.classifyTranscript(transcript, title, description);
-    }
-
-    public Map<String, String> generateAliases(List<String> canonicalCategories) {
-        return openAIClient.generateAliasesForCategories(canonicalCategories);
     }
 
     /**

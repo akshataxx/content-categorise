@@ -1,6 +1,7 @@
 package com.app.categorise.data.client.openai;
 
-import com.fasterxml.jackson.core.type.TypeReference;
+import com.app.categorise.domain.model.ClassificationResult;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
@@ -8,17 +9,10 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestTemplate;
-import com.app.categorise.domain.model.ClassificationResult;
-import com.fasterxml.jackson.core.JsonProcessingException;
 
-import java.io.IOException;
 import java.util.List;
-import java.util.Map;
-import java.util.Arrays;
 
 @Component
 @Profile("prod")
@@ -39,20 +33,6 @@ public class OpenAIClientImpl implements OpenAIClient {
         this.apiUrl = apiUrl;
         this.restClient = restClient;
         this.objectMapper = objectMapper;
-    }
-
-    @Deprecated
-    @Override
-    public List<String> classifyTranscript(String transcript, String title, String description) {
-        // ... this method is now deprecated
-        return List.of();
-    }
-
-    @Deprecated
-    @Override
-    public Map<String, String> generateAliasesForCategories(List<String> canonicalCategories) {
-        // ... this method is now deprecated
-        return Map.of();
     }
 
     @Override

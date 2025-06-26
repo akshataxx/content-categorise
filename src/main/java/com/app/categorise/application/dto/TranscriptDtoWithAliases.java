@@ -25,4 +25,5 @@ public class TranscriptDtoWithAliases {
     private String identifierId;
     private String identifier;
     private List<String> categories;  // These will be alias names, not canonical
+    private Instant createdAt;
 }

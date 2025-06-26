@@ -35,6 +35,7 @@ public class TranscriptMapper {
                 .map(category -> aliasMap.getOrDefault(category, category))
                 .collect(Collectors.toList());
         dto.setCategories(aliasedCategories);
+        dto.setCreatedAt(transcriptEntity.getCreatedAt());
 
         return dto;
     }

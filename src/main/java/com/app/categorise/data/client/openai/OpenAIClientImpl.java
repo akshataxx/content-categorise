@@ -57,7 +57,7 @@ public class OpenAIClientImpl implements OpenAIClient {
             + categoryList +
             "], provide that categoryId name. Otherwise, this MUST be null.\n" +
             "2. \"genericTopic\": Return a single, lowercase, one-word keyword that describes the overall topic (e.g., \"tech\", \"fashion\", \"comedy\", \"health\"). This field MUST always be present.\n" +
-            "3. 'suggestedAlias': Create a trendy, engaging, and short (1-3 words) alias for the video. This alias should be catchy, like a hashtag and follow recent trends in social media.\n\n" +
+            "3. 'suggestedAlias': Create a trendy, engaging, and short (1-3 words) alias for the video. This alias should be catchy and follow recent trends in social media. Make sure not be cringe. Make sure it isn't specific to the video. It's supposed to be an alias for the categoryId \n\n" +
             "DO NOT include any explanation or extra text. Just output the JSON object.\n\n";
     }
 

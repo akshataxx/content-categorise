@@ -85,6 +85,12 @@ public class VideoService {
         return whisperClient.transcribeAudio(audioFile);
     }
 
+
+    public TikTokMetadata extractMetadata(File metadataFile) throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        return mapper.readValue(metadataFile, TikTokMetadata.class);
+    }
+
     /**
      * Processes a video from its raw text transcript and metadata into a fully categorized transcript with a user-aware alias.
      * This method orchestrates the core logic:
@@ -100,71 +106,66 @@ public class VideoService {
      * @param userId The ID of the user submitting the video.
      * @return A {@link TranscriptDtoWithAliases} containing all the necessary information for the client.
      */
-    public TranscriptDtoWithAliases processVideoAndCreateTranscript(String videoUrl, String transcriptText, TikTokMetadata metadata, String userId) {
+    public TranscriptDtoWithAliases processVideoAndCreateTranscript(String videoUrl, String transcriptText, TikTokMetadata metadata, String userId) throws Exception {
         // Classify and get suggestions from AI
         TranscriptCategorisationResult categorisationResult = categorisationService.classifyAndSuggestAlias(
                 transcriptText, metadata.getTitle(), metadata.getDescription()
         );
 
-        // Determine the categoryId. Prioritize the classified categoryId.
-        String classificationCategory = categorisationResult.category();
-        String classificationTopic = categorisationResult.genericTopic();
-        String classificationAlias = categorisationResult.suggestedAlias();
-        String category = null;
-        if (classificationCategory != null && !classificationCategory.isBlank()) {
-            category = classificationCategory;
-        } else if (classificationTopic != null && !classificationTopic.isBlank()) {
-            category = classificationTopic;
-        } else if (classificationAlias != null && !classificationAlias.isBlank()) {
-            category = classificationAlias;
-        } else {
-            System.out.println("No categoryId found for video: " + videoUrl);
-            category = "Unknown";
-        }
+        // Determine the category and save it if it doesn't exist
+        String categoryName = determineCategory(categorisationResult, videoUrl);
+        CategoryEntity category = categoryService.saveIfNotExists(categoryName, "", userId);
 
-        Optional<CategoryEntity> existingCategory = categoryService.findCategoryByName(category);
-        Optional<String> existingAlias = existingCategory.flatMap(c ->
-            categoryAliasService.findByUserIdAndCategoryId(userId, c.getId()
-        ).map(CategoryAliasEntity::getAlias));
-
-        String finalCategory = category;
-        CategoryEntity categoryEntity = existingCategory.orElseGet(() ->
-            categoryService.saveCategory(null, finalCategory, "", userId)
-        );
-
-        String finalAlias = null;
-        if (existingAlias.isPresent()) {
-            finalAlias = existingAlias.get();
-        } else if (classificationAlias != null && !classificationAlias.isBlank()) {
-            // Save the new suggestion in the users alias list for a categoryId
-            categoryAliasService.saveAlias(userId, categoryEntity.getId(), classificationAlias);
-            // Use the categoryId name as the alias
-            finalAlias = classificationAlias;
-        }
+        // Resolve the alias, use the pre-existing one if it exists, saving the mapping to a category it doesn't exist
+        String alias = resolveAlias(userId, category.getId(), categorisationResult.suggestedAlias());
 
         // Create and save the transcript entity
-        TranscriptEntity transcriptEntity = new TranscriptEntity();
-        transcriptEntity.setVideoUrl(videoUrl);
-        transcriptEntity.setTranscript(transcriptText);
-        transcriptEntity.setDescription(metadata.getDescription());
-        transcriptEntity.setTitle(metadata.getTitle());
-        transcriptEntity.setDuration(metadata.getDuration());
-        transcriptEntity.setUploadedAt(Instant.ofEpochSecond(metadata.getUploadedEpoch()));
-        transcriptEntity.setAccountId(metadata.getAccountId());
-        transcriptEntity.setAccount(metadata.getAccount());
-        transcriptEntity.setIdentifierId(metadata.getIdentifierId());
-        transcriptEntity.setIdentifier(metadata.getIdentifier());
-        transcriptEntity.setUserId(userId);
-        transcriptEntity.setCategoryId(categoryEntity.getId());
-
+        TranscriptEntity transcriptEntity = createTranscriptEntity(videoUrl, transcriptText, metadata, userId, category.getId());
         TranscriptEntity savedEntity = transcriptService.save(transcriptEntity);
 
-        // Map to DTO and return
-        return transcriptMapper.toDto(savedEntity, categoryEntity.getName(), finalAlias);
+        return transcriptMapper.toDto(savedEntity, category.getName(), alias);
     }
 
-    public TikTokMetadata extractMetadata(File metadataFile) throws Exception {
-        ObjectMapper mapper = new ObjectMapper();
-        return mapper.readValue(metadataFile, TikTokMetadata.class);
+    // Determine the categoryId. Prioritize the classified categoryId, then the generic topic, then the suggested alias.
+    private String determineCategory(TranscriptCategorisationResult result, String videoUrl) throws Exception {
+        if (result.category() != null && !result.category().isBlank()) return result.category();
+        if (result.genericTopic() != null && !result.genericTopic().isBlank()) return result.genericTopic();
+        if (result.suggestedAlias() != null && !result.suggestedAlias().isBlank()) return result.suggestedAlias();
+        System.out.println("No category found for video: " + videoUrl);
+        throw new Exception("No category found for video: " + videoUrl);
     }
+
+    /** Resolve the alias. If the user has a pre-existing alias for this category, use it.
+     *  If not, use the suggested alias from the AI and save it for future use.
+     *  TODO: We shouldn't store the generated alias as the category alias, the user should make that choice.
+     *  */
+    private String resolveAlias(String userId, String categoryId, String suggestedAlias) {
+        return categoryAliasService.findByUserIdAndCategoryId(userId, categoryId)
+            .map(CategoryAliasEntity::getAlias)
+            .orElseGet(() -> {
+                if (suggestedAlias != null && !suggestedAlias.isBlank()) {
+                    categoryAliasService.saveAlias(userId, categoryId, suggestedAlias);
+                    return suggestedAlias;
+                }
+                return null;
+            });
+    }
+
+    private TranscriptEntity createTranscriptEntity(String videoUrl, String transcriptText, TikTokMetadata metadata, String userId, String categoryId) {
+        TranscriptEntity entity = new TranscriptEntity();
+        entity.setVideoUrl(videoUrl);
+        entity.setTranscript(transcriptText);
+        entity.setDescription(metadata.getDescription());
+        entity.setTitle(metadata.getTitle());
+        entity.setDuration(metadata.getDuration());
+        entity.setUploadedAt(Instant.ofEpochSecond(metadata.getUploadedEpoch()));
+        entity.setAccountId(metadata.getAccountId());
+        entity.setAccount(metadata.getAccount());
+        entity.setIdentifierId(metadata.getIdentifierId());
+        entity.setIdentifier(metadata.getIdentifier());
+        entity.setUserId(userId);
+        entity.setCategoryId(categoryId);
+        return entity;
+    }
+
 }

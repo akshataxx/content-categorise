@@ -55,11 +55,11 @@ public class CategorySeeder implements CommandLineRunner {
 
         int seeded = 0;
         for (CategoryEntity c : categories) {
-            if (categoryService.saveIfNotExists(c.getId(), c.getName(), c.getDescription(), c.getCreatedBy())) {
+            if (categoryService.findCategoryByName(c.getName()).isEmpty()) {
+                categoryService.saveCategory(c.getId(), c.getName(), c.getDescription(), c.getCreatedBy());
                 seeded++;
             }
         }
-
         System.out.println("Seeded " + seeded + " categories into the database.");
     }
 } 

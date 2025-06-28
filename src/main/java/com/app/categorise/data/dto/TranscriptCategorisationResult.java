@@ -8,6 +8,4 @@ package com.app.categorise.data.dto;
  * @param genericTopic   A stable, one-word keyword for the general topic (e.g., "tech"). Used for grouping non-special content.
  * @param suggestedAlias A creative, trendy alias for the video suggested by the AI.
  */
-public record TranscriptCategorisationResult(String category, String genericTopic, String suggestedAlias) {
-
-}
+public record TranscriptCategorisationResult(String category, String genericTopic, String suggestedAlias) { }

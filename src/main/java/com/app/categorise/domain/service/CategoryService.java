@@ -35,12 +35,12 @@ public class CategoryService {
         return categoryRepository.save(new CategoryEntity(id, name, description, createdBy));
     }
 
-    public boolean saveIfNotExists(String id,String name, String description, String createdBy) {
-        if (categoryRepository.findByName(name).isEmpty()) {
-            categoryRepository.save(new CategoryEntity(id, name, description, createdBy));
-            return true;
-        }
-        return false;
+    // Save a category if it doesn't exist, otherwise return the existing one. Uniqueness is determined by name
+    public CategoryEntity saveIfNotExists(String name, String description, String createdBy) {
+        Optional<CategoryEntity> existingCategory = categoryRepository.findByName(name);
+        return existingCategory.orElseGet(() ->
+            categoryRepository.save(new CategoryEntity(name, description, createdBy))
+        );
     }
 
     // Get all categories created by the system

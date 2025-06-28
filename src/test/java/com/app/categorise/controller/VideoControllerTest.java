@@ -1,9 +1,10 @@
 package com.app.categorise.controller;
 
-import com.app.categorise.models.dto.TikTokMetadata;
-import com.app.categorise.models.entity.Transcript;
-import com.app.categorise.models.internal.ProcessedVideoFiles;
-import com.app.categorise.service.VideoService;
+import com.app.categorise.application.dto.TikTokMetadata;
+import com.app.categorise.application.dto.TranscriptDtoWithAliases;
+import com.app.categorise.application.internal.ProcessedVideoFiles;
+import com.app.categorise.domain.service.VideoService;
+import com.app.categorise.api.controller.VideoController;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,9 +32,10 @@ class VideoControllerTest {
     private VideoController videoController;
 
     private final String testVideoUrl = "https://example.com/video";
+    private final String testUserId = "testUserId";
     private final String testTranscript = "This is a test transcript";
     private TikTokMetadata testMetadata;
-    private Transcript testTranscriptObj;
+    private TranscriptDtoWithAliases testTranscriptDtoWithAlias;
 
     @BeforeEach
     void setUp() {
@@ -47,10 +49,10 @@ class VideoControllerTest {
         testMetadata.setIdentifierId("testChannelId");
         testMetadata.setIdentifier("testChannel");
 
-        testTranscriptObj = new Transcript();
-        testTranscriptObj.setId("testId");
-        testTranscriptObj.setVideoUrl(testVideoUrl);
-        testTranscriptObj.setTranscript(testTranscript);
+        testTranscriptDtoWithAlias = new TranscriptDtoWithAliases();
+        testTranscriptDtoWithAlias.setId("testId");
+        testTranscriptDtoWithAlias.setVideoUrl(testVideoUrl);
+        testTranscriptDtoWithAlias.setTranscript(testTranscript);
     }
 
     @Test
@@ -63,23 +65,25 @@ class VideoControllerTest {
         when(videoService.extractAudioAndMetadata(testVideoUrl)).thenReturn(mockFiles);
         when(videoService.transcribeAudio(any(File.class))).thenReturn(testTranscript);
         when(videoService.extractMetadata(any(File.class))).thenReturn(testMetadata);
-        when(videoService.saveTranscript(eq(testVideoUrl), eq(testTranscript), eq(testMetadata)))
-            .thenReturn(testTranscriptObj);
+        when(videoService.processVideoAndCreateTranscript(eq(testVideoUrl), eq(testTranscript), eq(testMetadata), eq(testUserId)))
+                .thenReturn(testTranscriptDtoWithAlias);
 
         // Act
-        ResponseEntity<Transcript> response = videoController.handleVideo(Map.of("videoUrl", testVideoUrl));
+        ResponseEntity<TranscriptDtoWithAliases> response = videoController.handleVideo(Map.of("videoUrl", testVideoUrl,
+                "userId", testUserId));
 
         // Assert
         assertNotNull(response);
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
-        assertEquals(testTranscriptObj.getId(), response.getBody().getId());
+        assertEquals(testTranscriptDtoWithAlias.getId(), response.getBody().getId());
         assertEquals(testVideoUrl, response.getBody().getVideoUrl());
         
         verify(videoService).extractAudioAndMetadata(testVideoUrl);
         verify(videoService).transcribeAudio(any(File.class));
         verify(videoService).extractMetadata(any(File.class));
-        verify(videoService).saveTranscript(eq(testVideoUrl), eq(testTranscript), eq(testMetadata));
+        verify(videoService).processVideoAndCreateTranscript(eq(testVideoUrl), eq(testTranscript), eq(testMetadata),
+                eq(testUserId));
         verify(mockFiles).close();
     }
 
@@ -116,7 +120,7 @@ class VideoControllerTest {
         // Act & Assert
         assertThrows(
             RuntimeException.class,
-            () -> videoController.handleVideo(Map.of("videoUrl", testVideoUrl))
+            () -> videoController.handleVideo(Map.of("videoUrl", testVideoUrl, "userId", testUserId))
         );
         
         verify(videoService).extractAudioAndMetadata(testVideoUrl);

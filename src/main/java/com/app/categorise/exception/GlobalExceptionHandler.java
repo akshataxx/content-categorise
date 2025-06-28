@@ -1,6 +1,6 @@
 package com.app.categorise.exception;
 
-import com.app.categorise.models.dto.ErrorResponse;
+import com.app.categorise.application.dto.ErrorResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.*;

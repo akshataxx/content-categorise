@@ -1,6 +1,6 @@
 package com.app.categorise.config;
 
-import com.app.categorise.models.dto.ErrorResponse;
+import com.app.categorise.application.dto.ErrorResponse;
 import io.swagger.v3.core.converter.ModelConverters;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Components;

@@ -1,7 +1,7 @@
 package com.app.categorise.api.dto;
 
 /**
- * DTO for handling requests to rename a categoryId alias.
+ * DTO for handling requests to rename a category alias.
  * It contains the necessary information to identify the user, the grouping to target, and the new alias name.
  */
 public class RenameAliasRequest {

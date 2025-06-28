@@ -19,9 +19,14 @@ import java.util.stream.Collectors;
 public class CategoryAliasService {
 
     private final CategoryAliasRepository aliasRepository;
+    private final CategoryService categoryService;
 
-    public CategoryAliasService(CategoryAliasRepository aliasRepository) {
+    public CategoryAliasService(
+        CategoryAliasRepository aliasRepository,
+        CategoryService categoryService
+    ) {
         this.aliasRepository = aliasRepository;
+        this.categoryService = categoryService;
     }
 
     /**
@@ -69,7 +74,11 @@ public class CategoryAliasService {
      * @param newAlias The new alias name.
      */
     @Transactional
-    public CategoryAliasEntity upsertAlias(String userId, String categoryId, String newAlias) {
+    public CategoryAliasEntity upsertAlias(String userId, String categoryId, String newAlias) throws Exception {
+        if (categoryService.findCategoryById(categoryId).isEmpty()) {
+            throw new Exception("Category does not exist");
+        }
+
         CategoryAliasEntity aliasEntity = aliasRepository.findByUserIdAndCategoryId(userId, categoryId)
             .orElse(new CategoryAliasEntity());
 

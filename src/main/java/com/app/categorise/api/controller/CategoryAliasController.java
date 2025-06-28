@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST controller for managing categoryId alias operations.
+ * REST controller for managing category alias operations.
  */
 @RestController
 @RequestMapping("/api/v1/aliases")
@@ -26,7 +26,7 @@ public class CategoryAliasController {
 
     @PutMapping("/upsert")
     @Operation(summary = "Upsert a categoryId alias for a user", description = "Updates the alias for a given canonical categoryId.")
-    public ResponseEntity<CategoryAliasEntity> upsertAlias(@RequestBody RenameAliasRequest request) {
+    public ResponseEntity<CategoryAliasEntity> upsertAlias(@RequestBody RenameAliasRequest request) throws Exception {
         CategoryAliasEntity alias = aliasService.upsertAlias(
             request.getUserId(),
             request.getCategoryId(),

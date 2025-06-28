@@ -1,6 +1,6 @@
 package com.app.categorise.controller;
 
-import com.app.categorise.domain.dto.TikTokMetadata;
+import com.app.categorise.data.dto.TikTokMetadata;
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.application.internal.ProcessedVideoFiles;
 import com.app.categorise.domain.service.VideoService;

@@ -1,6 +1,6 @@
 package com.app.categorise.data.client.openai;
 
-import com.app.categorise.domain.dto.TranscriptCategorisationResult;
+import com.app.categorise.data.dto.TranscriptCategorisationResult;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

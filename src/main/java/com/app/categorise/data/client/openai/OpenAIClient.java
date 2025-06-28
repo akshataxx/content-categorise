@@ -1,6 +1,6 @@
 package com.app.categorise.data.client.openai;
 
-import com.app.categorise.domain.dto.TranscriptCategorisationResult;
+import com.app.categorise.data.dto.TranscriptCategorisationResult;
 
 import java.util.List;
 

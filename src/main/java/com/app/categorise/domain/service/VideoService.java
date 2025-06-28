@@ -1,6 +1,6 @@
 package com.app.categorise.domain.service;
 
-import com.app.categorise.domain.dto.TikTokMetadata;
+import com.app.categorise.data.dto.TikTokMetadata;
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.application.internal.ProcessedVideoFiles;
 import com.app.categorise.application.mapper.TranscriptMapper;
@@ -8,8 +8,7 @@ import com.app.categorise.data.client.whisper.WhisperClient;
 import com.app.categorise.data.entity.CategoryAliasEntity;
 import com.app.categorise.data.entity.CategoryEntity;
 import com.app.categorise.data.entity.TranscriptEntity;
-import com.app.categorise.data.repository.TranscriptRepository;
-import com.app.categorise.domain.dto.TranscriptCategorisationResult;
+import com.app.categorise.data.dto.TranscriptCategorisationResult;
 import com.app.categorise.util.ProcessRunner;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;

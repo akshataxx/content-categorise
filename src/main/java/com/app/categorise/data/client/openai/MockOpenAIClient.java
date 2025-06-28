@@ -1,6 +1,6 @@
 package com.app.categorise.data.client.openai;
 
-import com.app.categorise.domain.dto.TranscriptCategorisationResult;
+import com.app.categorise.data.dto.TranscriptCategorisationResult;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 

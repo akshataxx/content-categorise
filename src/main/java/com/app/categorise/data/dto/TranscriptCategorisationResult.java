@@ -1,4 +1,4 @@
-package com.app.categorise.domain.dto;
+package com.app.categorise.data.dto;
 
 /**
  * A DTO representing the result of an AI classification call.

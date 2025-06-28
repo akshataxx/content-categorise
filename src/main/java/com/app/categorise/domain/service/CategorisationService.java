@@ -1,7 +1,7 @@
 package com.app.categorise.domain.service;
 
 import com.app.categorise.data.client.openai.OpenAIClient;
-import com.app.categorise.domain.dto.TranscriptCategorisationResult;
+import com.app.categorise.data.dto.TranscriptCategorisationResult;
 import org.springframework.stereotype.Service;
 
 import java.util.List;

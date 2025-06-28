@@ -10,12 +10,4 @@ import java.util.List;
  */
 public interface CustomTranscriptRepository {
     List<TranscriptEntity> filter(List<String> categories, String account, Instant from, Instant to);
-    /**
-     * Performs a bulk update to change the alias for all transcripts matching a specific user and grouping key.
-     *
-     * @param userId The ID of the user whose transcripts will be updated.
-     * @param groupingKey The grouping key (e.g., "Recipe" or "tech") to identify the target transcripts.
-     * @param newAlias The new alias to set on the matching transcripts.
-     */
-    void updateAliasForUserAndGroupingKey(String userId, String groupingKey, String newAlias);
 }

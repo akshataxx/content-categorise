@@ -15,19 +15,23 @@ import java.time.Instant;
 public class TranscriptEntity {
     @MongoId
     private String id;
+
+    // Information about the video
     private String videoUrl;
     private String transcript;
     private String description;
     private String title;
     private double duration;
     private Instant uploadedAt;
+
+    // Identifying information about the transcript and uploader
     private String accountId;
     private String account;
     private String identifierId;
     private String identifier;
-    private String alias;
-    private String canonicalCategory;
-    private String groupingKey;
+
+    private String categoryId;
+
     private String userId;
     private Instant createdAt = Instant.now();
 
@@ -48,9 +52,7 @@ public class TranscriptEntity {
     public String getAccount() { return account; }
     public String getIdentifierId() { return identifierId; }
     public String getIdentifier() { return identifier; }
-    public String getAlias() { return alias; }
-    public String getCanonicalCategory() { return canonicalCategory; }
-    public String getGroupingKey() { return groupingKey; }
+    public String getCategoryId() { return categoryId; }
     public Instant getCreatedAt() { return createdAt; }
     public String getUserId() { return userId; }
 
@@ -72,7 +74,6 @@ public class TranscriptEntity {
     public void setDuration(double duration) {
         this.duration = duration;
     }
-
     public void setUploadedAt(Instant uploadedAt) {
         this.uploadedAt = uploadedAt;
     }
@@ -88,9 +89,7 @@ public class TranscriptEntity {
     public void setIdentifier(String identifier) {
         this.identifier = identifier;
     }
-    public void setAlias(String alias) { this.alias = alias; }
-    public void setCanonicalCategory(String canonicalCategory) { this.canonicalCategory = canonicalCategory; }
-    public void setGroupingKey(String groupingKey) { this.groupingKey = groupingKey; }
+    public void setCategoryId(String categoryId) { this.categoryId = categoryId; }
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }

@@ -25,12 +25,15 @@ public class TranscriptService {
     public Optional<TranscriptEntity> findTranscript(String id) {
         if (id != null && !id.isEmpty()) {
             return transcriptRepository.findById(id);
-
         }
         return Optional.empty();
     }
 
-    public List<TranscriptEntity> filterTranscripts(List<String> categories, String account, Instant from, Instant to) {
+    public List<TranscriptEntity> allFilteredTranscripts(List<String> categories, String account, Instant from, Instant to) {
         return transcriptRepository.filter(categories, account, from, to);
+    }
+
+    public TranscriptEntity save(TranscriptEntity transcript) {
+        return transcriptRepository.save(transcript);
     }
 }

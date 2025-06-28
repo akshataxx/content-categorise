@@ -1,7 +1,7 @@
 package com.app.categorise.application.mapper;
 
 
-import com.app.categorise.application.dto.TranscriptDtoWithAliases;
+import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.data.entity.TranscriptEntity;
 import org.springframework.stereotype.Component;
 
@@ -14,27 +14,26 @@ public class TranscriptMapper {
     /**
      * Converts a TranscriptEntity to a TranscriptDtoWithAliases.
      * @param transcriptEntity The entity from the database.
-     * @param groupingKey The grouping key determined by the service layer.
+     * @param categoryAlias The categoryAlias for the categoryId determined by the service layer.
      * @return A DTO ready to be sent to the client.
      */
-    public TranscriptDtoWithAliases toDto(TranscriptEntity transcriptEntity, String groupingKey) {
-        TranscriptDtoWithAliases dto = new TranscriptDtoWithAliases();
-        dto.setId(transcriptEntity.getId());
-        dto.setVideoUrl(transcriptEntity.getVideoUrl());
-        dto.setTranscript(transcriptEntity.getTranscript());
-        dto.setDescription(transcriptEntity.getDescription());
-        dto.setTitle(transcriptEntity.getTitle());
-        dto.setDuration(transcriptEntity.getDuration());
-        dto.setUploadedAt(transcriptEntity.getUploadedAt());
-        dto.setAccountId(transcriptEntity.getAccountId());
-        dto.setAccount(transcriptEntity.getAccount());
-        dto.setIdentifierId(transcriptEntity.getIdentifierId());
-        dto.setIdentifier(transcriptEntity.getIdentifier());
-        dto.setAlias(transcriptEntity.getAlias());
-        dto.setCanonicalCategory(transcriptEntity.getCanonicalCategory());
-        dto.setGroupingKey(groupingKey);
-        dto.setCreatedAt(transcriptEntity.getCreatedAt());
-
-        return dto;
+    public TranscriptDtoWithAliases toDto(TranscriptEntity transcriptEntity, String category, String categoryAlias) {
+        return new TranscriptDtoWithAliases(
+            transcriptEntity.getId(),
+            transcriptEntity.getVideoUrl(),
+            transcriptEntity.getTranscript(),
+            transcriptEntity.getDescription(),
+            transcriptEntity.getTitle(),
+            transcriptEntity.getDuration(),
+            transcriptEntity.getUploadedAt(),
+            transcriptEntity.getAccountId(),
+            transcriptEntity.getAccount(),
+            transcriptEntity.getIdentifierId(),
+            transcriptEntity.getIdentifier(),
+            categoryAlias,
+            transcriptEntity.getCategoryId(),
+            category,
+            transcriptEntity.getCreatedAt()
+        );
     }
 }

@@ -12,19 +12,7 @@ import java.util.Optional;
  */
 @Repository
 public interface CategoryAliasRepository extends MongoRepository<CategoryAliasEntity, String> {
-
-    /**
-     * Finds all aliases for a given user.
-     * @param userId The ID of the user.
-     * @return A list of category alias entities.
-     */
     List<CategoryAliasEntity> findByUserId(String userId);
 
-    /**
-     * Finds a specific alias preference for a user based on a grouping key.
-     * @param userId The ID of the user.
-     * @param groupingKey The grouping key (e.g., "Recipe", "tech").
-     * @return An optional containing the alias entity if found.
-     */
-    Optional<CategoryAliasEntity> findByUserIdAndGroupingKey(String userId, String groupingKey);
+    Optional<CategoryAliasEntity> findByUserIdAndCategoryId(String userId, String categoryId);
 }

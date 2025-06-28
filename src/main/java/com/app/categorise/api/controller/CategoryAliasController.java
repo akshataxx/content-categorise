@@ -1,5 +1,7 @@
 package com.app.categorise.api.controller;
 
+import com.app.categorise.api.dto.TranscriptDtoWithAliases;
+import com.app.categorise.data.entity.CategoryAliasEntity;
 import com.app.categorise.domain.service.CategoryAliasService;
 import com.app.categorise.api.dto.RenameAliasRequest;
 import io.swagger.v3.oas.annotations.Operation;
@@ -10,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST controller for managing category alias operations.
+ * REST controller for managing categoryId alias operations.
  */
 @RestController
 @RequestMapping("/api/v1/aliases")
@@ -22,14 +24,14 @@ public class CategoryAliasController {
         this.aliasService = aliasService;
     }
 
-    @PutMapping("/rename")
-    @Operation(summary = "Rename a category alias for a user", description = "Updates the alias for a given canonical category and updates all existing transcripts for that user.")
-    public ResponseEntity<Void> renameAlias(@RequestBody RenameAliasRequest request) {
-        aliasService.renameAlias(
-                request.getUserId(),
-                request.getGroupingKey(),
-                request.getNewAlias()
+    @PutMapping("/upsert")
+    @Operation(summary = "Upsert a categoryId alias for a user", description = "Updates the alias for a given canonical categoryId.")
+    public ResponseEntity<CategoryAliasEntity> upsertAlias(@RequestBody RenameAliasRequest request) {
+        CategoryAliasEntity alias = aliasService.upsertAlias(
+            request.getUserId(),
+            request.getCategoryId(),
+            request.getNewAlias()
         );
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(alias);
     }
 }

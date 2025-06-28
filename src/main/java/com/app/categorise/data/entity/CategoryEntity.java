@@ -1,6 +1,7 @@
 package com.app.categorise.data.entity;
 
 
+import org.springframework.data.annotation.PersistenceCreator;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.MongoId;
@@ -10,20 +11,25 @@ import org.springframework.data.mongodb.core.mapping.MongoId;
  */
 @Document(collection = "category")
 public class CategoryEntity {
-
     @MongoId
     private String id;
+    @Indexed(unique = true)
+    private final String name;
+    private final String description;
+    private String createdBy;
 
-    @Indexed
-    private String name;
-
-    private String description;
-
-    public CategoryEntity() {}
-
-    public CategoryEntity(String name, String description) {
+    public CategoryEntity(String id,String name, String description) {
+        this.id = id;
         this.name = name;
         this.description = description;
+    }
+
+    @PersistenceCreator
+    public CategoryEntity(String id, String name, String description, String createdBy) {
+        this.id = id;
+        this.name = name;
+        this.description = description;
+        this.createdBy = createdBy;
     }
 
     public String getId() {
@@ -37,4 +43,6 @@ public class CategoryEntity {
     public String getDescription() {
         return description;
     }
+
+    public String getCreatedBy() { return createdBy; }
 }

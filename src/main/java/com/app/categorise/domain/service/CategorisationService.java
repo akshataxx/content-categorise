@@ -1,13 +1,10 @@
 package com.app.categorise.domain.service;
 
 import com.app.categorise.data.client.openai.OpenAIClient;
-import com.app.categorise.data.entity.CategoryEntity;
-import com.app.categorise.data.repository.CategoryRepository;
-import com.app.categorise.domain.model.ClassificationResult;
+import com.app.categorise.domain.dto.TranscriptCategorisationResult;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Service for categorising video content.
@@ -18,11 +15,11 @@ import java.util.stream.Collectors;
 public class CategorisationService {
 
     private final OpenAIClient openAIClient;
-    private final CategoryRepository categoryRepository;
+    private final CategoryService categoryService;
 
-    public CategorisationService(OpenAIClient openAIClient, CategoryRepository categoryRepository) {
+    public CategorisationService(OpenAIClient openAIClient, CategoryService categoryService) {
         this.openAIClient = openAIClient;
-        this.categoryRepository = categoryRepository;
+        this.categoryService = categoryService;
     }
 
     /**
@@ -32,14 +29,13 @@ public class CategorisationService {
      * @param transcript The video transcript.
      * @param title The video title.
      * @param description The video description.
-     * @return A {@link ClassificationResult} containing the analysis from the AI.
+     * @return A {@link TranscriptCategorisationResult} containing the analysis from the AI.
      */
-    public ClassificationResult classifyAndSuggestAlias(String transcript, String title, String description) {
-        List<String> canonicalCategoryNames = categoryRepository.findAll().stream()
-                .map(CategoryEntity::getName)
-                .collect(Collectors.toList());
+    public TranscriptCategorisationResult classifyAndSuggestAlias(String transcript, String title, String description) {
+        // Fetch all predefined categories not created by the user
+        List<String> categoryNames = categoryService.getAllCategoryNamesCreatedBySystem();
 
-        return openAIClient.classifyAndSuggestAlias(transcript, title, description, canonicalCategoryNames);
+        return openAIClient.classifyAndSuggestAlias(transcript, title, description, categoryNames);
     }
 }
 

@@ -1,4 +1,4 @@
-package com.app.categorise.application.dto;
+package com.app.categorise.domain.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;

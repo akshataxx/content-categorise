@@ -1,13 +1,13 @@
 package com.app.categorise.api.dto;
 
 /**
- * DTO for handling requests to rename a category alias.
+ * DTO for handling requests to rename a categoryId alias.
  * It contains the necessary information to identify the user, the grouping to target, and the new alias name.
  */
 public class RenameAliasRequest {
 
     private String userId;
-    private String groupingKey;
+    private String categoryId;
     private String newAlias;
 
     // Getters and setters
@@ -19,12 +19,12 @@ public class RenameAliasRequest {
         this.userId = userId;
     }
 
-    public String getGroupingKey() {
-        return groupingKey;
+    public String getCategoryId() {
+        return categoryId;
     }
 
-    public void setGroupingKey(String groupingKey) {
-        this.groupingKey = groupingKey;
+    public void setCategoryId(String categoryId) {
+        this.categoryId = categoryId;
     }
 
     public String getNewAlias() {

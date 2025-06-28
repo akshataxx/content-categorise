@@ -39,7 +39,7 @@ public class CategoryService {
     public CategoryEntity saveIfNotExists(String name, String description, String createdBy) {
         Optional<CategoryEntity> existingCategory = categoryRepository.findByName(name);
         return existingCategory.orElseGet(() ->
-            categoryRepository.save(new CategoryEntity(name, description, createdBy))
+            categoryRepository.save(new CategoryEntity(null, name, description, createdBy))
         );
     }
 

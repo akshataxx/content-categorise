@@ -50,7 +50,10 @@ public class CategorySeeder implements CommandLineRunner {
             new CategoryEntity("19", "Fashion", "Dress to impress"),
             new CategoryEntity("20", "Gossip", "The talk of the town"),
             new CategoryEntity("21", "Education", "Time to learn"),
-            new CategoryEntity("22", "Pets", "Awww")
+            new CategoryEntity("22", "Pets", "Awww"),
+            new CategoryEntity("23", "Jewellery", "Bling"),
+            new CategoryEntity("24", "Cars", "Speeeed"),
+            new CategoryEntity("25", "Artificial Intelligence", "The end is here")
         );
 
         int seeded = 0;

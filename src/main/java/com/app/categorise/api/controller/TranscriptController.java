@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/transcript")
@@ -51,15 +52,12 @@ public class TranscriptController {
      */
     @GetMapping
     public ResponseEntity<List<TranscriptDtoWithAliases>>  findTranscripts(
-        @RequestParam(required = false) List<String> categoryIds,
+        @RequestParam(required = false) List<UUID> categoryIds,
         @RequestParam(required = false) String account,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
-        @RequestParam(required = false) String userId
+        @RequestParam(required = false) UUID userId
     ) {
-        // TODO: remove when user functionality is implemented
-        String effectiveUserId = (userId == null || userId.isEmpty()) ? "1" : userId;
-
         System.out.printf("Finding all transcripts with filters: categoryIds=%s, account=%s, from=%s, to=%s%n",
             categoryIds, account, from, to
         );
@@ -67,7 +65,7 @@ public class TranscriptController {
         List<TranscriptEntity> transcripts = transcriptService.allFilteredTranscripts(categoryIds, account, from, to);
 
         List<TranscriptDtoWithAliases> results = transcripts.stream()
-            .map(transcript -> mapToDtoWithAlias(transcript, effectiveUserId))
+            .map(transcript -> mapToDtoWithAlias(transcript, userId))
             .toList();
 
         return ResponseEntity.ok(results);
@@ -80,21 +78,18 @@ public class TranscriptController {
      */
     @GetMapping("/{transcriptId}")
     public ResponseEntity<TranscriptDtoWithAliases> findTranscript(
-        @PathVariable String transcriptId,
-        @RequestParam(required = false) String userId
+        @PathVariable UUID transcriptId,
+        @RequestParam(required = false) UUID userId
     ) {
-        // TODO: remove when user functionality is implemented
-        String effectiveUserId = (userId == null || userId.isEmpty()) ? "1" : userId;
-
         return transcriptService.findTranscript(transcriptId)
-            .map(transcript -> mapToDtoWithAlias(transcript, effectiveUserId))
+            .map(transcript -> mapToDtoWithAlias(transcript, userId))
             .map(ResponseEntity::ok)
             .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    private TranscriptDtoWithAliases mapToDtoWithAlias(TranscriptEntity transcript, String userId) {
+    private TranscriptDtoWithAliases mapToDtoWithAlias(TranscriptEntity transcript, UUID userId) {
         String alias = null;
-        if (userId != null && !userId.isEmpty()) {
+        if (userId != null) {
             alias = categoryAliasService.findByUserIdAndCategoryId(userId, transcript.getCategoryId())
                 .map(CategoryAliasEntity::getAlias).orElse(null);
         }

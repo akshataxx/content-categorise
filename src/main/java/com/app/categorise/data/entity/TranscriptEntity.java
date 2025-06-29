@@ -1,25 +1,32 @@
 package com.app.categorise.data.entity;
 
 
-import lombok.ToString;
-import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.mapping.MongoId;
+import jakarta.persistence.*;
+import lombok.Data;
 
 import java.time.Instant;
+import java.util.UUID;
+
 
 /**
  * represents the transcript of a video
  */
-@ToString
-@Document(collection = "transcripts")
+@Entity
+@Table(name = "transcripts")
+@Data
 public class TranscriptEntity {
-    @MongoId
-    private String id;
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
 
     // Information about the video
+    @Column(columnDefinition = "TEXT")
     private String videoUrl;
+    @Column(columnDefinition = "TEXT")
     private String transcript;
+    @Column(columnDefinition = "TEXT")
     private String description;
+    @Column(columnDefinition = "TEXT")
     private String title;
     private double duration;
     private Instant uploadedAt;
@@ -27,15 +34,16 @@ public class TranscriptEntity {
     // Identifying information about the transcript and uploader
     private String accountId;
     private String account;
+    @Column(length = 1024)
     private String identifierId;
     private String identifier;
 
-    private String categoryId;
+    private UUID categoryId;
 
-    private String userId;
+    private UUID userId;
     private Instant createdAt = Instant.now();
 
-    public String getId() {
+    public UUID getId() {
         return id;
     }
     public String getVideoUrl() {
@@ -52,13 +60,10 @@ public class TranscriptEntity {
     public String getAccount() { return account; }
     public String getIdentifierId() { return identifierId; }
     public String getIdentifier() { return identifier; }
-    public String getCategoryId() { return categoryId; }
+    public UUID getCategoryId() { return categoryId; }
     public Instant getCreatedAt() { return createdAt; }
-    public String getUserId() { return userId; }
+    public UUID getUserId() { return userId; }
 
-    public void setId(String id) {
-        this.id = id;
-    }
     public void setVideoUrl(String videoUrl) {
         this.videoUrl = videoUrl;
     }
@@ -89,11 +94,11 @@ public class TranscriptEntity {
     public void setIdentifier(String identifier) {
         this.identifier = identifier;
     }
-    public void setCategoryId(String categoryId) { this.categoryId = categoryId; }
+    public void setCategoryId(UUID categoryId) { this.categoryId = categoryId; }
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
-    public void setUserId(String userId) {
+    public void setUserId(UUID userId) {
         this.userId = userId;
     }
 }

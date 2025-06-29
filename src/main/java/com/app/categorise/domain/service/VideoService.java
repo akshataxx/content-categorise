@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.io.File;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * handles logic to
@@ -106,7 +107,7 @@ public class VideoService {
      * @param userId The ID of the user submitting the video.
      * @return A {@link TranscriptDtoWithAliases} containing all the necessary information for the client.
      */
-    public TranscriptDtoWithAliases processVideoAndCreateTranscript(String videoUrl, String transcriptText, TikTokMetadata metadata, String userId) throws Exception {
+    public TranscriptDtoWithAliases processVideoAndCreateTranscript(String videoUrl, String transcriptText, TikTokMetadata metadata, UUID userId) throws Exception {
         // Classify and get suggestions from AI
         TranscriptCategorisationResult categorisationResult = categorisationService.classifyAndSuggestAlias(
                 transcriptText, metadata.getTitle(), metadata.getDescription()
@@ -139,7 +140,7 @@ public class VideoService {
      *  If not, use the suggested alias from the AI and save it for future use.
      *  TODO: We shouldn't store the generated alias as the category alias, the user should make that choice.
      *  */
-    private String resolveAlias(String userId, String categoryId, String suggestedAlias) {
+    private String resolveAlias(UUID userId, UUID categoryId, String suggestedAlias) {
         return categoryAliasService.findByUserIdAndCategoryId(userId, categoryId)
             .map(CategoryAliasEntity::getAlias)
             .orElseGet(() -> {
@@ -151,7 +152,7 @@ public class VideoService {
             });
     }
 
-    private TranscriptEntity createTranscriptEntity(String videoUrl, String transcriptText, TikTokMetadata metadata, String userId, String categoryId) {
+    private TranscriptEntity createTranscriptEntity(String videoUrl, String transcriptText, TikTokMetadata metadata, UUID userId, UUID categoryId) {
         TranscriptEntity entity = new TranscriptEntity();
         entity.setVideoUrl(videoUrl);
         entity.setTranscript(transcriptText);

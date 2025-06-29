@@ -1,14 +1,18 @@
 package com.app.categorise.data.entity;
 
+import jakarta.persistence.*;
 import lombok.Data;
-import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.mapping.MongoId;
 
+import java.util.UUID;
+
+@Entity
+@Table(name = "users")
 @Data
-@Document(collection = "user")
 public class UserEntity {
-    @MongoId
-    private String id;
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+
     private String username;
     private String email;
     private String displayName;

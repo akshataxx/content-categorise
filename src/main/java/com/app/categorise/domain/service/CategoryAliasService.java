@@ -8,6 +8,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -35,7 +36,7 @@ public class CategoryAliasService {
      * @param categoryId The categoryId name (e.g., "Recipe", "Tech").
      * @return An Optional containing the {@link CategoryAliasEntity} if a preference exists.
      */
-    public Optional<CategoryAliasEntity> findByUserIdAndCategoryId(String userId, String categoryId) {
+    public Optional<CategoryAliasEntity> findByUserIdAndCategoryId(UUID userId, UUID categoryId) {
         return aliasRepository.findByUserIdAndCategoryId(userId, categoryId);
     }
 
@@ -44,7 +45,7 @@ public class CategoryAliasService {
      * @param userId
      * @return A map where keys are grouping keys and values are the user's preferred aliases.
      */
-    public Map<String, String> getAliasesForUser(String userId) {
+    public Map<UUID, String> getAliasesForUser(UUID userId) {
         return aliasRepository.findByUserId(userId).stream()
             .collect(Collectors.toMap(
                 CategoryAliasEntity::getCategoryId,
@@ -58,7 +59,7 @@ public class CategoryAliasService {
      * @param categoryId The categoryId to associate the alias with.
      * @param alias The alias to save.
      */
-    public void saveAlias(String userId, String categoryId, String alias) {
+    public void saveAlias(UUID userId, UUID categoryId, String alias) {
         CategoryAliasEntity aliasEntity = new CategoryAliasEntity();
         aliasEntity.setUserId(userId);
         aliasEntity.setCategoryId(categoryId);
@@ -74,7 +75,7 @@ public class CategoryAliasService {
      * @param newAlias The new alias name.
      */
     @Transactional
-    public CategoryAliasEntity upsertAlias(String userId, String categoryId, String newAlias) throws Exception {
+    public CategoryAliasEntity upsertAlias(UUID userId, UUID categoryId, String newAlias) throws Exception {
         if (categoryService.findCategoryById(categoryId).isEmpty()) {
             throw new Exception("Category does not exist");
         }

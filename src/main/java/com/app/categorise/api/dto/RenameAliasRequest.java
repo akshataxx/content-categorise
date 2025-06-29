@@ -1,29 +1,31 @@
 package com.app.categorise.api.dto;
 
+import java.util.UUID;
+
 /**
  * DTO for handling requests to rename a category alias.
  * It contains the necessary information to identify the user, the grouping to target, and the new alias name.
  */
 public class RenameAliasRequest {
 
-    private String userId;
-    private String categoryId;
+    private UUID userId;
+    private UUID categoryId;
     private String newAlias;
 
     // Getters and setters
-    public String getUserId() {
+    public UUID getUserId() {
         return userId;
     }
 
-    public void setUserId(String userId) {
+    public void setUserId(UUID userId) {
         this.userId = userId;
     }
 
-    public String getCategoryId() {
+    public UUID getCategoryId() {
         return categoryId;
     }
 
-    public void setCategoryId(String categoryId) {
+    public void setCategoryId(UUID categoryId) {
         this.categoryId = categoryId;
     }
 

@@ -1,6 +1,7 @@
 package com.app.categorise.api.dto;
 
 import java.time.Instant;
+import java.util.UUID;
 
 /**
  * DTO for Transcript with aliases for categories.
@@ -9,7 +10,7 @@ import java.time.Instant;
  * Not saved to db, only used in API response.
  */
 public record TranscriptDtoWithAliases(
-    String id,
+    UUID id,
     String videoUrl,
     String transcript,
     String description,
@@ -23,7 +24,7 @@ public record TranscriptDtoWithAliases(
     /** The final, user-visible alias for the transcript (e.g., "Big-Back", "Tech-Tok"). */
     String alias,
     /** The special, predefined categoryId */
-    String categoryId,
+    UUID categoryId,
     /** The special, predefined category name (e.g., "Recipe"). */
     String category,
     Instant createdAt

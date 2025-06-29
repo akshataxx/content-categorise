@@ -7,16 +7,28 @@ Add your key in `application-secrets.properties`:
 openai.api.key=<YOUR_API_KEY>
 ```
 
-### Install MongoDB
-```declarative
-brew tap mongodb/brew
-brew install mongodb-community
-brew services start mongodb-community
+### Setup Database
+#### Install Postgres
+```shell
+brew install postgresql
+brew services restart postgresql@14
+
+brew install --cask pgadmin4
+open -a pgAdmin\ 4 #(To open pgAdmin)
 ```
 This will:
-- Install the MongoDB server,
+- Install the Postgres server,
 - Run it in the background,
-- Make it available on localhost:27017.
+- Install pgAdmin (GUI for Postgres).
+
+#### Create Database
+```shell
+psql -U postgres 
+# Once the shell is open, run the following command:
+CREATE DATABASE contentdb;
+```
+This will create a new database called "contentdb" with the default user "postgres".
+You can choose to use a different user or database name if desired, just have update the `application.properties` accordingly.
 
 ### Install other dependencies
 ```declarative

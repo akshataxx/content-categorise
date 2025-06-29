@@ -1,45 +1,51 @@
 package com.app.categorise.data.repository;
 
 import com.app.categorise.data.entity.TranscriptEntity;
-import org.springframework.data.mongodb.core.MongoTemplate;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.data.mongodb.core.query.Update;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.criteria.*;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Repository
 public class TranscriptRepositoryImpl implements CustomTranscriptRepository {
 
-    private final MongoTemplate mongoTemplate;
+    private final EntityManager entityManager;
 
-    public TranscriptRepositoryImpl(MongoTemplate mongoTemplate) {
-        this.mongoTemplate = mongoTemplate;
+    public TranscriptRepositoryImpl(EntityManager entityManager) {
+        this.entityManager = entityManager;
     }
 
     @Override
-    public List<TranscriptEntity> filter(List<String> categories, String account, Instant from, Instant to) {
-        Query query = new Query();
+    public List<TranscriptEntity> filter(List<UUID> categories, String account, Instant from, Instant to) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<TranscriptEntity> query = cb.createQuery(TranscriptEntity.class);
+        Root<TranscriptEntity> root = query.from(TranscriptEntity.class);
+
+        List<Predicate> predicates = new ArrayList<>();
 
         if (categories != null && !categories.isEmpty()) {
-            query.addCriteria(Criteria.where("categories").in(categories));
+            predicates.add(root.get("categoryId").in(categories));
         }
 
-        if (account != null && !account.isEmpty()) {
-            query.addCriteria(Criteria.where("account").is(account));
+        if (account != null && !account.isBlank()) {
+            predicates.add(cb.equal(root.get("account"), account));
         }
 
         if (from != null && to != null) {
-            query.addCriteria(Criteria.where("uploadedAt").gte(from).lte(to));
+            predicates.add(cb.between(root.get("uploadedAt"), from, to));
         } else if (from != null) {
-            query.addCriteria(Criteria.where("uploadedAt").gte(from));
+            predicates.add(cb.greaterThanOrEqualTo(root.get("uploadedAt"), from));
         } else if (to != null) {
-            query.addCriteria(Criteria.where("uploadedAt").lte(to));
+            predicates.add(cb.lessThanOrEqualTo(root.get("uploadedAt"), to));
         }
 
-        return mongoTemplate.find(query, TranscriptEntity.class);
+        query.where(cb.and(predicates.toArray(new Predicate[0])));
+        return entityManager.createQuery(query).getResultList();
     }
 }
+
 

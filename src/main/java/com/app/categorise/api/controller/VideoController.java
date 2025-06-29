@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @Tag(name = "Video", description = "Operations related to processing video URLs")
@@ -36,20 +37,24 @@ public class VideoController {
         System.out.println("POST /api/video/transcribe received");
 
         String videoUrl = request.get("videoUrl");
-        String userId = request.get("userId");
 
         if (videoUrl == null || videoUrl.isBlank()) {
             throw new IllegalArgumentException("Missing 'videoUrl' in request body");
         }
 
-        if (userId == null || userId.isBlank()) {
+        if (request.get("userId") == null) {
             throw new IllegalArgumentException("Missing 'userId' in request body");
         }
+        UUID userId = UUID.fromString(request.get("userId"));
 
         try (ProcessedVideoFiles files = videoService.extractAudioAndMetadata(videoUrl)) {
+            System.out.println("Audio file: " + files.getAudioFile().getAbsolutePath());
             String textTranscript = videoService.transcribeAudio(files.getAudioFile());
+            System.out.println("Transcript: " + textTranscript);
             TikTokMetadata metadata = videoService.extractMetadata(files.getMetadataFile());
+            System.out.println("Metadata: " + metadata);
             TranscriptDtoWithAliases transcriptDto = videoService.processVideoAndCreateTranscript(videoUrl, textTranscript, metadata, userId);
+            System.out.println("TranscriptDto: " + transcriptDto);
             return ResponseEntity.ok(transcriptDto);
         }
     }

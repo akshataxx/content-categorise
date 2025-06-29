@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -27,19 +28,19 @@ public class CategoryService {
         return categoryRepository.findByName(name);
     }
 
-    public Optional<CategoryEntity> findCategoryById(String id) {
+    public Optional<CategoryEntity> findCategoryById(UUID id) {
         return categoryRepository.findById(id);
     }
 
-    public CategoryEntity saveCategory(String id,String name, String description, String createdBy) {
-        return categoryRepository.save(new CategoryEntity(id, name, description, createdBy));
+    public CategoryEntity saveCategory(String name, String description, UUID createdBy) {
+        return categoryRepository.save(new CategoryEntity(name, description, createdBy));
     }
 
     // Save a category if it doesn't exist, otherwise return the existing one. Uniqueness is determined by name
-    public CategoryEntity saveIfNotExists(String name, String description, String createdBy) {
+    public CategoryEntity saveIfNotExists(String name, String description, UUID createdBy) {
         Optional<CategoryEntity> existingCategory = categoryRepository.findByName(name);
         return existingCategory.orElseGet(() ->
-            categoryRepository.save(new CategoryEntity(null, name, description, createdBy))
+            categoryRepository.save(new CategoryEntity(name, description, createdBy))
         );
     }
 

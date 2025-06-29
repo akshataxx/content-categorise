@@ -9,10 +9,7 @@ import com.app.categorise.domain.service.CategoryAliasService;
 import com.app.categorise.domain.service.CategoryService;
 import com.app.categorise.domain.service.TranscriptService;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
 import java.util.List;
@@ -38,14 +35,12 @@ public class TranscriptController {
         this.transcriptMapper = transcriptMapper;
     }
 
-
     /**
      * Find transcripts based on various filters.
      * Returns transcript + aliased categories.
      * Calls TranscriptService to get the data
      * Calls CategoryAliasService to get the user's aliases
      * Uses TranscriptMapper to build the final response
-     * @param id
      * @param categoryIds
      * @param account
      * @param from
@@ -53,26 +48,36 @@ public class TranscriptController {
      * @param userId
      * @return List of TranscriptDtoWithAliases
      */
-
     @GetMapping
     public List<TranscriptDtoWithAliases> findTranscripts(
-        @RequestParam(required = false) String id,
         @RequestParam(required = false) List<String> categoryIds,
         @RequestParam(required = false) String account,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
         @RequestParam(required = false) String userId
     ) {
-        if (id != null && !id.isEmpty()) {
-            return transcriptService.findTranscript(id)
-                .map(transcript -> List.of(mapToDtoWithAlias(transcript, userId)))
-                .orElse(List.of());
-        }
-
+        System.out.println("Finding all transcripts with filters: " + categoryIds + ", " + account + ", " + from + ", " + to);
         List<TranscriptEntity> transcriptEntities = transcriptService.allFilteredTranscripts(categoryIds, account, from, to);
         return transcriptEntities.stream()
             .map(transcript -> mapToDtoWithAlias(transcript, userId))
             .toList();
+    }
+
+    /**
+     * Find transcripts based on id
+     */
+    @GetMapping("/{transcriptId}")
+    public TranscriptDtoWithAliases findTranscript(
+        @PathVariable String transcriptId,
+        @RequestParam(required = false) String userId
+    ) {
+        if (transcriptId != null && !transcriptId.isEmpty()) {
+            System.out.println("Finding transcript by id: " + transcriptId);
+            return transcriptService.findTranscript(transcriptId)
+                .map(transcript -> mapToDtoWithAlias(transcript, userId))
+                .orElse(null);
+        }
+        return null;
     }
 
     private TranscriptDtoWithAliases mapToDtoWithAlias(TranscriptEntity transcript, String userId) {

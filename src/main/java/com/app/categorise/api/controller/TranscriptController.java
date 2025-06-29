@@ -9,6 +9,7 @@ import com.app.categorise.domain.service.CategoryAliasService;
 import com.app.categorise.domain.service.CategoryService;
 import com.app.categorise.domain.service.TranscriptService;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -41,43 +42,54 @@ public class TranscriptController {
      * Calls TranscriptService to get the data
      * Calls CategoryAliasService to get the user's aliases
      * Uses TranscriptMapper to build the final response
-     * @param categoryIds
-     * @param account
-     * @param from
-     * @param to
-     * @param userId
-     * @return List of TranscriptDtoWithAliases
+     * @param categoryIds Optional list of category IDs to filter transcripts
+     * @param account Optional account name to filter transcripts
+     * @param from Optional start of date-time range (ISO 8601 format)
+     * @param to Optional end of date-time range (ISO 8601 format)
+     * @param userId Optional user ID used to fetch category aliases for personalization
+     * @return A list of {@link TranscriptDtoWithAliases} matching the applied filters
      */
     @GetMapping
-    public List<TranscriptDtoWithAliases> findTranscripts(
+    public ResponseEntity<List<TranscriptDtoWithAliases>>  findTranscripts(
         @RequestParam(required = false) List<String> categoryIds,
         @RequestParam(required = false) String account,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
         @RequestParam(required = false) String userId
     ) {
-        System.out.println("Finding all transcripts with filters: " + categoryIds + ", " + account + ", " + from + ", " + to);
-        List<TranscriptEntity> transcriptEntities = transcriptService.allFilteredTranscripts(categoryIds, account, from, to);
-        return transcriptEntities.stream()
-            .map(transcript -> mapToDtoWithAlias(transcript, userId))
+        // TODO: remove when user functionality is implemented
+        String effectiveUserId = (userId == null || userId.isEmpty()) ? "1" : userId;
+
+        System.out.printf("Finding all transcripts with filters: categoryIds=%s, account=%s, from=%s, to=%s%n",
+            categoryIds, account, from, to
+        );
+
+        List<TranscriptEntity> transcripts = transcriptService.allFilteredTranscripts(categoryIds, account, from, to);
+
+        List<TranscriptDtoWithAliases> results = transcripts.stream()
+            .map(transcript -> mapToDtoWithAlias(transcript, effectiveUserId))
             .toList();
+
+        return ResponseEntity.ok(results);
     }
 
     /**
      * Find transcripts based on id
+     * @param userId Optional user ID used to fetch category aliases for personalization
+     * @return A {@link TranscriptDtoWithAliases} matching the id
      */
     @GetMapping("/{transcriptId}")
-    public TranscriptDtoWithAliases findTranscript(
+    public ResponseEntity<TranscriptDtoWithAliases> findTranscript(
         @PathVariable String transcriptId,
         @RequestParam(required = false) String userId
     ) {
-        if (transcriptId != null && !transcriptId.isEmpty()) {
-            System.out.println("Finding transcript by id: " + transcriptId);
-            return transcriptService.findTranscript(transcriptId)
-                .map(transcript -> mapToDtoWithAlias(transcript, userId))
-                .orElse(null);
-        }
-        return null;
+        // TODO: remove when user functionality is implemented
+        String effectiveUserId = (userId == null || userId.isEmpty()) ? "1" : userId;
+
+        return transcriptService.findTranscript(transcriptId)
+            .map(transcript -> mapToDtoWithAlias(transcript, effectiveUserId))
+            .map(ResponseEntity::ok)
+            .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     private TranscriptDtoWithAliases mapToDtoWithAlias(TranscriptEntity transcript, String userId) {

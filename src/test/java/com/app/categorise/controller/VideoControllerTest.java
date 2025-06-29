@@ -1,7 +1,7 @@
 package com.app.categorise.controller;
 
-import com.app.categorise.application.dto.TikTokMetadata;
-import com.app.categorise.application.dto.TranscriptDtoWithAliases;
+import com.app.categorise.data.dto.TikTokMetadata;
+import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.application.internal.ProcessedVideoFiles;
 import com.app.categorise.domain.service.VideoService;
 import com.app.categorise.api.controller.VideoController;
@@ -49,10 +49,22 @@ class VideoControllerTest {
         testMetadata.setIdentifierId("testChannelId");
         testMetadata.setIdentifier("testChannel");
 
-        testTranscriptDtoWithAlias = new TranscriptDtoWithAliases();
-        testTranscriptDtoWithAlias.setId("testId");
-        testTranscriptDtoWithAlias.setVideoUrl(testVideoUrl);
-        testTranscriptDtoWithAlias.setTranscript(testTranscript);
+        testTranscriptDtoWithAlias = new TranscriptDtoWithAliases(
+                "testId",
+                testVideoUrl,
+                testTranscript,
+                testMetadata.getDescription(),
+                testMetadata.getTitle(),
+            30.0,
+                Instant.now(),
+                testMetadata.getAccountId(),
+                testMetadata.getAccount(),
+                testMetadata.getIdentifierId(),
+                testMetadata.getIdentifier(),
+                "recipe",
+                "testCategory",
+                null
+        );
     }
 
     @Test

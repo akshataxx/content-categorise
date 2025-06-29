@@ -1,4 +1,4 @@
-package com.app.categorise.application.dto;
+package com.app.categorise.api.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 

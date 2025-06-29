@@ -1,7 +1,7 @@
 package com.app.categorise.api.controller;
 
-import com.app.categorise.application.dto.TikTokMetadata;
-import com.app.categorise.application.dto.TranscriptDtoWithAliases;
+import com.app.categorise.data.dto.TikTokMetadata;
+import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.application.internal.ProcessedVideoFiles;
 import com.app.categorise.domain.service.VideoService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,6 +27,7 @@ public class VideoController {
     /**
      * Rest endpoint to receive video url and get transcript of video
      * @param request the video url
+*    * @param userId the user id
      * @return the transcript of video
      */
     @Operation(summary = "Submit a video URL", description = "Downloads video, extracts transcript and metadata, and saves to DB")

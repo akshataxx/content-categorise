@@ -7,7 +7,7 @@ package com.app.categorise.api.dto;
 public class RenameAliasRequest {
 
     private String userId;
-    private String groupingKey;
+    private String categoryId;
     private String newAlias;
 
     // Getters and setters
@@ -19,12 +19,12 @@ public class RenameAliasRequest {
         this.userId = userId;
     }
 
-    public String getGroupingKey() {
-        return groupingKey;
+    public String getCategoryId() {
+        return categoryId;
     }
 
-    public void setGroupingKey(String groupingKey) {
-        this.groupingKey = groupingKey;
+    public void setCategoryId(String categoryId) {
+        this.categoryId = categoryId;
     }
 
     public String getNewAlias() {

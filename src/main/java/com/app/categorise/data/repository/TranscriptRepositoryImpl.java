@@ -41,17 +41,5 @@ public class TranscriptRepositoryImpl implements CustomTranscriptRepository {
 
         return mongoTemplate.find(query, TranscriptEntity.class);
     }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void updateAliasForUserAndGroupingKey(String userId, String groupingKey, String newAlias) {
-        // This query finds all transcripts where the accountId and groupingKey match the criteria.
-        Query query = new Query(Criteria.where("accountId").is(userId)
-                .and("groupingKey").is(groupingKey));
-        Update update = new Update().set("alias", newAlias);
-        mongoTemplate.updateMulti(query, update, TranscriptEntity.class);
-    }
 }
 

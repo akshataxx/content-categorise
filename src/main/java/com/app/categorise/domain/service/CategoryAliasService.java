@@ -2,7 +2,6 @@ package com.app.categorise.domain.service;
 
 import com.app.categorise.data.entity.CategoryAliasEntity;
 import com.app.categorise.data.repository.CategoryAliasRepository;
-import com.app.categorise.data.repository.TranscriptRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,53 +12,56 @@ import java.util.stream.Collectors;
 
 /**
  * Service for managing category aliases for users.
- * This service provides methods to retrieve and save category aliases to db.
+ * This service provides methods to retrieve and save categoryId aliases to db.
  */
 
 @Service
 public class CategoryAliasService {
 
     private final CategoryAliasRepository aliasRepository;
-    private final TranscriptRepository transcriptRepository;
+    private final CategoryService categoryService;
 
-    public CategoryAliasService(CategoryAliasRepository aliasRepository, TranscriptRepository transcriptRepository) {
+    public CategoryAliasService(
+        CategoryAliasRepository aliasRepository,
+        CategoryService categoryService
+    ) {
         this.aliasRepository = aliasRepository;
-        this.transcriptRepository = transcriptRepository;
+        this.categoryService = categoryService;
     }
 
     /**
      * Finds a user's specific alias preference for a given grouping key.
      * @param userId The user's ID.
-     * @param groupingKey The grouping key (e.g., "Recipe", "tech").
+     * @param categoryId The categoryId name (e.g., "Recipe", "Tech").
      * @return An Optional containing the {@link CategoryAliasEntity} if a preference exists.
      */
-    public Optional<CategoryAliasEntity> findByUserIdAndGroupingKey(String userId, String groupingKey) {
-        return aliasRepository.findByUserIdAndGroupingKey(userId, groupingKey);
+    public Optional<CategoryAliasEntity> findByUserIdAndCategoryId(String userId, String categoryId) {
+        return aliasRepository.findByUserIdAndCategoryId(userId, categoryId);
     }
 
     /**
-     * Retrieves a map of category aliases for a given user.
+     * Retrieves a map of categoryId aliases for a given user.
      * @param userId
      * @return A map where keys are grouping keys and values are the user's preferred aliases.
      */
     public Map<String, String> getAliasesForUser(String userId) {
         return aliasRepository.findByUserId(userId).stream()
-                .collect(Collectors.toMap(
-                        CategoryAliasEntity::getGroupingKey,
-                        CategoryAliasEntity::getAlias
-                ));
+            .collect(Collectors.toMap(
+                CategoryAliasEntity::getCategoryId,
+                CategoryAliasEntity::getAlias
+            ));
     }
 
     /**
      * Saves a new alias preference for a user.
      * @param userId The user's ID.
-     * @param groupingKey The grouping key to associate the alias with.
+     * @param categoryId The categoryId to associate the alias with.
      * @param alias The alias to save.
      */
-    public void saveAlias(String userId, String groupingKey, String alias) {
+    public void saveAlias(String userId, String categoryId, String alias) {
         CategoryAliasEntity aliasEntity = new CategoryAliasEntity();
         aliasEntity.setUserId(userId);
-        aliasEntity.setGroupingKey(groupingKey);
+        aliasEntity.setCategoryId(categoryId);
         aliasEntity.setAlias(alias);
         aliasRepository.save(aliasEntity);
     }
@@ -68,42 +70,21 @@ public class CategoryAliasService {
      * Renames an alias for a user. This is a transactional operation that updates the user's
      * future preference and also performs a bulk update on all existing transcripts to reflect the change.
      * @param userId The user's ID.
-     * @param groupingKey The grouping key whose alias is being renamed.
+     * @param categoryId The categoryId whose alias is being renamed.
      * @param newAlias The new alias name.
      */
     @Transactional
-    public void renameAlias(String userId, String groupingKey, String newAlias) {
-        // Step 1: Update or create the user's preference for future videos
-        CategoryAliasEntity aliasEntity = aliasRepository.findByUserIdAndGroupingKey(userId, groupingKey)
-                .orElse(new CategoryAliasEntity());
+    public CategoryAliasEntity upsertAlias(String userId, String categoryId, String newAlias) throws Exception {
+        if (categoryService.findCategoryById(categoryId).isEmpty()) {
+            throw new Exception("Category does not exist");
+        }
+
+        CategoryAliasEntity aliasEntity = aliasRepository.findByUserIdAndCategoryId(userId, categoryId)
+            .orElse(new CategoryAliasEntity());
 
         aliasEntity.setUserId(userId);
-        aliasEntity.setGroupingKey(groupingKey);
+        aliasEntity.setCategoryId(categoryId);
         aliasEntity.setAlias(newAlias);
-        aliasRepository.save(aliasEntity);
-
-        // Step 2: Bulk-update all existing transcripts for this user and category
-        transcriptRepository.updateAliasForUserAndGroupingKey(userId, groupingKey, newAlias);
+        return aliasRepository.save(aliasEntity);
     }
-
-    /**
-     * Saves AI-generated aliases for a given user.
-     * @param userId
-     * @param aliasMap
-     */
-    @Deprecated
-    public void saveAliases(String userId, Map<String, String> aliasMap) {
-        List<CategoryAliasEntity> aliases = aliasMap.entrySet().stream()
-                .map(entry -> {
-                    CategoryAliasEntity alias = new CategoryAliasEntity();
-                    alias.setUserId(userId);
-                    alias.setGroupingKey(entry.getKey());
-                    alias.setAlias(entry.getValue());
-                    return alias;
-                })
-                .toList();
-
-        aliasRepository.saveAll(aliases);
-    }
-
 }

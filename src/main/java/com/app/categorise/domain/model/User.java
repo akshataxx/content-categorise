@@ -1,7 +1,11 @@
 package com.app.categorise.domain.model;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
 import java.util.UUID;
 
+@Getter
 public class User {
     private UUID id;
     private String username;

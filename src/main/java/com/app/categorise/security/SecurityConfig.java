@@ -17,6 +17,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
+            .csrf(csrf -> csrf.disable()) // 🔴 Add this line to disable CSRF
             .authorizeHttpRequests(auth -> auth
                 .anyRequest().permitAll()
             )

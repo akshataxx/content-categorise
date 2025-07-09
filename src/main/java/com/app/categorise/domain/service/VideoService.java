@@ -68,7 +68,6 @@ public class VideoService {
 
         ProcessRunner.runCommand(
                 "yt-dlp",
-                "--use-extractors", "TikTok",
                 "--write-info-json",
                 "-x", "--audio-format", "mp3", "--audio-quality", "5",
                 "-o", outputTemplate,

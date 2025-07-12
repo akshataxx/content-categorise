@@ -5,6 +5,7 @@ import com.app.categorise.data.entity.CategoryAliasEntity;
 import com.app.categorise.domain.service.CategoryAliasService;
 import com.app.categorise.api.dto.RenameAliasRequest;
 import io.swagger.v3.oas.annotations.Operation;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -26,7 +27,7 @@ public class CategoryAliasController {
 
     @PutMapping("/upsert")
     @Operation(summary = "Upsert a categoryId alias for a user", description = "Updates the alias for a given canonical categoryId.")
-    public ResponseEntity<CategoryAliasEntity> upsertAlias(@RequestBody RenameAliasRequest request) throws Exception {
+    public ResponseEntity<CategoryAliasEntity> upsertAlias(@Valid @RequestBody RenameAliasRequest request) throws Exception {
         CategoryAliasEntity alias = aliasService.upsertAlias(
             request.getUserId(),
             request.getCategoryId(),

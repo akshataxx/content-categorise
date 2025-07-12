@@ -1,7 +1,9 @@
 package com.app.categorise.domain.service;
 
+import com.app.categorise.application.mapper.TranscriptMapper;
 import com.app.categorise.data.entity.TranscriptEntity;
 import com.app.categorise.data.repository.TranscriptRepository;
+import com.app.categorise.domain.model.Transcript;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -18,24 +20,30 @@ import java.util.UUID;
 public class TranscriptService {
 
     private final TranscriptRepository transcriptRepository;
+    private final TranscriptMapper transcriptMapper;
 
-    public TranscriptService(TranscriptRepository transcriptRepository) {
+    public TranscriptService(TranscriptRepository transcriptRepository, TranscriptMapper transcriptMapper) {
         this.transcriptRepository = transcriptRepository;
+        this.transcriptMapper = transcriptMapper;
     }
 
-    public Optional<TranscriptEntity> findTranscript(UUID id) {
+    public Optional<Transcript> findTranscript(UUID id) {
         if (id != null) {
-            return transcriptRepository.findById(id);
+            return transcriptRepository.findById(id).map(transcriptMapper::toDomain);
         }
         return Optional.empty();
     }
 
-    public List<TranscriptEntity> allFilteredTranscripts(List<UUID> categories, String account, Instant from, Instant to) {
-        return transcriptRepository.filter(categories, account, from, to);
+    public List<Transcript> allFilteredTranscripts(List<UUID> categories, String account, Instant from, Instant to) {
+        return transcriptRepository.filter(categories, account, from, to)
+            .stream()
+            .map(transcriptMapper::toDomain)
+            .toList();
     }
 
-    public TranscriptEntity save(TranscriptEntity transcript) {
+    public Transcript save(TranscriptEntity transcript) {
         System.out.println(transcript);
-        return transcriptRepository.save(transcript);
+         TranscriptEntity entity = transcriptRepository.save(transcript);
+         return transcriptMapper.toDomain(entity);
     }
 }

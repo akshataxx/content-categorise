@@ -5,6 +5,7 @@ import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.data.entity.CategoryAliasEntity;
 import com.app.categorise.data.entity.CategoryEntity;
 import com.app.categorise.data.entity.TranscriptEntity;
+import com.app.categorise.domain.model.Transcript;
 import com.app.categorise.domain.service.CategoryAliasService;
 import com.app.categorise.domain.service.CategoryService;
 import com.app.categorise.domain.service.TranscriptService;
@@ -62,7 +63,7 @@ public class TranscriptController {
             categoryIds, account, from, to
         );
 
-        List<TranscriptEntity> transcripts = transcriptService.allFilteredTranscripts(categoryIds, account, from, to);
+        List<Transcript> transcripts = transcriptService.allFilteredTranscripts(categoryIds, account, from, to);
 
         List<TranscriptDtoWithAliases> results = transcripts.stream()
             .map(transcript -> mapToDtoWithAlias(transcript, userId))
@@ -87,7 +88,7 @@ public class TranscriptController {
             .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    private TranscriptDtoWithAliases mapToDtoWithAlias(TranscriptEntity transcript, UUID userId) {
+    private TranscriptDtoWithAliases mapToDtoWithAlias(Transcript transcript, UUID userId) {
         String alias = null;
         if (userId != null) {
             alias = categoryAliasService.findByUserIdAndCategoryId(userId, transcript.getCategoryId())

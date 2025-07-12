@@ -9,6 +9,7 @@ import com.app.categorise.data.entity.CategoryAliasEntity;
 import com.app.categorise.data.entity.CategoryEntity;
 import com.app.categorise.data.entity.TranscriptEntity;
 import com.app.categorise.data.dto.TranscriptCategorisationResult;
+import com.app.categorise.domain.model.Transcript;
 import com.app.categorise.util.ProcessRunner;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
@@ -121,7 +122,7 @@ public class VideoService {
 
         // Create and save the transcript entity
         TranscriptEntity transcriptEntity = createTranscriptEntity(videoUrl, transcriptText, metadata, userId, category.getId());
-        TranscriptEntity savedEntity = transcriptService.save(transcriptEntity);
+        Transcript savedEntity = transcriptService.save(transcriptEntity);
 
         return transcriptMapper.toDto(savedEntity, category.getName(), alias);
     }

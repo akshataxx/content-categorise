@@ -1,4 +1,4 @@
-package com.app.categorise.service;
+package com.app.categorise.domain.service;
 
 import com.app.categorise.data.entity.UserEntity;
 import com.app.categorise.data.repository.UserRepository;

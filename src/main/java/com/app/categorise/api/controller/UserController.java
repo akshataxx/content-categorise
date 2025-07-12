@@ -1,8 +1,8 @@
     package com.app.categorise.api.controller;
 
     import com.app.categorise.data.entity.UserEntity;
-    import com.app.categorise.service.UserService;
     import com.app.categorise.domain.model.User;
+    import com.app.categorise.domain.service.UserService;
     import org.springframework.http.HttpStatus;
     import org.springframework.http.ResponseEntity;
     import org.springframework.security.core.annotation.AuthenticationPrincipal;

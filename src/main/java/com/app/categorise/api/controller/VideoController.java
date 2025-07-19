@@ -3,6 +3,7 @@ package com.app.categorise.api.controller;
 import com.app.categorise.data.dto.TikTokMetadata;
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.application.internal.ProcessedVideoFiles;
+import com.app.categorise.domain.service.UntranscribedLinkService;
 import com.app.categorise.domain.service.VideoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -20,9 +21,13 @@ import java.util.UUID;
 @RequestMapping("/api/video")
 public class VideoController {
     private final VideoService videoService;
+    private final UntranscribedLinkService untranscribedLinkService;
 
-    public VideoController(VideoService videoService) {
+    public VideoController(VideoService videoService, UntranscribedLinkService untranscribedLinkService) {
+
         this.videoService = videoService;
+        this.untranscribedLinkService = untranscribedLinkService;
+
     }
 
     /**
@@ -55,6 +60,8 @@ public class VideoController {
             System.out.println("Metadata: " + metadata);
             TranscriptDtoWithAliases transcriptDto = videoService.processVideoAndCreateTranscript(videoUrl, textTranscript, metadata, userId);
             System.out.println("TranscriptDto: " + transcriptDto);
+            // remove from untranscribed list if present
+            untranscribedLinkService.deleteLink(userId, videoUrl);
             return ResponseEntity.ok(transcriptDto);
         }
     }

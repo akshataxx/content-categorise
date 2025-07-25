@@ -34,11 +34,11 @@ public class JwtTokenProvider {
         }
 
         return Jwts.builder()
-                .setSubject(userPrincipal.getId().toString())
-                .setIssuedAt(new Date())
-                .setExpiration(expiryDate)
-                .signWith(key, SignatureAlgorithm.HS512)
-                .compact();
+            .setSubject(userPrincipal.getId().toString())
+            .setIssuedAt(new Date())
+            .setExpiration(expiryDate)
+            .signWith(key, SignatureAlgorithm.HS512)
+            .compact();
     }
 
     public String getUserIdFromJWT(String token) {
@@ -51,7 +51,7 @@ public class JwtTokenProvider {
             Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(authToken);
             return true;
         } catch (Exception ex) {
-            // log the exception
+            ex.printStackTrace();
         }
         return false;
     }

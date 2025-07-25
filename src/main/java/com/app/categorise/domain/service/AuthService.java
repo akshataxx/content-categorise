@@ -34,11 +34,12 @@ public class AuthService {
 
     public String authenticateWithGoogle(GoogleAuthRequest googleAuthRequest) throws Exception {
         GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), jsonFactory)
-                .setAudience(Collections.singletonList(googleClientId))
-                .build();
+            .setAudience(Collections.singletonList(googleClientId))
+            .build();
 
         GoogleIdToken idToken = verifier.verify(googleAuthRequest.getIdToken());
         if (idToken == null) {
+            System.out.println("Invalid Google ID token.");
             throw new Exception("Invalid Google ID token.");
         }
 
@@ -49,6 +50,8 @@ public class AuthService {
         String pictureUrl = (String) payload.get("picture");
         String firstName = (String) payload.get("given_name");
         String lastName = (String) payload.get("family_name");
+
+        System.out.println("Validated User ID: " + userId);
 
         UserEntity userEntity = userRepository.findBySub(userId).orElseGet(() -> {
             UserEntity newUser = new UserEntity();

@@ -1,3 +1,5 @@
 
 # Secret files
 /src/main/resources/application-secrets.properties
+
+/target/**/*

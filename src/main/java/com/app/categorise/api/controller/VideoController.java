@@ -8,11 +8,9 @@ import com.app.categorise.domain.service.VideoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
+import java.util.concurrent.CompletableFuture;
 import java.util.Map;
 import java.util.UUID;
 
@@ -24,34 +22,48 @@ public class VideoController {
     private final UntranscribedLinkService untranscribedLinkService;
 
     public VideoController(VideoService videoService, UntranscribedLinkService untranscribedLinkService) {
-
         this.videoService = videoService;
         this.untranscribedLinkService = untranscribedLinkService;
-
     }
 
-    /**
-     * Rest endpoint to receive video url and get transcript of video
-     * @param request the video url
-*    * @param userId the user id
-     * @return the transcript of video
-     */
     @Operation(summary = "Submit a video URL", description = "Downloads video, extracts transcript and metadata, and saves to DB")
     @PostMapping("/transcribe")
     public ResponseEntity<TranscriptDtoWithAliases> handleVideo(@RequestBody Map<String, String> request) throws Exception {
         System.out.println("POST /api/video/transcribe received");
 
         String videoUrl = request.get("videoUrl");
+        String userIdStr = request.get("userId");
 
-        if (videoUrl == null || videoUrl.isBlank()) {
-            throw new IllegalArgumentException("Missing 'videoUrl' in request body");
-        }
+        validateRequest(videoUrl, userIdStr);
 
-        if (request.get("userId") == null) {
-            throw new IllegalArgumentException("Missing 'userId' in request body");
-        }
-        UUID userId = UUID.fromString(request.get("userId"));
+        UUID userId = UUID.fromString(userIdStr);
+        TranscriptDtoWithAliases result = processVideo(videoUrl, userId);
+        return ResponseEntity.ok(result);
+    }
 
+    @PostMapping("/transcribe-async")
+    public ResponseEntity<Void> transcribeAsync(@RequestBody Map<String, String> request) {
+        System.out.println("POST /api/video/transcribe-async received");
+
+        String videoUrl = request.get("videoUrl");
+        String userIdStr = request.get("userId");
+
+        validateRequest(videoUrl, userIdStr);
+        UUID userId = UUID.fromString(userIdStr);
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                processVideo(videoUrl, userId);
+            } catch (Exception e) {
+                System.err.println("Error during async transcription: " + e.getMessage());
+                e.printStackTrace();
+            }
+        });
+
+        return ResponseEntity.accepted().build();
+    }
+
+    private TranscriptDtoWithAliases processVideo(String videoUrl, UUID userId) throws Exception {
         try (ProcessedVideoFiles files = videoService.extractAudioAndMetadata(videoUrl)) {
             System.out.println("Audio file: " + files.getAudioFile().getAbsolutePath());
             String textTranscript = videoService.transcribeAudio(files.getAudioFile());
@@ -60,9 +72,19 @@ public class VideoController {
             System.out.println("Metadata: " + metadata);
             TranscriptDtoWithAliases transcriptDto = videoService.processVideoAndCreateTranscript(videoUrl, textTranscript, metadata, userId);
             System.out.println("TranscriptDto: " + transcriptDto);
-            // remove from untranscribed list if present
+
             untranscribedLinkService.deleteLink(userId, videoUrl);
-            return ResponseEntity.ok(transcriptDto);
+
+            return transcriptDto;
+        }
+    }
+
+    private void validateRequest(String videoUrl, String userIdStr) {
+        if (videoUrl == null || videoUrl.isBlank()) {
+            throw new IllegalArgumentException("Missing 'videoUrl' in request body");
+        }
+        if (userIdStr == null || userIdStr.isBlank()) {
+            throw new IllegalArgumentException("Missing 'userId' in request body");
         }
     }
 }

@@ -22,11 +22,6 @@ public class AuthController {
     @Autowired
     private AuthService authService;
 
-    @GetMapping("/google")
-    public void redirectToGoogle(HttpServletResponse response) throws IOException {
-        response.sendRedirect("/oauth2/authorization/google");
-    }
-
     @PostMapping("/google")
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody GoogleAuthRequest googleAuthRequest) {
         try {

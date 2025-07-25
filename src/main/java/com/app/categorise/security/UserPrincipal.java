@@ -40,12 +40,12 @@ public class UserPrincipal implements UserDetails {
         List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_USER"));
 
         return new UserPrincipal(
-                user.getId(),
-                user.getName(),
-                user.getEmail(),
-                user.getEmail(),
-                null,
-                authorities
+            user.getId(),
+            user.getName(),
+            user.getEmail(),
+            user.getEmail(),
+            null,
+            authorities
         );
     }
 

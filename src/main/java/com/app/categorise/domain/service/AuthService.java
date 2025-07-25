@@ -27,7 +27,7 @@ public class AuthService {
     @Autowired
     private JwtTokenProvider tokenProvider;
 
-    @Value("${spring.security.oauth2.client.registration.google.client-id}")
+    @Value("${google.client-id}")
     private String googleClientId;
     
     private final JsonFactory jsonFactory = new GsonFactory();

@@ -26,6 +26,7 @@ public class AuthController {
             System.out.println("JWT: " + jwt);
             return ResponseEntity.ok(new JwtAuthResponse(jwt));
         } catch (Exception e) {
+            System.err.println("Error during authentication: " + e.getMessage());
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }

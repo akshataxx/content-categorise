@@ -37,6 +37,9 @@ public class AuthService {
             .setAudience(Collections.singletonList(googleClientId))
             .build();
 
+        System.out.println("Google Client ID: " + googleClientId);
+        System.out.println("Google Auth Request: " + googleAuthRequest.getIdToken());
+
         GoogleIdToken idToken = verifier.verify(googleAuthRequest.getIdToken());
         if (idToken == null) {
             System.out.println("Invalid Google ID token.");
@@ -67,6 +70,9 @@ public class AuthService {
         User user = new User(userEntity.getId(), userEntity.getName(), userEntity.getEmail(), userEntity.getPictureUrl());
 
         Authentication authentication = new UsernamePasswordAuthenticationToken(user, null, null);
-        return tokenProvider.generateToken(authentication);
+        System.out.println("Authentication: " + authentication);
+        String jwt = tokenProvider.generateToken(authentication);
+        System.out.println("Generated JWT: " + jwt);
+        return jwt;
     }
 } 

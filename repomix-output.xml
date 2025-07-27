@@ -59,6 +59,9 @@ src/
                 UserController.java
                 VideoController.java
               dto/
+                auth/
+                  GoogleAuthRequest.java
+                  JwtAuthResponse.java
                 AddLinkRequest.java
                 ErrorResponse.java
                 RenameAliasRequest.java
@@ -107,6 +110,7 @@ src/
                 Transcript.java
                 User.java
               service/
+                AuthService.java
                 CategorisationService.java
                 CategoryAliasService.java
                 CategoryService.java
@@ -117,8 +121,11 @@ src/
             exception/
               GlobalExceptionHandler.java
             security/
-              CustomOAuth2UserService.java
+              jwt/
+                JwtAuthenticationFilter.java
+                JwtTokenProvider.java
               SecurityConfig.java
+              UserPrincipal.java
             util/
               ProcessRunner.java
             ContentApplication.java
@@ -168,27 +175,6 @@ distributionType=only-script
 distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.9/apache-maven-3.9.9-bin.zip
 </file>
 
-<file path="src/main/java/com/app/categorise/api/controller/AuthController.java">
-package com.app.categorise.api.controller;
-
-import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-
-import java.io.IOException;
-
-@RestController
-@RequestMapping("login")
-public class AuthController {
-
-    @GetMapping("/google")
-    public void redirectToGoogle(HttpServletResponse response) throws IOException {
-        response.sendRedirect("/oauth2/authorization/google");
-    }
-}
-</file>
-
 <file path="src/main/java/com/app/categorise/api/controller/UntranscribedLinkController.java">
 package com.app.categorise.api.controller;
 
@@ -227,6 +213,55 @@ public class UntranscribedLinkController {
     @GetMapping("/{userId}")
     public ResponseEntity<List<String>> getLinks(@PathVariable UUID userId) {
         return ResponseEntity.ok(service.getLinks(userId));
+    }
+}
+</file>
+
+<file path="src/main/java/com/app/categorise/api/dto/auth/GoogleAuthRequest.java">
+package com.app.categorise.api.dto.auth;
+
+import jakarta.validation.constraints.NotEmpty;
+
+public class GoogleAuthRequest {
+
+    @NotEmpty
+    private String idToken;
+
+    public String getIdToken() {
+        return idToken;
+    }
+
+    public void setIdToken(String idToken) {
+        this.idToken = idToken;
+    }
+}
+</file>
+
+<file path="src/main/java/com/app/categorise/api/dto/auth/JwtAuthResponse.java">
+package com.app.categorise.api.dto.auth;
+
+public class JwtAuthResponse {
+    private String accessToken;
+    private String tokenType = "Bearer";
+
+    public JwtAuthResponse(String accessToken) {
+        this.accessToken = accessToken;
+    }
+
+    public String getAccessToken() {
+        return accessToken;
+    }
+
+    public void setAccessToken(String accessToken) {
+        this.accessToken = accessToken;
+    }
+
+    public String getTokenType() {
+        return tokenType;
+    }
+
+    public void setTokenType(String tokenType) {
+        this.tokenType = tokenType;
     }
 }
 </file>
@@ -609,6 +644,78 @@ public interface UntranscribedLinkRepository extends JpaRepository<Untranscribed
 }
 </file>
 
+<file path="src/main/java/com/app/categorise/domain/service/AuthService.java">
+package com.app.categorise.domain.service;
+
+import com.app.categorise.api.dto.auth.GoogleAuthRequest;
+import com.app.categorise.data.entity.UserEntity;
+import com.app.categorise.data.repository.UserRepository;
+import com.app.categorise.domain.model.User;
+import com.app.categorise.security.jwt.JwtTokenProvider;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.JsonFactory;
+import com.google.api.client.json.gson.GsonFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.stereotype.Service;
+
+import java.util.Collections;
+
+@Service
+public class AuthService {
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private JwtTokenProvider tokenProvider;
+
+    @Value("${google.client-id}")
+    private String googleClientId;
+    
+    private final JsonFactory jsonFactory = new GsonFactory();
+
+    public String authenticateWithGoogle(GoogleAuthRequest googleAuthRequest) throws Exception {
+        GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(new NetHttpTransport(), jsonFactory)
+                .setAudience(Collections.singletonList(googleClientId))
+                .build();
+
+        GoogleIdToken idToken = verifier.verify(googleAuthRequest.getIdToken());
+        if (idToken == null) {
+            throw new Exception("Invalid Google ID token.");
+        }
+
+        GoogleIdToken.Payload payload = idToken.getPayload();
+        String userId = payload.getSubject();
+        String email = payload.getEmail();
+        String name = (String) payload.get("name");
+        String pictureUrl = (String) payload.get("picture");
+        String firstName = (String) payload.get("given_name");
+        String lastName = (String) payload.get("family_name");
+
+        UserEntity userEntity = userRepository.findBySub(userId).orElseGet(() -> {
+            UserEntity newUser = new UserEntity();
+            newUser.setSub(userId);
+            newUser.setEmail(email);
+            newUser.setName(name);
+            newUser.setFirstName(firstName);
+            newUser.setLastName(lastName);
+            newUser.setPictureUrl(pictureUrl);
+            return userRepository.save(newUser);
+        });
+
+        User user = new User(userEntity.getId(), userEntity.getName(), userEntity.getEmail(), userEntity.getPictureUrl());
+
+        Authentication authentication = new UsernamePasswordAuthenticationToken(user, null, null);
+        return tokenProvider.generateToken(authentication);
+    }
+}
+</file>
+
 <file path="src/main/java/com/app/categorise/domain/service/UntranscribedLinkService.java">
 package com.app.categorise.domain.service;
 
@@ -644,52 +751,237 @@ public class UntranscribedLinkService {
 }
 </file>
 
-<file path="src/main/java/com/app/categorise/security/CustomOAuth2UserService.java">
+<file path="src/main/java/com/app/categorise/security/jwt/JwtAuthenticationFilter.java">
+package com.app.categorise.security.jwt;
+
+import com.app.categorise.domain.service.UserService;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.util.StringUtils;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.util.UUID;
+
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    @Autowired
+    private JwtTokenProvider tokenProvider;
+
+    @Autowired
+    private UserService userService;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
+        try {
+            String jwt = getJwtFromRequest(request);
+
+            if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
+                String userId = tokenProvider.getUserIdFromJWT(jwt);
+
+                UserDetails userDetails = userService.loadUserById(UUID.fromString(userId));
+                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            }
+        } catch (Exception ex) {
+            logger.error("Could not set user authentication in security context", ex);
+        }
+
+        filterChain.doFilter(request, response);
+    }
+
+    private String getJwtFromRequest(HttpServletRequest request) {
+        String bearerToken = request.getHeader("Authorization");
+        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
+            return bearerToken.substring(7, bearerToken.length());
+        }
+        return null;
+    }
+}
+</file>
+
+<file path="src/main/java/com/app/categorise/security/jwt/JwtTokenProvider.java">
+package com.app.categorise.security.jwt;
+
+import com.app.categorise.domain.model.User;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.Authentication;
+import org.springframework.stereotype.Component;
+
+import java.security.Key;
+import java.util.Date;
+
+@Component
+public class JwtTokenProvider {
+
+    @Value("${app.jwtSecret}")
+    private String jwtSecret;
+
+    @Value("${app.jwtExpirationInMs}")
+    private int jwtExpirationInMs;
+
+    private Key key;
+
+    public String generateToken(Authentication authentication) {
+        User userPrincipal = (User) authentication.getPrincipal();
+
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + jwtExpirationInMs);
+        
+        if (key == null) {
+            key = Keys.hmacShaKeyFor(jwtSecret.getBytes());
+        }
+
+        return Jwts.builder()
+                .setSubject(userPrincipal.getId().toString())
+                .setIssuedAt(new Date())
+                .setExpiration(expiryDate)
+                .signWith(key, SignatureAlgorithm.HS512)
+                .compact();
+    }
+
+    public String getUserIdFromJWT(String token) {
+        Claims claims = Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token).getBody();
+        return claims.getSubject();
+    }
+
+    public boolean validateToken(String authToken) {
+        try {
+            Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(authToken);
+            return true;
+        } catch (Exception ex) {
+            // log the exception
+        }
+        return false;
+    }
+}
+</file>
+
+<file path="src/main/java/com/app/categorise/security/UserPrincipal.java">
 package com.app.categorise.security;
 
 import com.app.categorise.data.entity.UserEntity;
-import com.app.categorise.data.repository.UserRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
-import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
-import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
-import org.springframework.security.oauth2.core.user.OAuth2User;
-import org.springframework.stereotype.Service;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
 
-import java.util.Map;
+import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
-@Service
-public class CustomOAuth2UserService implements OAuth2UserService<OAuth2UserRequest, OAuth2User> {
+public class UserPrincipal implements UserDetails {
+    private UUID id;
 
-    @Autowired
-    private UserRepository userRepository;
+    private String name;
 
-    private final DefaultOAuth2UserService delegate = new DefaultOAuth2UserService();
+    private String username;
+
+    @JsonIgnore
+    private String email;
+
+    @JsonIgnore
+    private String password;
+
+    private Collection<? extends GrantedAuthority> authorities;
+
+    public UserPrincipal(UUID id, String name, String username, String email, String password, Collection<? extends GrantedAuthority> authorities) {
+        this.id = id;
+        this.name = name;
+        this.username = username;
+        this.email = email;
+        this.password = password;
+        this.authorities = authorities;
+    }
+
+    public static UserPrincipal create(UserEntity user) {
+        List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_USER"));
+
+        return new UserPrincipal(
+            user.getId(),
+            user.getName(),
+            user.getEmail(),
+            user.getEmail(),
+            null,
+            authorities
+        );
+    }
+
+    public UUID getId() {
+        return id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getEmail() {
+        return email;
+    }
 
     @Override
-    public OAuth2User loadUser(OAuth2UserRequest userRequest) {
-        OAuth2User oAuth2User = delegate.loadUser(userRequest);
+    public String getUsername() {
+        return username;
+    }
 
-        Map<String, Object> attributes = oAuth2User.getAttributes();
-        String googleId = (String) attributes.get("sub");
-        String email = (String) attributes.get("email");
-        String name = (String) attributes.get("name");
-        String firstName = (String) attributes.get("given_name");
-        String lastName = (String) attributes.get("family_name");
-        String picture = (String) attributes.get("picture");
+    @Override
+    public boolean isAccountNonExpired() {
+        return true;
+    }
 
-        userRepository.findBySub(googleId).orElseGet(() -> {
-            UserEntity newUser = new UserEntity();
-            newUser.setSub(googleId);
-            newUser.setName(name);
-            newUser.setFirstName(firstName);
-            newUser.setLastName(lastName);
-            newUser.setEmail(email);
-            newUser.setPictureUrl(picture);
-            return userRepository.save(newUser);
-        });
+    @Override
+    public boolean isAccountNonLocked() {
+        return true;
+    }
 
-        return oAuth2User;
+    @Override
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return true;
+    }
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return authorities;
+    }
+
+    @Override
+    public String getPassword() {
+        return password;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        UserPrincipal that = (UserPrincipal) o;
+        return Objects.equals(id, that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
     }
 }
 </file>
@@ -736,22 +1028,6 @@ public class ProcessRunner {
             throw new RuntimeException("Command failed with exit code: " + exitCode);
         }
     }
-}
-</file>
-
-<file path="src/main/java/com/app/categorise/ContentApplication.java">
-package com.app.categorise;
-
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-
-@SpringBootApplication
-public class ContentApplication {
-
-	public static void main(String[] args) {
-		SpringApplication.run(ContentApplication.class, args);
-	}
-
 }
 </file>
 
@@ -837,6 +1113,43 @@ class ContentApplicationTests {
 *.cmd text eol=crlf
 </file>
 
+<file path="src/main/java/com/app/categorise/api/controller/AuthController.java">
+package com.app.categorise.api.controller;
+
+import com.app.categorise.api.dto.auth.GoogleAuthRequest;
+import com.app.categorise.api.dto.auth.JwtAuthResponse;
+import com.app.categorise.domain.service.AuthService;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.io.IOException;
+
+@RestController
+@RequestMapping("/api/auth")
+public class AuthController {
+
+    @Autowired
+    private AuthService authService;
+
+    @PostMapping("/google")
+    public ResponseEntity<?> authenticateUser(@Valid @RequestBody GoogleAuthRequest googleAuthRequest) {
+        try {
+            String jwt = authService.authenticateWithGoogle(googleAuthRequest);
+            return ResponseEntity.ok(new JwtAuthResponse(jwt));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+}
+</file>
+
 <file path="src/main/java/com/app/categorise/data/dto/TranscriptCategorisationResult.java">
 package com.app.categorise.data.dto;
 
@@ -851,93 +1164,33 @@ package com.app.categorise.data.dto;
 public record TranscriptCategorisationResult(String category, String genericTopic, String suggestedAlias) { }
 </file>
 
-<file path="src/main/java/com/app/categorise/domain/service/UserService.java">
-package com.app.categorise.domain.service;
+<file path="src/main/java/com/app/categorise/ContentApplication.java">
+package com.app.categorise;
 
-import com.app.categorise.data.entity.UserEntity;
-import com.app.categorise.data.repository.UserRepository;
-import org.springframework.stereotype.Service;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.PropertySource;
 
-import java.util.Optional;
+@SpringBootApplication
+@PropertySource("classpath:application-secrets.properties")
+public class ContentApplication {
 
-@Service
-public class UserService {
+	public static void main(String[] args) {
+		SpringApplication.run(ContentApplication.class, args);
+	}
 
-    private final UserRepository userRepository;
-
-    public UserService(UserRepository userRepository) {
-        this.userRepository = userRepository;
-    }
-
-    public Optional<UserEntity> findById(Long id) {
-        return userRepository.findById(id);
-    }
-
-    public Optional<UserEntity> findBySub(String sub) {
-        return userRepository.findBySub(sub);
-    }
-
-    public Optional<UserEntity> findByEmail(String email) {
-        return userRepository.findByEmail(email);
-    }
-
-    public UserEntity saveUser(UserEntity user) {
-        return userRepository.save(user);
-    }
-
-    public boolean existsByEmail(String email) {
-        return userRepository.findByEmail(email).isPresent();
-    }
-}
-</file>
-
-<file path="src/main/java/com/app/categorise/security/SecurityConfig.java">
-package com.app.categorise.security;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.web.SecurityFilterChain;
-
-@Configuration
-@EnableWebSecurity
-public class SecurityConfig {
-
-    @Autowired
-    private CustomOAuth2UserService customOAuth2UserService;
-
-    @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-            .csrf(csrf -> csrf.disable()) // 🔴 Add this line to disable CSRF
-            .authorizeHttpRequests(auth -> auth
-                .anyRequest().permitAll()
-            )
-            .oauth2Login(oauth2 -> oauth2
-                .userInfoEndpoint(userInfo -> userInfo
-                    .userService(customOAuth2UserService)
-                )
-                .defaultSuccessUrl("/user/profile", true)
-            ).logout(logout -> logout.logoutSuccessUrl("/"));
-
-
-        return http.build();
-    }
 }
 </file>
 
 <file path="src/main/java/com/app/categorise/api/controller/UserController.java">
 package com.app.categorise.api.controller;
 
-    import com.app.categorise.data.entity.UserEntity;
     import com.app.categorise.domain.model.User;
     import com.app.categorise.domain.service.UserService;
+    import com.app.categorise.security.UserPrincipal;
     import org.springframework.http.HttpStatus;
     import org.springframework.http.ResponseEntity;
     import org.springframework.security.core.annotation.AuthenticationPrincipal;
-    import org.springframework.security.oauth2.core.user.OAuth2User;
     import org.springframework.web.bind.annotation.GetMapping;
     import org.springframework.web.bind.annotation.RequestMapping;
     import org.springframework.web.bind.annotation.RestController;
@@ -954,27 +1207,12 @@ package com.app.categorise.api.controller;
         }
 
         @GetMapping("/profile")
-        public ResponseEntity<User> getCurrentUser(@AuthenticationPrincipal OAuth2User principal) {
-            if (principal == null) {
-                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Not authenticated");
-            }
-            System.out.println("Principal: " + principal);
-            System.out.println("Attributes: " + principal.getAttributes());
-
-            String sub = principal.getAttribute("sub");
-            if (sub == null) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing 'sub' in OAuth2 principal");
-            }
-
-            UserEntity user = userService.findBySub(sub)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
-            System.out.println("User: " + user);
-
+        public ResponseEntity<User> getCurrentUser(@AuthenticationPrincipal UserPrincipal principal) {
+            if (principal == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Not authenticated");
             return ResponseEntity.ok(new User(
-                user.getId(),
-                user.getName(),
-                user.getEmail(),
-                user.getPictureUrl()
+                principal.getId(),
+                principal.getName(),
+                principal.getEmail()
             ));
         }
     }
@@ -1330,6 +1568,117 @@ public class Transcript {
 }
 </file>
 
+<file path="src/main/java/com/app/categorise/domain/service/UserService.java">
+package com.app.categorise.domain.service;
+
+import com.app.categorise.data.entity.UserEntity;
+import com.app.categorise.data.repository.UserRepository;
+import com.app.categorise.security.UserPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Optional;
+import java.util.UUID;
+
+@Service
+public class UserService implements UserDetailsService {
+
+    private final UserRepository userRepository;
+
+    public UserService(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
+
+    public Optional<UserEntity> findById(UUID id) {
+        return userRepository.findById(id);
+    }
+
+    @Transactional
+    public UserDetails loadUserById(UUID id) {
+        UserEntity user = userRepository.findById(id).orElseThrow(
+                () -> new UsernameNotFoundException("User not found with id : " + id)
+        );
+
+        return UserPrincipal.create(user);
+    }
+
+    @Override
+    @Transactional
+    public UserDetails loadUserByUsername(String email)
+            throws UsernameNotFoundException {
+        UserEntity user = userRepository.findByEmail(email)
+                .orElseThrow(() ->
+                        new UsernameNotFoundException("User not found with email : " + email)
+                );
+
+        return UserPrincipal.create(user);
+    }
+
+    public Optional<UserEntity> findBySub(String sub) {
+        return userRepository.findBySub(sub);
+    }
+
+    public Optional<UserEntity> findByEmail(String email) {
+        return userRepository.findByEmail(email);
+    }
+
+    public UserEntity saveUser(UserEntity user) {
+        return userRepository.save(user);
+    }
+
+    public boolean existsByEmail(String email) {
+        return userRepository.findByEmail(email).isPresent();
+    }
+}
+</file>
+
+<file path="src/main/java/com/app/categorise/security/SecurityConfig.java">
+package com.app.categorise.security;
+
+import com.app.categorise.security.jwt.JwtAuthenticationFilter;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity(
+        securedEnabled = true,
+        jsr250Enabled = true
+)
+public class SecurityConfig {
+    @Bean
+    public JwtAuthenticationFilter jwtAuthenticationFilter() {
+        return new JwtAuthenticationFilter();
+    }
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+            .cors(cors -> cors.disable())
+            .csrf(csrf -> csrf.disable())
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/api/auth/**", "/").permitAll()
+                .anyRequest().authenticated()
+            );
+
+        http.addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+}
+</file>
+
 <file path="src/main/java/com/app/categorise/api/controller/CategoryAliasController.java">
 package com.app.categorise.api.controller;
 
@@ -1496,20 +1845,6 @@ public interface CustomTranscriptRepository {
 }
 </file>
 
-<file path="src/main/java/com/app/categorise/data/repository/UserRepository.java">
-package com.app.categorise.data.repository;
-
-import com.app.categorise.data.entity.UserEntity;
-import org.springframework.data.jpa.repository.JpaRepository;
-
-import java.util.Optional;
-
-public interface UserRepository extends JpaRepository<UserEntity, Long> {
-    Optional<UserEntity> findBySub(String sub);
-    Optional<UserEntity> findByEmail(String email);
-}
-</file>
-
 <file path="src/main/java/com/app/categorise/domain/service/CategoryService.java">
 package com.app.categorise.domain.service;
 
@@ -1672,47 +2007,6 @@ public class GlobalExceptionHandler {
 }
 </file>
 
-<file path=".gitignore">
-HELP.md
-target/
-.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
-
-### STS ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
-
-### IntelliJ IDEA ###
-.idea
-*.iws
-*.iml
-*.ipr
-
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-build/
-!**/src/main/**/build/
-!**/src/test/**/build/
-
-### VS Code ###
-.vscode/
-
-### Exclude application-secrets.properties file
-src/main/resources/application-secrets.properties
-
-.DS_Store
-</file>
-
 <file path="src/main/java/com/app/categorise/api/dto/RenameAliasRequest.java">
 package com.app.categorise.api.dto;
 
@@ -1856,6 +2150,21 @@ public class TranscriptRepositoryImpl implements CustomTranscriptRepository {
 }
 </file>
 
+<file path="src/main/java/com/app/categorise/data/repository/UserRepository.java">
+package com.app.categorise.data.repository;
+
+import com.app.categorise.data.entity.UserEntity;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.Optional;
+import java.util.UUID;
+
+public interface UserRepository extends JpaRepository<UserEntity, UUID> {
+    Optional<UserEntity> findBySub(String sub);
+    Optional<UserEntity> findByEmail(String email);
+}
+</file>
+
 <file path="src/main/java/com/app/categorise/domain/model/User.java">
 package com.app.categorise.domain.model;
 
@@ -1876,6 +2185,17 @@ public class User {
         this.username = username;
         this.email = email;
         this.pictureUrl = pictureUrl;
+    }
+
+    public User(UUID id, String username, String email) {
+        this.id = id;
+        this.username = username;
+        this.email = email;
+        this.pictureUrl = "";
+    }
+
+    public UUID getId() {
+        return id;
     }
 }
 </file>
@@ -1972,6 +2292,15 @@ public class CategoryAliasService {
         return aliasRepository.save(aliasEntity);
     }
 }
+</file>
+
+<file path=".gitignore">
+# Secret files
+/src/main/resources/application-secrets.properties
+
+/target/**/*
+
+.idea
 </file>
 
 <file path="src/main/java/com/app/categorise/api/controller/TranscriptController.java">
@@ -2762,7 +3091,7 @@ public class TranscriptEntity {
 
 <file path="src/main/resources/application.properties">
 spring.application.name=content
-spring.profiles.active=prod
+spring.profiles.active=dev
 
 spring.data.mongodb.uri=mongodb://localhost:27017/contentdb
 
@@ -2777,15 +3106,6 @@ spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
 
 spring.flyway.enabled=true
 spring.flyway.locations=classpath:db/migration
-
-
-spring.security.oauth2.client.registration.google.client-id=916782596266-tdjnnnl8csh15oeghn6h9fid4u4qsf98.apps.googleusercontent.com
-spring.security.oauth2.client.registration.google.client-secret=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
-spring.security.oauth2.client.registration.google.scope=profile,email
-
-spring.security.oauth2.client.provider.google.authorization-uri=https://accounts.google.com/o/oauth2/v2/auth
-spring.security.oauth2.client.provider.google.token-uri=https://oauth2.googleapis.com/token
-spring.security.oauth2.client.provider.google.user-info-uri=https://www.googleapis.com/oauth2/v3/userinfo
 </file>
 
 <file path="README.md">
@@ -3140,13 +3460,35 @@ public class VideoService {
 
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-oauth2-client</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security</artifactId>
 		</dependency>
 
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.google.api-client</groupId>
+			<artifactId>google-api-client</artifactId>
+			<version>1.33.0</version>
+		</dependency>
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-api</artifactId>
+			<version>0.11.5</version>
+		</dependency>
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-impl</artifactId>
+			<version>0.11.5</version>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>io.jsonwebtoken</groupId>
+			<artifactId>jjwt-jackson</artifactId>
+			<version>0.11.5</version>
+			<scope>runtime</scope>
+		</dependency>
 		<!--	test	-->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

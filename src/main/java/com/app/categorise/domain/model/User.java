@@ -18,4 +18,15 @@ public class User {
         this.email = email;
         this.pictureUrl = pictureUrl;
     }
+
+    public User(UUID id, String username, String email) {
+        this.id = id;
+        this.username = username;
+        this.email = email;
+        this.pictureUrl = "";
+    }
+
+    public UUID getId() {
+        return id;
+    }
 }

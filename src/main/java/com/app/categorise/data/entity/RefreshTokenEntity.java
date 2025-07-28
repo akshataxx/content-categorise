@@ -1,7 +1,7 @@
-package com.app.categorise.data.entity
+package com.app.categorise.data.entity;
 
-import jakarta.persistence.*
-import lombok.Data
+import jakarta.persistence.*;
+import lombok.Data;
 import java.time.Instant;
 import java.util.UUID;
 

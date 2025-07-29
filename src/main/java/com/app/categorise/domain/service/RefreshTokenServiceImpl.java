@@ -23,7 +23,9 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
 
     @Override
     public boolean isValid(String refreshToken) {
-        return repo.findByToken(refreshToken).isPresent();
+        return repo.findByToken(refreshToken)
+                .filter(rt -> rt.getExpiryDate().isAfter(Instant.now()))
+                .isPresent();
     }
 
     @Override

@@ -3,6 +3,8 @@ package com.app.categorise.api.controller;
 import com.app.categorise.api.dto.auth.GoogleAuthRequest;
 import com.app.categorise.api.dto.auth.JwtAuthResponse;
 import com.app.categorise.domain.service.AuthService;
+//import com.google.api.client.auth.oauth2.RefreshTokenRequest;
+import com.app.categorise.api.dto.auth.RefreshTokenRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -19,15 +21,21 @@ public class AuthController {
     private AuthService authService;
 
     @PostMapping("/google")
-    public ResponseEntity<?> authenticateUser(@Valid @RequestBody GoogleAuthRequest googleAuthRequest) {
+    public ResponseEntity<?> authenticateUser(@Valid @RequestBody GoogleAuthRequest req) {
         System.out.println("POST /api/auth/google received");
         try {
-            String jwt = authService.authenticateWithGoogle(googleAuthRequest);
-            System.out.println("JWT: " + jwt);
-            return ResponseEntity.ok(new JwtAuthResponse(jwt));
+            JwtAuthResponse tokens = authService.authenticateWithGoogle(req);
+            System.out.println("Tokens: " + tokens);
+            return ResponseEntity.ok(tokens);
         } catch (Exception e) {
             System.err.println("Error during authentication: " + e.getMessage());
             return ResponseEntity.badRequest().body(e.getMessage());
         }
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<JwtAuthResponse> refreshToken(@Valid @RequestBody RefreshTokenRequest req) throws Exception {
+        JwtAuthResponse tokens = authService.refreshAccessToken(req);
+        return ResponseEntity.ok(tokens);
     }
 }

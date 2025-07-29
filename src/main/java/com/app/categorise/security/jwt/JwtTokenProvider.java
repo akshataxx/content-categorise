@@ -21,7 +21,7 @@ public class JwtTokenProvider {
     @Value("${app.jwtExpirationInMs}")
     private int jwtExpirationInMs;
 
-    @Value("{app.jwtRefreshExpirationInMs}")
+    @Value("${app.jwtRefreshExpirationInMs}")
     private int jwtRefreshExpirationInMs;
 
     private Key key;
@@ -48,7 +48,7 @@ public class JwtTokenProvider {
         User userPrincipal = (User) authentication.getPrincipal();
 
         Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + jwtExpirationInMs);
+        Date expiryDate = new Date(now.getTime() + jwtRefreshExpirationInMs);
 
         if (key == null) {
             key = Keys.hmacShaKeyFor(jwtSecret.getBytes());

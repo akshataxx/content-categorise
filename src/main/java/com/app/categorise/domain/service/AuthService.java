@@ -6,7 +6,6 @@ import com.app.categorise.data.entity.UserEntity;
 import com.app.categorise.data.repository.UserRepository;
 import com.app.categorise.domain.model.User;
 import com.app.categorise.security.jwt.JwtTokenProvider;
-//import com.google.api.client.auth.oauth2.RefreshTokenRequest;
 import com.app.categorise.api.dto.auth.RefreshTokenRequest;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
@@ -83,11 +82,6 @@ public class AuthService {
 
         Authentication authentication = new UsernamePasswordAuthenticationToken(user, null, null);
         System.out.println("Authentication: " + authentication);
-
-
-        /*String jwt = tokenProvider.generateToken(authentication);
-        System.out.println("Generated JWT: " + jwt);
-        return jwt;*/
 
         //issue both access and refresh tokens at the same time
         String accessToken = tokenProvider.generateToken(authentication);

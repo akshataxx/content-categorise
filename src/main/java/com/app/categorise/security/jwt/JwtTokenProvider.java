@@ -22,7 +22,7 @@ public class JwtTokenProvider {
     private int jwtExpirationInMs;
 
     @Value("${app.jwtRefreshExpirationInMs}")
-    private int jwtRefreshExpirationInMs;
+    private long jwtRefreshExpirationInMs;
 
     private Key key;
 

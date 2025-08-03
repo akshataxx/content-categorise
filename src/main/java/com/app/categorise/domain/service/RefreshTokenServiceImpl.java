@@ -3,6 +3,7 @@ package com.app.categorise.domain.service;
 import com.app.categorise.data.entity.RefreshTokenEntity;
 import com.app.categorise.data.repository.RefreshTokenRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -16,6 +17,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     }
 
     @Override
+    @Transactional
     public void save(UUID userId, String refreshToken, Instant expiry) {
         repo.deleteByUserId(userId);
         repo.save(new RefreshTokenEntity(null, userId, refreshToken, expiry));
@@ -29,6 +31,7 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     }
 
     @Override
+    @Transactional
     public void deleteByUserId(UUID userId) {
         repo.deleteByUserId(userId);
     }

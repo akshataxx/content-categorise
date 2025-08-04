@@ -21,6 +21,9 @@ public class JwtTokenProvider {
     @Value("${app.jwtExpirationInMs}")
     private int jwtExpirationInMs;
 
+    @Value("${app.jwtRefreshExpirationInMs}")
+    private long jwtRefreshExpirationInMs;
+
     private Key key;
 
     public String generateToken(Authentication authentication) {
@@ -39,6 +42,24 @@ public class JwtTokenProvider {
             .setExpiration(expiryDate)
             .signWith(key, SignatureAlgorithm.HS512)
             .compact();
+    }
+
+    public String generateRefreshToken(Authentication authentication) {
+        User userPrincipal = (User) authentication.getPrincipal();
+
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + jwtRefreshExpirationInMs);
+
+        if (key == null) {
+            key = Keys.hmacShaKeyFor(jwtSecret.getBytes());
+        }
+
+        return Jwts.builder()
+                .setSubject(userPrincipal.getId().toString())
+                .setIssuedAt(now)
+                .setExpiration(expiryDate)
+                .signWith(key, SignatureAlgorithm.HS512)
+                .compact();
     }
 
     public String getUserIdFromJWT(String token) {

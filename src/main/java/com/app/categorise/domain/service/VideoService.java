@@ -4,6 +4,7 @@ import com.app.categorise.data.dto.TikTokMetadata;
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.application.internal.ProcessedVideoFiles;
 import com.app.categorise.application.mapper.TranscriptMapper;
+import com.app.categorise.application.mapper.VideoMapper;
 import com.app.categorise.data.client.whisper.WhisperClient;
 import com.app.categorise.data.entity.CategoryAliasEntity;
 import com.app.categorise.data.entity.CategoryEntity;
@@ -41,6 +42,7 @@ public class VideoService {
     private final CategoryAliasService categoryAliasService;
     private final TranscriptService transcriptService;
     private final TranscriptMapper transcriptMapper;
+    private final VideoMapper videoMapper;
 
     private final BaseTranscriptRepository baseTranscriptRepository;
     private final UserTranscriptRepository userTranscriptRepository;
@@ -52,6 +54,7 @@ public class VideoService {
         CategoryAliasService categoryAliasService,
         TranscriptService transcriptService,
         TranscriptMapper transcriptMapper,
+        VideoMapper videoMapper,
         BaseTranscriptRepository baseTranscriptRepository,
         UserTranscriptRepository userTranscriptRepository
     ){
@@ -61,6 +64,7 @@ public class VideoService {
         this.categoryAliasService = categoryAliasService;
         this.transcriptService = transcriptService;
         this.transcriptMapper = transcriptMapper;
+        this.videoMapper = videoMapper;
         this.baseTranscriptRepository = baseTranscriptRepository;
         this.userTranscriptRepository = userTranscriptRepository;
     }
@@ -132,7 +136,7 @@ public class VideoService {
                 TikTokMetadata metadata = extractMetadata(files.getMetadataFile());
 
                 // Create new base transcript
-                baseTranscript = createBaseTranscriptEntity(videoUrl, transcriptText, metadata);
+                baseTranscript = videoMapper.createBaseTranscriptEntity(videoUrl, transcriptText, metadata);
                 baseTranscript = baseTranscriptRepository.save(baseTranscript);
             }
         }
@@ -148,7 +152,7 @@ public class VideoService {
             userTranscript.setLastAccessedAt(Instant.now());
             userTranscriptRepository.save(userTranscript);
             
-            return buildResponse(baseTranscript, userTranscript);
+            return videoMapper.buildResponse(baseTranscript, userTranscript);
         }
         
         // Create new user association with categorization
@@ -167,13 +171,10 @@ public class VideoService {
         String alias = resolveAlias(userId, category.getId(), categorisationResult.suggestedAlias());
         
         // Create user transcript association
-        UserTranscriptEntity userTranscript = new UserTranscriptEntity();
-        userTranscript.setUserId(userId);
-        userTranscript.setBaseTranscript(baseTranscript);
-        userTranscript.setCategory(category);
+        UserTranscriptEntity userTranscript = videoMapper.createUserTranscriptEntity(userId, baseTranscript, category);
         userTranscript = userTranscriptRepository.save(userTranscript);
         
-        return buildResponse(baseTranscript, userTranscript, category.getName(), alias);
+        return videoMapper.buildResponse(baseTranscript, userTranscript, category.getName(), alias);
     }
 
     /**
@@ -205,7 +206,7 @@ public class VideoService {
         String alias = resolveAlias(userId, category.getId(), categorisationResult.suggestedAlias());
 
         // Create and save the transcript entity
-        TranscriptEntity transcriptEntity = createTranscriptEntity(videoUrl, transcriptText, metadata, userId, category.getId());
+        TranscriptEntity transcriptEntity = videoMapper.createTranscriptEntity(videoUrl, transcriptText, metadata, userId, category.getId());
         Transcript savedEntity = transcriptService.save(transcriptEntity);
 
         return transcriptMapper.toDto(savedEntity, category.getName(), alias);
@@ -236,84 +237,6 @@ public class VideoService {
             });
     }
 
-    private TranscriptEntity createTranscriptEntity(String videoUrl, String transcriptText, TikTokMetadata metadata, UUID userId, UUID categoryId) {
-        TranscriptEntity entity = new TranscriptEntity();
-        entity.setVideoUrl(videoUrl);
-        entity.setTranscript(transcriptText);
-        entity.setDescription(metadata.getDescription());
-        entity.setTitle(metadata.getTitle());
-        entity.setDuration(metadata.getDuration());
-        entity.setUploadedAt(Instant.ofEpochSecond(metadata.getUploadedEpoch()));
-        entity.setAccountId(metadata.getAccountId());
-        entity.setAccount(metadata.getAccount());
-        entity.setIdentifierId(metadata.getIdentifierId());
-        entity.setIdentifier(metadata.getIdentifier());
-        entity.setUserId(userId);
-        entity.setCategoryId(categoryId);
-        return entity;
-    }
 
-    /**
-     * Creates a BaseTranscriptEntity from video URL, transcript text, and metadata
-     */
-    private BaseTranscriptEntity createBaseTranscriptEntity(String videoUrl, String transcriptText, TikTokMetadata metadata) {
-        return new BaseTranscriptEntity(
-            videoUrl,
-            transcriptText,
-            metadata.getDescription(),
-            metadata.getTitle(),
-            (double) metadata.getDuration(),
-            Instant.ofEpochSecond(metadata.getUploadedEpoch()),
-            metadata.getAccountId(),
-            metadata.getAccount(),
-            metadata.getIdentifierId(),
-            metadata.getIdentifier()
-        );
-    }
-
-    /**
-     * Builds response DTO from BaseTranscriptEntity and UserTranscriptEntity (for existing user transcripts)
-     */
-    private TranscriptDtoWithAliases buildResponse(BaseTranscriptEntity baseTranscript, UserTranscriptEntity userTranscript) {
-        // For existing user transcripts, we need to get the category and alias
-        CategoryEntity category = userTranscript.getCategory();
-        String categoryName = category != null ? category.getName() : null;
-        
-        String alias = null;
-        if (category != null) {
-            alias = categoryAliasService.findByUserIdAndCategoryId(userTranscript.getUserId(), category.getId())
-                .map(CategoryAliasEntity::getAlias)
-                .orElse(null);
-        }
-        
-        return buildResponse(baseTranscript, userTranscript, categoryName, alias);
-    }
-
-    /**
-     * Builds response DTO from BaseTranscriptEntity, UserTranscriptEntity, category name, and alias
-     */
-    private TranscriptDtoWithAliases buildResponse(BaseTranscriptEntity baseTranscript, UserTranscriptEntity userTranscript, 
-                                                  String categoryName, String alias) {
-        // Create a temporary Transcript domain object for mapping
-        // TODO: This is a temporary solution - we should update the mapper to work with the new entities directly
-        Transcript transcript = new Transcript(
-            userTranscript.getId(),
-            baseTranscript.getVideoUrl(),
-            baseTranscript.getTranscript(),
-            baseTranscript.getDescription(),
-            baseTranscript.getTitle(),
-            baseTranscript.getDuration() != null ? baseTranscript.getDuration() : 0.0,
-            baseTranscript.getUploadedAt(),
-            baseTranscript.getAccountId(),
-            baseTranscript.getAccount(),
-            baseTranscript.getIdentifierId(),
-            baseTranscript.getIdentifier(),
-            userTranscript.getCategoryId(),
-            userTranscript.getUserId(),
-            userTranscript.getCreatedAt()
-        );
-        
-        return transcriptMapper.toDto(transcript, categoryName, alias);
-    }
 
 }

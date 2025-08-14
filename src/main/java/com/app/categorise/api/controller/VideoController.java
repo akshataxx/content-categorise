@@ -1,8 +1,6 @@
 package com.app.categorise.api.controller;
 
-import com.app.categorise.data.dto.TikTokMetadata;
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
-import com.app.categorise.application.internal.ProcessedVideoFiles;
 import com.app.categorise.domain.service.UntranscribedLinkService;
 import com.app.categorise.domain.service.VideoService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -64,19 +62,12 @@ public class VideoController {
     }
 
     private TranscriptDtoWithAliases processVideo(String videoUrl, UUID userId) throws Exception {
-        try (ProcessedVideoFiles files = videoService.extractAudioAndMetadata(videoUrl)) {
-            System.out.println("Audio file: " + files.getAudioFile().getAbsolutePath());
-            String textTranscript = videoService.transcribeAudio(files.getAudioFile());
-            System.out.println("Transcript: " + textTranscript);
-            TikTokMetadata metadata = videoService.extractMetadata(files.getMetadataFile());
-            System.out.println("Metadata: " + metadata);
-            TranscriptDtoWithAliases transcriptDto = videoService.processVideoAndCreateTranscript(videoUrl, textTranscript, metadata, userId);
-            System.out.println("TranscriptDto: " + transcriptDto);
+        TranscriptDtoWithAliases transcriptDto = videoService.processVideoAndCreateTranscript(videoUrl, userId);
+        System.out.println("TranscriptDto: " + transcriptDto);
 
-            untranscribedLinkService.deleteLink(userId, videoUrl);
+        untranscribedLinkService.deleteLink(userId, videoUrl);
 
-            return transcriptDto;
-        }
+        return transcriptDto;
     }
 
     private void validateRequest(String videoUrl, String userIdStr) {

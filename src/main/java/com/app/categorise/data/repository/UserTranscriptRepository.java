@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+// TODO: can this class be simplified by removing lazy loading so the ...withBaseTranscript etc. is not needed
 @Repository
 public interface UserTranscriptRepository extends JpaRepository<UserTranscriptEntity, UUID> {
     

@@ -1,4 +1,8 @@
 -- V5: Replace old transcripts table with new deduplication schema
+-- Since this is non-production, we can safely drop the old table and start fresh
+
+-- Drop old transcripts table (no production data to preserve)
+DROP TABLE IF EXISTS transcripts CASCADE;
 
 -- Create base_transcripts table to store core transcript data independent of users
 CREATE TABLE base_transcripts (

@@ -12,7 +12,7 @@ import java.util.UUID;
 
 // TODO: can this class be simplified by removing lazy loading so the ...withBaseTranscript etc. is not needed
 @Repository
-public interface UserTranscriptRepository extends JpaRepository<UserTranscriptEntity, UUID> {
+public interface UserTranscriptRepository extends JpaRepository<UserTranscriptEntity, UUID>, CustomUserTranscriptRepository {
     
     /**
      * Find user transcript association by user ID and base transcript ID

@@ -8,6 +8,10 @@ import com.app.categorise.data.client.whisper.WhisperClient;
 import com.app.categorise.data.entity.CategoryAliasEntity;
 import com.app.categorise.data.entity.CategoryEntity;
 import com.app.categorise.data.entity.TranscriptEntity;
+import com.app.categorise.data.entity.BaseTranscriptEntity;
+import com.app.categorise.data.entity.UserTranscriptEntity;
+import com.app.categorise.data.repository.BaseTranscriptRepository;
+import com.app.categorise.data.repository.UserTranscriptRepository;
 import com.app.categorise.data.dto.TranscriptCategorisationResult;
 import com.app.categorise.domain.model.Transcript;
 import com.app.categorise.util.ProcessRunner;
@@ -38,13 +42,18 @@ public class VideoService {
     private final TranscriptService transcriptService;
     private final TranscriptMapper transcriptMapper;
 
+    private final BaseTranscriptRepository baseTranscriptRepository;
+    private final UserTranscriptRepository userTranscriptRepository;
+
     public VideoService(
         WhisperClient whisperClient,
         CategorisationService categorisationService,
         CategoryService categoryService,
         CategoryAliasService categoryAliasService,
         TranscriptService transcriptService,
-        TranscriptMapper transcriptMapper
+        TranscriptMapper transcriptMapper,
+        BaseTranscriptRepository baseTranscriptRepository,
+        UserTranscriptRepository userTranscriptRepository
     ){
         this.whisperClient = whisperClient;
         this.categorisationService = categorisationService;
@@ -52,6 +61,8 @@ public class VideoService {
         this.categoryAliasService = categoryAliasService;
         this.transcriptService = transcriptService;
         this.transcriptMapper = transcriptMapper;
+        this.baseTranscriptRepository = baseTranscriptRepository;
+        this.userTranscriptRepository = userTranscriptRepository;
     }
 
     /**
@@ -93,7 +104,80 @@ public class VideoService {
     }
 
     /**
-     * Processes a video from its raw text transcript and metadata into a fully categorized transcript with a user-aware alias.
+     * Processes a video URL and creates transcript with deduplication support.
+     * 1. Check if transcript already exists for this video URL
+     * 2. If exists, reuse it; if not, create new base transcript
+     * 3. Check if user already has access to this transcript
+     * 4. If user has access, update last accessed; if not, create new user association
+     *
+     * @param videoUrl The TikTok video URL to process.
+     * @param userId The ID of the user submitting the video.
+     * @return A {@link TranscriptDtoWithAliases} containing all the necessary information for the client.
+     */
+    public TranscriptDtoWithAliases processVideoAndCreateTranscript(String videoUrl, UUID userId) throws Exception {
+        
+        // Check if transcript already exists
+        Optional<BaseTranscriptEntity> existingTranscript = 
+            baseTranscriptRepository.findByVideoUrl(videoUrl);
+        
+        BaseTranscriptEntity baseTranscript;
+        if (existingTranscript.isPresent()) {
+            // Transcript exists, reuse it
+            baseTranscript = existingTranscript.get();
+            System.out.println("Reusing existing transcript for: " + baseTranscript.getVideoUrl());
+        } else {
+            // New transcript needed
+            try (ProcessedVideoFiles files = extractAudioAndMetadata(videoUrl)) {
+                String transcriptText = transcribeAudio(files.getAudioFile());
+                TikTokMetadata metadata = extractMetadata(files.getMetadataFile());
+
+                // Create new base transcript
+                baseTranscript = createBaseTranscriptEntity(videoUrl, transcriptText, metadata);
+                baseTranscript = baseTranscriptRepository.save(baseTranscript);
+            }
+        }
+        
+        // Check if user already has this transcript
+        Optional<UserTranscriptEntity> existingUserTranscript = 
+            userTranscriptRepository.findByUserIdAndBaseTranscriptIdWithBaseTranscript(
+                userId, baseTranscript.getId());
+        
+        if (existingUserTranscript.isPresent()) {
+            // User already has this transcript, update last accessed
+            UserTranscriptEntity userTranscript = existingUserTranscript.get();
+            userTranscript.setLastAccessedAt(Instant.now());
+            userTranscriptRepository.save(userTranscript);
+            
+            return buildResponse(baseTranscript, userTranscript);
+        }
+        
+        // Create new user association with categorization
+        TranscriptCategorisationResult categorisationResult = 
+            categorisationService.classifyAndSuggestAlias(
+                baseTranscript.getTranscript(), 
+                baseTranscript.getTitle(), 
+                baseTranscript.getDescription()
+            );
+
+        // Determine the category and save it if it doesn't exist
+        String categoryName = determineCategory(categorisationResult, videoUrl);
+        CategoryEntity category = categoryService.saveIfNotExists(categoryName, "", userId);
+
+        // Resolve the alias, use the pre-existing one if it exists, saving the mapping to a category it doesn't exist
+        String alias = resolveAlias(userId, category.getId(), categorisationResult.suggestedAlias());
+        
+        // Create user transcript association
+        UserTranscriptEntity userTranscript = new UserTranscriptEntity();
+        userTranscript.setUserId(userId);
+        userTranscript.setBaseTranscript(baseTranscript);
+        userTranscript.setCategory(category);
+        userTranscript = userTranscriptRepository.save(userTranscript);
+        
+        return buildResponse(baseTranscript, userTranscript, category.getName(), alias);
+    }
+
+    /**
+     * LEGACY METHOD - Processes a video from its raw text transcript and metadata into a fully categorized transcript with a user-aware alias.
      * This method orchestrates the core logic:
      * 1. Calls the AI service to get a classification result (canonical categoryId, generic topic, and suggested alias).
      * 2. Determines the correct grouping key (prioritizing the canonical categoryId).
@@ -167,6 +251,69 @@ public class VideoService {
         entity.setUserId(userId);
         entity.setCategoryId(categoryId);
         return entity;
+    }
+
+    /**
+     * Creates a BaseTranscriptEntity from video URL, transcript text, and metadata
+     */
+    private BaseTranscriptEntity createBaseTranscriptEntity(String videoUrl, String transcriptText, TikTokMetadata metadata) {
+        return new BaseTranscriptEntity(
+            videoUrl,
+            transcriptText,
+            metadata.getDescription(),
+            metadata.getTitle(),
+            (double) metadata.getDuration(),
+            Instant.ofEpochSecond(metadata.getUploadedEpoch()),
+            metadata.getAccountId(),
+            metadata.getAccount(),
+            metadata.getIdentifierId(),
+            metadata.getIdentifier()
+        );
+    }
+
+    /**
+     * Builds response DTO from BaseTranscriptEntity and UserTranscriptEntity (for existing user transcripts)
+     */
+    private TranscriptDtoWithAliases buildResponse(BaseTranscriptEntity baseTranscript, UserTranscriptEntity userTranscript) {
+        // For existing user transcripts, we need to get the category and alias
+        CategoryEntity category = userTranscript.getCategory();
+        String categoryName = category != null ? category.getName() : null;
+        
+        String alias = null;
+        if (category != null) {
+            alias = categoryAliasService.findByUserIdAndCategoryId(userTranscript.getUserId(), category.getId())
+                .map(CategoryAliasEntity::getAlias)
+                .orElse(null);
+        }
+        
+        return buildResponse(baseTranscript, userTranscript, categoryName, alias);
+    }
+
+    /**
+     * Builds response DTO from BaseTranscriptEntity, UserTranscriptEntity, category name, and alias
+     */
+    private TranscriptDtoWithAliases buildResponse(BaseTranscriptEntity baseTranscript, UserTranscriptEntity userTranscript, 
+                                                  String categoryName, String alias) {
+        // Create a temporary Transcript domain object for mapping
+        // TODO: This is a temporary solution - we should update the mapper to work with the new entities directly
+        Transcript transcript = new Transcript(
+            userTranscript.getId(),
+            baseTranscript.getVideoUrl(),
+            baseTranscript.getTranscript(),
+            baseTranscript.getDescription(),
+            baseTranscript.getTitle(),
+            baseTranscript.getDuration() != null ? baseTranscript.getDuration() : 0.0,
+            baseTranscript.getUploadedAt(),
+            baseTranscript.getAccountId(),
+            baseTranscript.getAccount(),
+            baseTranscript.getIdentifierId(),
+            baseTranscript.getIdentifier(),
+            userTranscript.getCategoryId(),
+            userTranscript.getUserId(),
+            userTranscript.getCreatedAt()
+        );
+        
+        return transcriptMapper.toDto(transcript, categoryName, alias);
     }
 
 }

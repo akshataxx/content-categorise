@@ -1,6 +1,7 @@
 package com.app.categorise.api.controller;
 
 import com.app.categorise.application.mapper.TranscriptMapper;
+import com.app.categorise.api.dto.DeleteTranscriptsRequest;
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.data.entity.CategoryAliasEntity;
 import com.app.categorise.data.entity.CategoryEntity;
@@ -12,7 +13,10 @@ import com.app.categorise.domain.service.TranscriptService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import jakarta.validation.Valid;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -21,6 +25,8 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/transcript")
 public class TranscriptController {
+
+    private static final Logger logger = LoggerFactory.getLogger(TranscriptController.class);
 
     private final TranscriptService transcriptService;
     private final CategoryAliasService categoryAliasService;
@@ -86,6 +92,49 @@ public class TranscriptController {
             .map(transcript -> mapToDtoWithAlias(transcript, userId))
             .map(ResponseEntity::ok)
             .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Delete multiple transcripts by their IDs.
+     * @param request The request containing the list of transcript IDs to delete
+     * @return ResponseEntity with no content on successful deletion
+     */
+    @DeleteMapping
+    public ResponseEntity<Void> deleteTranscripts(@Valid @RequestBody DeleteTranscriptsRequest request) {
+        logger.info("Received request to delete transcripts: {}", request.getTranscriptIds());
+        
+        validateDeleteTranscriptsRequest(request);
+        
+        logger.info("Deleting {} transcripts", request.getTranscriptIds().size());
+        transcriptService.deleteTranscripts(request.getTranscriptIds());
+        
+        logger.info("Successfully deleted {} transcripts", request.getTranscriptIds().size());
+        return ResponseEntity.noContent().build();
+    }
+
+    private void validateDeleteTranscriptsRequest(DeleteTranscriptsRequest request) {
+        // Validate request
+        if (request == null) {
+            logger.warn("Delete transcripts request is null");
+            throw new IllegalArgumentException("Request body cannot be null");
+        }
+        
+        if (request.getTranscriptIds() == null || request.getTranscriptIds().isEmpty()) {
+            logger.warn("Delete transcripts request contains null or empty transcript IDs list");
+            throw new IllegalArgumentException("Transcript IDs list cannot be null or empty");
+        }
+
+        // Validate individual IDs
+        if (request.getTranscriptIds().stream().anyMatch(id -> id == null)) {
+            logger.warn("Delete transcripts request contains null transcript ID");
+            throw new IllegalArgumentException("Transcript IDs cannot contain null values");
+        }
+
+        // Check for reasonable batch size (prevent potential DoS)
+        if (request.getTranscriptIds().size() > 100) {
+            logger.warn("Delete transcripts request contains too many IDs: {}", request.getTranscriptIds().size());
+            throw new IllegalArgumentException("Cannot delete more than 100 transcripts at once");
+        }
     }
 
     private TranscriptDtoWithAliases mapToDtoWithAlias(Transcript transcript, UUID userId) {

@@ -30,6 +30,19 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.FORBIDDEN, ex, request);
     }
 
+    @ExceptionHandler(TranscriptNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleTranscriptNotFound(TranscriptNotFoundException ex, WebRequest request) {
+        logger.warn("Transcript not found: {}", ex.getMessage());
+        return buildErrorResponse(HttpStatus.NOT_FOUND, ex, request);
+    }
+
+    @ExceptionHandler(TranscriptDeletionException.class)
+    public ResponseEntity<ErrorResponse> handleTranscriptDeletion(TranscriptDeletionException ex, WebRequest request) {
+        logger.error("Transcript deletion failed: {}", ex.getMessage(), ex);
+        return buildErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, ex, request);
+    }
+
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(Exception ex, WebRequest request) {
         logger.error("Unexpected error occurred", ex);

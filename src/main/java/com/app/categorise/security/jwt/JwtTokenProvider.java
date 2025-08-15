@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 
+import javax.annotation.PostConstruct;
 import java.security.Key;
 import java.util.Date;
 
@@ -26,15 +27,16 @@ public class JwtTokenProvider {
 
     private Key key;
 
+    @PostConstruct
+    public void init() {
+        this.key = Keys.hmacShaKeyFor(jwtSecret.getBytes());
+    }
+
     public String generateToken(Authentication authentication) {
         User userPrincipal = (User) authentication.getPrincipal();
 
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationInMs);
-        
-        if (key == null) {
-            key = Keys.hmacShaKeyFor(jwtSecret.getBytes());
-        }
 
         return Jwts.builder()
             .setSubject(userPrincipal.getId().toString())
@@ -49,10 +51,6 @@ public class JwtTokenProvider {
 
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtRefreshExpirationInMs);
-
-        if (key == null) {
-            key = Keys.hmacShaKeyFor(jwtSecret.getBytes());
-        }
 
         return Jwts.builder()
                 .setSubject(userPrincipal.getId().toString())

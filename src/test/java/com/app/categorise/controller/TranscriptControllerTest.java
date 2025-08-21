@@ -2,7 +2,6 @@ package com.app.categorise.controller;
 
 import com.app.categorise.api.controller.TranscriptController;
 import com.app.categorise.api.dto.DeleteTranscriptsRequest;
-import com.app.categorise.application.mapper.TranscriptMapper;
 import com.app.categorise.domain.service.CategoryAliasService;
 import com.app.categorise.domain.service.CategoryService;
 import com.app.categorise.domain.service.TranscriptService;
@@ -46,9 +45,6 @@ class TranscriptControllerTest {
 
     @MockitoBean
     private CategoryService categoryService;
-
-    @MockitoBean
-    private TranscriptMapper transcriptMapper;
 
     private UUID transcriptId1;
     private UUID transcriptId2;

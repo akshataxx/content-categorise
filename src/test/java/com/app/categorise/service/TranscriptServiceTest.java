@@ -1,11 +1,16 @@
 package com.app.categorise.service;
 
-import com.app.categorise.application.mapper.TranscriptMapper;
-import com.app.categorise.data.entity.TranscriptEntity;
-import com.app.categorise.data.repository.TranscriptRepository;
+import com.app.categorise.application.mapper.VideoMapper;
+import com.app.categorise.data.entity.BaseTranscriptEntity;
+import com.app.categorise.data.entity.CategoryEntity;
+import com.app.categorise.data.entity.UserTranscriptEntity;
+import com.app.categorise.data.repository.BaseTranscriptRepository;
+import com.app.categorise.data.repository.UserTranscriptRepository;
+import com.app.categorise.domain.service.CategoryAliasService;
 import com.app.categorise.domain.service.TranscriptService;
 import com.app.categorise.exception.TranscriptDeletionException;
 import com.app.categorise.exception.TranscriptNotFoundException;
+import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -16,9 +21,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataAccessException;
 
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -29,21 +36,33 @@ import static org.mockito.Mockito.*;
 class TranscriptServiceTest {
 
     @Mock
-    private TranscriptRepository transcriptRepository;
+    private UserTranscriptRepository userTranscriptRepository;
 
     @Mock
-    private TranscriptMapper transcriptMapper;
+    private BaseTranscriptRepository baseTranscriptRepository;
+
+    @Mock
+    private VideoMapper videoMapper;
+
+    @Mock
+    private CategoryAliasService categoryAliasService;
 
     @InjectMocks
     private TranscriptService transcriptService;
 
-    private UUID transcriptId1;
-    private UUID transcriptId2;
+    private UUID userTranscriptId1;
+    private UUID userTranscriptId2;
+    private UUID userId;
+    private UUID baseTranscriptId;
+    private UUID categoryId;
 
     @BeforeEach
     void setUp() {
-        transcriptId1 = UUID.randomUUID();
-        transcriptId2 = UUID.randomUUID();
+        userTranscriptId1 = UUID.randomUUID();
+        userTranscriptId2 = UUID.randomUUID();
+        userId = UUID.randomUUID();
+        baseTranscriptId = UUID.randomUUID();
+        categoryId = UUID.randomUUID();
     }
 
     @Nested
@@ -51,122 +70,141 @@ class TranscriptServiceTest {
     class DeleteTranscriptsTests {
 
         @Test
-        @DisplayName("Should delete multiple transcripts successfully")
+        @DisplayName("Should delete multiple user transcripts successfully")
         void deleteTranscripts_WithValidIds_CallsRepositoryDeleteAllById() {
             // Arrange
-            List<UUID> transcriptIds = Arrays.asList(transcriptId1, transcriptId2);
-            List<TranscriptEntity> existingEntities = Arrays.asList(
-                    createMockEntity(transcriptId1),
-                    createMockEntity(transcriptId2)
+            List<UUID> userTranscriptIds = Arrays.asList(userTranscriptId1, userTranscriptId2);
+            List<UserTranscriptEntity> existingEntities = Arrays.asList(
+                    createMockUserTranscriptEntity(userTranscriptId1),
+                    createMockUserTranscriptEntity(userTranscriptId2)
             );
 
-            when(transcriptRepository.findAllById(transcriptIds)).thenReturn(existingEntities);
+            when(userTranscriptRepository.findAllById(userTranscriptIds)).thenReturn(existingEntities);
 
             // Act
-            transcriptService.deleteTranscripts(transcriptIds);
+            transcriptService.deleteTranscripts(userTranscriptIds);
 
             // Assert
-            verify(transcriptRepository).findAllById(transcriptIds);
-            verify(transcriptRepository).deleteAllById(transcriptIds);
+            verify(userTranscriptRepository).findAllById(userTranscriptIds);
+            verify(userTranscriptRepository).deleteAllById(userTranscriptIds);
         }
 
         @Test
-        @DisplayName("Should delete single transcript successfully")
+        @DisplayName("Should delete single user transcript successfully")
         void deleteTranscripts_WithSingleId_CallsRepositoryDeleteAllById() {
             // Arrange
-            List<UUID> transcriptIds = Collections.singletonList(transcriptId1);
-            List<TranscriptEntity> existingEntities = Collections.singletonList(createMockEntity(transcriptId1));
+            List<UUID> userTranscriptIds = Collections.singletonList(userTranscriptId1);
+            List<UserTranscriptEntity> existingEntities = Collections.singletonList(createMockUserTranscriptEntity(userTranscriptId1));
 
-            when(transcriptRepository.findAllById(transcriptIds)).thenReturn(existingEntities);
+            when(userTranscriptRepository.findAllById(userTranscriptIds)).thenReturn(existingEntities);
 
             // Act
-            transcriptService.deleteTranscripts(transcriptIds);
+            transcriptService.deleteTranscripts(userTranscriptIds);
 
             // Assert
-            verify(transcriptRepository).findAllById(transcriptIds);
-            verify(transcriptRepository).deleteAllById(transcriptIds);
+            verify(userTranscriptRepository).findAllById(userTranscriptIds);
+            verify(userTranscriptRepository).deleteAllById(userTranscriptIds);
         }
 
         @Test
-        @DisplayName("Should throw exception for empty transcript IDs list")
+        @DisplayName("Should throw exception for empty user transcript IDs list")
         void deleteTranscripts_WithEmptyList_ThrowsIllegalArgumentException() {
             // Arrange
-            List<UUID> transcriptIds = Collections.emptyList();
+            List<UUID> userTranscriptIds = Collections.emptyList();
 
             // Act & Assert
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-                transcriptService.deleteTranscripts(transcriptIds);
+                transcriptService.deleteTranscripts(userTranscriptIds);
             });
 
-            assertEquals("Transcript IDs list cannot be null or empty", exception.getMessage());
-            verify(transcriptRepository, never()).findAllById(any());
-            verify(transcriptRepository, never()).deleteAllById(any());
+            assertEquals("User transcript IDs list cannot be null or empty", exception.getMessage());
+            verify(userTranscriptRepository, never()).findAllById(any());
+            verify(userTranscriptRepository, never()).deleteAllById(any());
         }
 
         @Test
-        @DisplayName("Should throw exception for null transcript IDs list")
+        @DisplayName("Should throw exception for null user transcript IDs list")
         void deleteTranscripts_WithNullList_ThrowsIllegalArgumentException() {
             // Act & Assert
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
                 transcriptService.deleteTranscripts(null);
             });
 
-            assertEquals("Transcript IDs list cannot be null or empty", exception.getMessage());
-            verify(transcriptRepository, never()).findAllById(any());
-            verify(transcriptRepository, never()).deleteAllById(any());
+            assertEquals("User transcript IDs list cannot be null or empty", exception.getMessage());
+            verify(userTranscriptRepository, never()).findAllById(any());
+            verify(userTranscriptRepository, never()).deleteAllById(any());
         }
 
         @Test
-        @DisplayName("Should throw exception when some transcripts don't exist")
+        @DisplayName("Should throw exception when some user transcripts don't exist")
         void deleteTranscripts_WithNonExistentIds_ThrowsTranscriptNotFoundException() {
             // Arrange
-            List<UUID> transcriptIds = Arrays.asList(transcriptId1, transcriptId2);
-            List<TranscriptEntity> existingEntities = Collections.singletonList(createMockEntity(transcriptId1));
+            List<UUID> userTranscriptIds = Arrays.asList(userTranscriptId1, userTranscriptId2);
+            List<UserTranscriptEntity> existingEntities = Collections.singletonList(createMockUserTranscriptEntity(userTranscriptId1));
 
-            when(transcriptRepository.findAllById(transcriptIds)).thenReturn(existingEntities);
+            when(userTranscriptRepository.findAllById(userTranscriptIds)).thenReturn(existingEntities);
 
             // Act & Assert
             TranscriptNotFoundException exception = assertThrows(TranscriptNotFoundException.class, () -> {
-                transcriptService.deleteTranscripts(transcriptIds);
+                transcriptService.deleteTranscripts(userTranscriptIds);
             });
 
             assertTrue(exception.getMessage().contains("not found"));
-            assertTrue(exception.getMessage().contains(transcriptId2.toString()));
-            assertEquals(Collections.singletonList(transcriptId2), exception.getNotFoundIds());
-            verify(transcriptRepository).findAllById(transcriptIds);
-            verify(transcriptRepository, never()).deleteAllById(any());
+            assertTrue(exception.getMessage().contains(userTranscriptId2.toString()));
+            assertEquals(Collections.singletonList(userTranscriptId2), exception.getNotFoundIds());
+            verify(userTranscriptRepository).findAllById(userTranscriptIds);
+            verify(userTranscriptRepository, never()).deleteAllById(any());
         }
 
         @Test
         @DisplayName("Should handle unexpected runtime exceptions")
         void deleteTranscripts_RepositoryThrowsRuntimeException_ThrowsTranscriptDeletionException() {
             // Arrange
-            List<UUID> transcriptIds = Arrays.asList(transcriptId1, transcriptId2);
-            List<TranscriptEntity> existingEntities = Arrays.asList(
-                    createMockEntity(transcriptId1),
-                    createMockEntity(transcriptId2)
+            List<UUID> userTranscriptIds = Arrays.asList(userTranscriptId1, userTranscriptId2);
+            List<UserTranscriptEntity> existingEntities = Arrays.asList(
+                    createMockUserTranscriptEntity(userTranscriptId1),
+                    createMockUserTranscriptEntity(userTranscriptId2)
             );
 
-            when(transcriptRepository.findAllById(transcriptIds)).thenReturn(existingEntities);
-            doThrow(new RuntimeException("Unexpected error")).when(transcriptRepository).deleteAllById(transcriptIds);
+            when(userTranscriptRepository.findAllById(userTranscriptIds)).thenReturn(existingEntities);
+            doThrow(new RuntimeException("Unexpected error")).when(userTranscriptRepository).deleteAllById(userTranscriptIds);
 
             // Act & Assert
             TranscriptDeletionException exception = assertThrows(TranscriptDeletionException.class, () -> {
-                transcriptService.deleteTranscripts(transcriptIds);
+                transcriptService.deleteTranscripts(userTranscriptIds);
             });
 
             assertTrue(exception.getMessage().contains("Unexpected error"));
-            assertEquals(transcriptIds, exception.getFailedIds());
-            verify(transcriptRepository).findAllById(transcriptIds);
-            verify(transcriptRepository).deleteAllById(transcriptIds);
+            assertEquals(userTranscriptIds, exception.getFailedIds());
+            verify(userTranscriptRepository).findAllById(userTranscriptIds);
+            verify(userTranscriptRepository).deleteAllById(userTranscriptIds);
         }
     }
 
-    private TranscriptEntity createMockEntity(UUID id) {
-        TranscriptEntity entity = new TranscriptEntity();
+    private UserTranscriptEntity createMockUserTranscriptEntity(UUID id) {
+        UserTranscriptEntity entity = new UserTranscriptEntity();
         entity.setId(id);
-        entity.setVideoUrl("https://example.com/video");
-        entity.setTranscript("Test transcript");
+        entity.setUserId(userId);
+        
+        // Create mock base transcript
+        BaseTranscriptEntity baseTranscript = new BaseTranscriptEntity();
+        baseTranscript.setId(baseTranscriptId);
+        baseTranscript.setVideoUrl("https://example.com/video");
+        baseTranscript.setTranscript("Test transcript");
+        baseTranscript.setTitle("Test Title");
+        baseTranscript.setDescription("Test Description");
+        baseTranscript.setCreatedAt(Instant.now());
+        
+        // Create mock category
+        CategoryEntity category = new CategoryEntity();
+        category.setId(categoryId);
+        category.setName("Test Category");
+        
+        entity.setBaseTranscript(baseTranscript);
+        entity.setCategory(category);
+        entity.setCreatedAt(Instant.now());
+        entity.setLastAccessedAt(Instant.now());
+        
         return entity;
     }
 }

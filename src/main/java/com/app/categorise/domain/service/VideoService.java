@@ -3,13 +3,15 @@ package com.app.categorise.domain.service;
 import com.app.categorise.data.dto.TikTokMetadata;
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.application.internal.ProcessedVideoFiles;
-import com.app.categorise.application.mapper.TranscriptMapper;
+import com.app.categorise.application.mapper.VideoMapper;
 import com.app.categorise.data.client.whisper.WhisperClient;
 import com.app.categorise.data.entity.CategoryAliasEntity;
 import com.app.categorise.data.entity.CategoryEntity;
-import com.app.categorise.data.entity.TranscriptEntity;
+import com.app.categorise.data.entity.BaseTranscriptEntity;
+import com.app.categorise.data.entity.UserTranscriptEntity;
+import com.app.categorise.data.repository.BaseTranscriptRepository;
+import com.app.categorise.data.repository.UserTranscriptRepository;
 import com.app.categorise.data.dto.TranscriptCategorisationResult;
-import com.app.categorise.domain.model.Transcript;
 import com.app.categorise.util.ProcessRunner;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
@@ -35,23 +37,27 @@ public class VideoService {
     private final CategorisationService categorisationService;
     private final CategoryService categoryService;
     private final CategoryAliasService categoryAliasService;
-    private final TranscriptService transcriptService;
-    private final TranscriptMapper transcriptMapper;
+    private final VideoMapper videoMapper;
+
+    private final BaseTranscriptRepository baseTranscriptRepository;
+    private final UserTranscriptRepository userTranscriptRepository;
 
     public VideoService(
         WhisperClient whisperClient,
         CategorisationService categorisationService,
         CategoryService categoryService,
         CategoryAliasService categoryAliasService,
-        TranscriptService transcriptService,
-        TranscriptMapper transcriptMapper
+        VideoMapper videoMapper,
+        BaseTranscriptRepository baseTranscriptRepository,
+        UserTranscriptRepository userTranscriptRepository
     ){
         this.whisperClient = whisperClient;
         this.categorisationService = categorisationService;
         this.categoryService = categoryService;
         this.categoryAliasService = categoryAliasService;
-        this.transcriptService = transcriptService;
-        this.transcriptMapper = transcriptMapper;
+        this.videoMapper = videoMapper;
+        this.baseTranscriptRepository = baseTranscriptRepository;
+        this.userTranscriptRepository = userTranscriptRepository;
     }
 
     /**
@@ -93,25 +99,60 @@ public class VideoService {
     }
 
     /**
-     * Processes a video from its raw text transcript and metadata into a fully categorized transcript with a user-aware alias.
-     * This method orchestrates the core logic:
-     * 1. Calls the AI service to get a classification result (canonical categoryId, generic topic, and suggested alias).
-     * 2. Determines the correct grouping key (prioritizing the canonical categoryId).
-     * 3. Checks if the user has a pre-existing alias for this grouping key. If so, uses it. If not, uses the AI's suggestion and saves it for future use.
-     * 4. Saves the final transcript entity to the database with the correct alias and categoryId info.
-     * 5. Maps the saved entity to a DTO to be returned by the API.
+     * Processes a video URL and creates transcript with deduplication support.
+     * 1. Check if transcript already exists for this video URL
+     * 2. If exists, reuse it; if not, create new base transcript
+     * 3. Check if user already has access to this transcript
+     * 4. If user has access, update last accessed; if not, create new user association
      *
-     * @param videoUrl The original URL of the video.
-     * @param transcriptText The text transcript of the video.
-     * @param metadata The metadata extracted from the video.
+     * @param videoUrl The TikTok video URL to process.
      * @param userId The ID of the user submitting the video.
      * @return A {@link TranscriptDtoWithAliases} containing all the necessary information for the client.
      */
-    public TranscriptDtoWithAliases processVideoAndCreateTranscript(String videoUrl, String transcriptText, TikTokMetadata metadata, UUID userId) throws Exception {
-        // Classify and get suggestions from AI
-        TranscriptCategorisationResult categorisationResult = categorisationService.classifyAndSuggestAlias(
-                transcriptText, metadata.getTitle(), metadata.getDescription()
-        );
+    public TranscriptDtoWithAliases processVideoAndCreateTranscript(String videoUrl, UUID userId) throws Exception {
+        
+        // Check if transcript already exists
+        Optional<BaseTranscriptEntity> existingTranscript = 
+            baseTranscriptRepository.findByVideoUrl(videoUrl);
+        
+        BaseTranscriptEntity baseTranscript;
+        if (existingTranscript.isPresent()) {
+            // Transcript exists, reuse it
+            baseTranscript = existingTranscript.get();
+            System.out.println("Reusing existing transcript for: " + baseTranscript.getVideoUrl());
+        } else {
+            // New transcript needed
+            try (ProcessedVideoFiles files = extractAudioAndMetadata(videoUrl)) {
+                String transcriptText = transcribeAudio(files.getAudioFile());
+                TikTokMetadata metadata = extractMetadata(files.getMetadataFile());
+
+                // Create new base transcript
+                baseTranscript = videoMapper.createBaseTranscriptEntity(videoUrl, transcriptText, metadata);
+                baseTranscript = baseTranscriptRepository.save(baseTranscript);
+            }
+        }
+        
+        // Check if user already has this transcript
+        Optional<UserTranscriptEntity> existingUserTranscript = 
+            userTranscriptRepository.findByUserIdAndBaseTranscriptIdWithBaseTranscript(
+                userId, baseTranscript.getId());
+        
+        if (existingUserTranscript.isPresent()) {
+            // User already has this transcript, update last accessed
+            UserTranscriptEntity userTranscript = existingUserTranscript.get();
+            userTranscript.setLastAccessedAt(Instant.now());
+            userTranscriptRepository.save(userTranscript);
+            
+            return videoMapper.buildResponse(baseTranscript, userTranscript);
+        }
+        
+        // Create new user association with categorization
+        TranscriptCategorisationResult categorisationResult = 
+            categorisationService.classifyAndSuggestAlias(
+                baseTranscript.getTranscript(), 
+                baseTranscript.getTitle(), 
+                baseTranscript.getDescription()
+            );
 
         // Determine the category and save it if it doesn't exist
         String categoryName = determineCategory(categorisationResult, videoUrl);
@@ -119,13 +160,14 @@ public class VideoService {
 
         // Resolve the alias, use the pre-existing one if it exists, saving the mapping to a category it doesn't exist
         String alias = resolveAlias(userId, category.getId(), categorisationResult.suggestedAlias());
-
-        // Create and save the transcript entity
-        TranscriptEntity transcriptEntity = createTranscriptEntity(videoUrl, transcriptText, metadata, userId, category.getId());
-        Transcript savedEntity = transcriptService.save(transcriptEntity);
-
-        return transcriptMapper.toDto(savedEntity, category.getName(), alias);
+        
+        // Create user transcript association
+        UserTranscriptEntity userTranscript = videoMapper.createUserTranscriptEntity(userId, baseTranscript, category);
+        userTranscript = userTranscriptRepository.save(userTranscript);
+        
+        return videoMapper.buildResponse(baseTranscript, userTranscript, category.getName(), alias);
     }
+
 
     // Determine the categoryId. Prioritize the classified categoryId, then the generic topic, then the suggested alias.
     private String determineCategory(TranscriptCategorisationResult result, String videoUrl) throws Exception {
@@ -152,21 +194,6 @@ public class VideoService {
             });
     }
 
-    private TranscriptEntity createTranscriptEntity(String videoUrl, String transcriptText, TikTokMetadata metadata, UUID userId, UUID categoryId) {
-        TranscriptEntity entity = new TranscriptEntity();
-        entity.setVideoUrl(videoUrl);
-        entity.setTranscript(transcriptText);
-        entity.setDescription(metadata.getDescription());
-        entity.setTitle(metadata.getTitle());
-        entity.setDuration(metadata.getDuration());
-        entity.setUploadedAt(Instant.ofEpochSecond(metadata.getUploadedEpoch()));
-        entity.setAccountId(metadata.getAccountId());
-        entity.setAccount(metadata.getAccount());
-        entity.setIdentifierId(metadata.getIdentifierId());
-        entity.setIdentifier(metadata.getIdentifier());
-        entity.setUserId(userId);
-        entity.setCategoryId(categoryId);
-        return entity;
-    }
+
 
 }

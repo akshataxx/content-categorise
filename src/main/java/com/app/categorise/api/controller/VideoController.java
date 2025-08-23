@@ -3,9 +3,11 @@ package com.app.categorise.api.controller;
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.domain.service.UntranscribedLinkService;
 import com.app.categorise.domain.service.VideoService;
+import com.app.categorise.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.concurrent.CompletableFuture;
@@ -26,28 +28,29 @@ public class VideoController {
 
     @Operation(summary = "Submit a video URL", description = "Downloads video, extracts transcript and metadata, and saves to DB")
     @PostMapping("/transcribe")
-    public ResponseEntity<TranscriptDtoWithAliases> handleVideo(@RequestBody Map<String, String> request) throws Exception {
+    public ResponseEntity<TranscriptDtoWithAliases> handleVideo(
+            @RequestBody Map<String, String> request,
+            @AuthenticationPrincipal UserPrincipal principal) throws Exception {
         System.out.println("POST /api/video/transcribe received");
 
         String videoUrl = request.get("videoUrl");
-        String userIdStr = request.get("userId");
+        validateRequest(videoUrl, principal);
 
-        validateRequest(videoUrl, userIdStr);
-
-        UUID userId = UUID.fromString(userIdStr);
+        UUID userId = principal.getId();
         TranscriptDtoWithAliases result = processVideo(videoUrl, userId);
         return ResponseEntity.ok(result);
     }
 
     @PostMapping("/transcribe-async")
-    public ResponseEntity<Void> transcribeAsync(@RequestBody Map<String, String> request) {
+    public ResponseEntity<Void> transcribeAsync(
+            @RequestBody Map<String, String> request,
+            @AuthenticationPrincipal UserPrincipal principal) {
         System.out.println("POST /api/video/transcribe-async received");
 
         String videoUrl = request.get("videoUrl");
-        String userIdStr = request.get("userId");
-
-        validateRequest(videoUrl, userIdStr);
-        UUID userId = UUID.fromString(userIdStr);
+        validateRequest(videoUrl, principal);
+        
+        UUID userId = principal.getId();
 
         CompletableFuture.runAsync(() -> {
             try {
@@ -70,12 +73,12 @@ public class VideoController {
         return transcriptDto;
     }
 
-    private void validateRequest(String videoUrl, String userIdStr) {
+    private void validateRequest(String videoUrl, UserPrincipal principal) {
         if (videoUrl == null || videoUrl.isBlank()) {
             throw new IllegalArgumentException("Missing 'videoUrl' in request body");
         }
-        if (userIdStr == null || userIdStr.isBlank()) {
-            throw new IllegalArgumentException("Missing 'userId' in request body");
+        if (principal == null) {
+            throw new IllegalArgumentException("User not authenticated");
         }
     }
 }

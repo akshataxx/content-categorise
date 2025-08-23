@@ -7,12 +7,10 @@ import java.util.UUID;
 
 /**
  * DTO for handling requests to rename a category alias.
- * It contains the necessary information to identify the user, the grouping to target, and the new alias name.
+ * It contains the necessary information to identify the grouping to target and the new alias name.
+ * The user is identified through authentication.
  */
 public class RenameAliasRequest {
-    @NotNull
-    private UUID userId;
-
     @NotNull
     private UUID categoryId;
 
@@ -20,12 +18,6 @@ public class RenameAliasRequest {
     private String newAlias;
 
     // Getters and setters
-    public UUID getUserId() {
-        return userId;
-    }
-    public void setUserId(UUID userId) {
-        this.userId = userId;
-    }
     public UUID getCategoryId() {
         return categoryId;
     }
@@ -33,9 +25,11 @@ public class RenameAliasRequest {
     public void setCategoryId(UUID categoryId) {
         this.categoryId = categoryId;
     }
+    
     public String getNewAlias() {
         return newAlias;
     }
+    
     public void setNewAlias(String newAlias) {
         this.newAlias = newAlias;
     }

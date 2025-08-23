@@ -52,7 +52,6 @@ public class VideoController {
 
         TranscriptDtoWithAliases result = processVideo(videoUrl, userId);
         
-        // Record successful transcription for rate limiting
         rateLimitService.recordTranscription(userId);
         
         return ResponseEntity.ok(result);
@@ -78,7 +77,6 @@ public class VideoController {
         CompletableFuture.runAsync(() -> {
             try {
                 processVideo(videoUrl, userId);
-                // Record successful transcription for rate limiting
                 rateLimitService.recordTranscription(userId);
             } catch (Exception e) {
                 System.err.println("Error during async transcription: " + e.getMessage());

@@ -1,6 +1,5 @@
-package com.app.categorise.controller;
+package com.app.categorise.api.controller;
 
-import com.app.categorise.api.controller.TranscriptController;
 import com.app.categorise.api.dto.DeleteTranscriptsRequest;
 import com.app.categorise.domain.service.CategoryAliasService;
 import com.app.categorise.domain.service.CategoryService;
@@ -157,22 +156,17 @@ class TranscriptControllerTest {
             // Act & Assert - JSON parsing errors result in 500 from global exception handler
             mockMvc.perform(delete("/transcript")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("invalid json"))
+                    .content("invalid"))
                     .andExpect(status().isInternalServerError());
 
             verify(transcriptService, never()).deleteTranscripts(any());
         }
 
         @Test
-        @DisplayName("Should return internal server error for missing content type")
-        void deleteTranscripts_WithMissingContentType_ReturnsInternalServerError() throws Exception {
-            // Arrange
-            DeleteTranscriptsRequest request = new DeleteTranscriptsRequest();
-            request.setTranscriptIds(Collections.singletonList(transcriptId1));
-
-            // Act & Assert - Missing content type results in 500 from global exception handler
-            mockMvc.perform(delete("/transcript")
-                    .content(objectMapper.writeValueAsString(request)))
+        @DisplayName("Should return internal server error for missing request body")
+        void deleteTranscripts_WithMissingRequestBody_ReturnsInternalServerError() throws Exception {
+            // Act & Assert - Missing request body results in 500 from global exception handler
+            mockMvc.perform(delete("/transcript"))
                     .andExpect(status().isInternalServerError());
 
             verify(transcriptService, never()).deleteTranscripts(any());

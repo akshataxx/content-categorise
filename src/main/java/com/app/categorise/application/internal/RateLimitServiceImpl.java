@@ -40,9 +40,10 @@ public class RateLimitServiceImpl implements RateLimitService {
     private static final int DEFAULT_TOTAL_TRANSCRIPTS = 10000;
 
     public RateLimitServiceImpl(UserRateLimitRepository rateLimitRepository,
-                               UserRateLimitTrackingRepository trackingRepository,
-                               UserTranscriptRepository transcriptRepository,
-                               RateLimitMapper mapper) {
+       UserRateLimitTrackingRepository trackingRepository,
+       UserTranscriptRepository transcriptRepository,
+       RateLimitMapper mapper
+    ) {
         this.rateLimitRepository = rateLimitRepository;
         this.trackingRepository = trackingRepository;
         this.transcriptRepository = transcriptRepository;
@@ -120,12 +121,10 @@ public class RateLimitServiceImpl implements RateLimitService {
         Optional<UserRateLimitEntity> existingEntity = rateLimitRepository.findByUserId(userId);
         
         if (existingEntity.isPresent()) {
-            // Update existing configuration
             UserRateLimitEntity entity = existingEntity.get();
             mapper.updateEntity(entity, config);
             rateLimitRepository.save(entity);
         } else {
-            // Create new configuration
             UserRateLimitEntity newEntity = mapper.toEntity(config);
             if (newEntity.getId() == null) {
                 newEntity.setId(UUID.randomUUID());
@@ -159,7 +158,6 @@ public class RateLimitServiceImpl implements RateLimitService {
         return rateLimitRepository.existsByUserId(userId);
     }
 
-    // Private helper methods
 
     private RateLimitResult checkTotalTranscriptLimit(UUID userId, RateLimitConfig config) {
         long totalTranscripts = transcriptRepository.countByUserId(userId);
@@ -241,12 +239,12 @@ public class RateLimitServiceImpl implements RateLimitService {
 
     private RateLimitConfig createDefaultConfig(UUID userId) {
         return new RateLimitConfig(
-            null, // No ID for default config
+            null,
             userId,
             DEFAULT_TRANSCRIPTS_PER_MINUTE,
             DEFAULT_TRANSCRIPTS_PER_DAY,
             DEFAULT_TOTAL_TRANSCRIPTS,
-            null, // No timestamps for default config
+            null,
             null
         );
     }

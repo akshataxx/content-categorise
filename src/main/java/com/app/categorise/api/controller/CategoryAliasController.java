@@ -4,9 +4,11 @@ import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.data.entity.CategoryAliasEntity;
 import com.app.categorise.domain.service.CategoryAliasService;
 import com.app.categorise.api.dto.RenameAliasRequest;
+import com.app.categorise.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,9 +29,11 @@ public class CategoryAliasController {
 
     @PutMapping("/upsert")
     @Operation(summary = "Upsert a categoryId alias for a user", description = "Updates the alias for a given canonical categoryId.")
-    public ResponseEntity<CategoryAliasEntity> upsertAlias(@Valid @RequestBody RenameAliasRequest request) throws Exception {
+    public ResponseEntity<CategoryAliasEntity> upsertAlias(
+            @Valid @RequestBody RenameAliasRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) throws Exception {
         CategoryAliasEntity alias = aliasService.upsertAlias(
-            request.getUserId(),
+            principal.getId(),
             request.getCategoryId(),
             request.getNewAlias()
         );

@@ -2,9 +2,11 @@ package com.app.categorise.api.controller;
 
 import com.app.categorise.api.dto.AddLinkRequest;
 import com.app.categorise.domain.service.UntranscribedLinkService;
+import com.app.categorise.security.UserPrincipal;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -21,19 +23,23 @@ public class UntranscribedLinkController {
     }
 
     /**
-     * Add a new untranscribed link for a user.
+     * Add a new untranscribed link for the authenticated user.
      */
     @PostMapping
-    public ResponseEntity<Void> addLink(@Valid @RequestBody AddLinkRequest request) {
-        service.saveLink(request.getUserId(), request.getLink());
+    public ResponseEntity<Void> addLink(
+            @Valid @RequestBody AddLinkRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        UUID userId = principal.getId();
+        service.saveLink(userId, request.getLink());
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
     /**
-     * Get all untranscribed links for the given user.
+     * Get all untranscribed links for the authenticated user.
      */
-    @GetMapping("/{userId}")
-    public ResponseEntity<List<String>> getLinks(@PathVariable UUID userId) {
+    @GetMapping
+    public ResponseEntity<List<String>> getLinks(@AuthenticationPrincipal UserPrincipal principal) {
+        UUID userId = principal.getId();
         return ResponseEntity.ok(service.getLinks(userId));
     }
 }

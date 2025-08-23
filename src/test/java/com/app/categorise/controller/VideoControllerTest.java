@@ -4,6 +4,7 @@ import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.domain.service.VideoService;
 import com.app.categorise.domain.service.UntranscribedLinkService;
 import com.app.categorise.api.controller.VideoController;
+import com.app.categorise.security.UserPrincipal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,6 +29,9 @@ class VideoControllerTest {
 
     @Mock
     private UntranscribedLinkService untranscribedLinkService;
+
+    @Mock
+    private UserPrincipal mockPrincipal;
 
     @InjectMocks
     private VideoController videoController;
@@ -60,12 +64,13 @@ class VideoControllerTest {
     @Test
     void handleVideo_WithValidUrl_ReturnsTranscript() throws Exception {
         // Arrange
+        when(mockPrincipal.getId()).thenReturn(testUserId);
         when(videoService.processVideoAndCreateTranscript(eq(testVideoUrl), eq(testUserId)))
                 .thenReturn(testTranscriptDtoWithAlias);
 
         // Act
-        ResponseEntity<TranscriptDtoWithAliases> response = videoController.handleVideo(Map.of("videoUrl", testVideoUrl,
-                "userId", testUserId.toString()));
+        ResponseEntity<TranscriptDtoWithAliases> response = videoController.handleVideo(
+            Map.of("videoUrl", testVideoUrl), mockPrincipal);
 
         // Assert
         assertNotNull(response);
@@ -84,7 +89,7 @@ class VideoControllerTest {
         // Act & Assert
         IllegalArgumentException exception = assertThrows(
             IllegalArgumentException.class,
-            () -> videoController.handleVideo(Map.of("wrongKey", testVideoUrl))
+            () -> videoController.handleVideo(Map.of("wrongKey", testVideoUrl), mockPrincipal)
         );
         
         assertEquals("Missing 'videoUrl' in request body", exception.getMessage());
@@ -96,7 +101,7 @@ class VideoControllerTest {
         // Act & Assert
         IllegalArgumentException exception = assertThrows(
             IllegalArgumentException.class,
-            () -> videoController.handleVideo(Map.of("videoUrl", ""))
+            () -> videoController.handleVideo(Map.of("videoUrl", ""), mockPrincipal)
         );
         
         assertEquals("Missing 'videoUrl' in request body", exception.getMessage());
@@ -104,15 +109,28 @@ class VideoControllerTest {
     }
 
     @Test
+    void handleVideo_WithNullPrincipal_ThrowsIllegalArgumentException() {
+        // Act & Assert
+        IllegalArgumentException exception = assertThrows(
+            IllegalArgumentException.class,
+            () -> videoController.handleVideo(Map.of("videoUrl", testVideoUrl), null)
+        );
+        
+        assertEquals("User not authenticated", exception.getMessage());
+        verifyNoInteractions(videoService);
+    }
+
+    @Test
     void handleVideo_WhenServiceThrowsException_PropagatesException() throws Exception {
         // Arrange
+        when(mockPrincipal.getId()).thenReturn(testUserId);
         when(videoService.processVideoAndCreateTranscript(testVideoUrl, testUserId))
             .thenThrow(new RuntimeException("Test exception"));
 
         // Act & Assert
         assertThrows(
             RuntimeException.class,
-            () -> videoController.handleVideo(Map.of("videoUrl", testVideoUrl, "userId", testUserId.toString()))
+            () -> videoController.handleVideo(Map.of("videoUrl", testVideoUrl), mockPrincipal)
         );
         
         verify(videoService).processVideoAndCreateTranscript(testVideoUrl, testUserId);

@@ -3,8 +3,10 @@ package com.app.categorise.api.controller;
 import com.app.categorise.api.dto.DeleteTranscriptsRequest;
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.domain.service.TranscriptService;
+import com.app.categorise.security.UserPrincipal;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +36,7 @@ public class TranscriptController {
      * @param account Optional account name to filter transcripts
      * @param from Optional start of date-time range (ISO 8601 format)
      * @param to Optional end of date-time range (ISO 8601 format)
-     * @param userId Required user ID to fetch user's transcripts
+     * @param principal The authenticated user principal
      * @return A list of {@link TranscriptDtoWithAliases} matching the applied filters
      */
     @GetMapping
@@ -43,8 +45,9 @@ public class TranscriptController {
         @RequestParam(required = false) String account,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
-        @RequestParam(required = true) UUID userId
+        @AuthenticationPrincipal UserPrincipal principal
     ) {
+        UUID userId = principal.getId();
         System.out.printf("Finding all transcripts with filters: categoryIds=%s, account=%s, from=%s, to=%s, userId=%s%n",
             categoryIds, account, from, to, userId
         );
@@ -57,14 +60,15 @@ public class TranscriptController {
     /**
      * Find user transcript based on user transcript id
      * @param userTranscriptId The user transcript ID to find
-     * @param userId Required user ID for authorization and personalization
+     * @param principal The authenticated user principal
      * @return A {@link TranscriptDtoWithAliases} matching the id
      */
     @GetMapping("/{userTranscriptId}")
     public ResponseEntity<TranscriptDtoWithAliases> findTranscript(
         @PathVariable UUID userTranscriptId,
-        @RequestParam(required = true) UUID userId
+        @AuthenticationPrincipal UserPrincipal principal
     ) {
+        UUID userId = principal.getId();
         return transcriptService.findTranscript(userTranscriptId, userId)
             .map(ResponseEntity::ok)
             .orElseGet(() -> ResponseEntity.notFound().build());

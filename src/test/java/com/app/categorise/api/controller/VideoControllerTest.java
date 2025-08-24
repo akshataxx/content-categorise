@@ -1,9 +1,10 @@
-package com.app.categorise.controller;
+package com.app.categorise.api.controller;
 
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
+import com.app.categorise.domain.model.RateLimitResult;
+import com.app.categorise.domain.service.RateLimitService;
 import com.app.categorise.domain.service.VideoService;
 import com.app.categorise.domain.service.UntranscribedLinkService;
-import com.app.categorise.api.controller.VideoController;
 import com.app.categorise.security.UserPrincipal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,9 @@ class VideoControllerTest {
 
     @Mock
     private UntranscribedLinkService untranscribedLinkService;
+
+    @Mock
+    private RateLimitService rateLimitService;
 
     @Mock
     private UserPrincipal mockPrincipal;
@@ -65,6 +69,11 @@ class VideoControllerTest {
     void handleVideo_WithValidUrl_ReturnsTranscript() throws Exception {
         // Arrange
         when(mockPrincipal.getId()).thenReturn(testUserId);
+        
+        // Mock rate limiting to allow the request
+        RateLimitResult allowedResult = RateLimitResult.allowed(4, java.time.Instant.now().plus(1, java.time.temporal.ChronoUnit.MINUTES), RateLimitResult.RateLimitType.PER_MINUTE);
+        when(rateLimitService.checkRateLimit(testUserId)).thenReturn(allowedResult);
+        
         when(videoService.processVideoAndCreateTranscript(eq(testVideoUrl), eq(testUserId)))
                 .thenReturn(testTranscriptDtoWithAlias);
 
@@ -78,6 +87,10 @@ class VideoControllerTest {
         assertNotNull(response.getBody());
         assertEquals(testTranscriptDtoWithAlias.id(), response.getBody().id());
         assertEquals(testVideoUrl, response.getBody().videoUrl());
+        
+        // Verify the rate limit check and recording
+        verify(rateLimitService).checkRateLimit(testUserId);
+        verify(rateLimitService).recordTranscription(testUserId);
         
         // Verify the new simplified method is called
         verify(videoService).processVideoAndCreateTranscript(eq(testVideoUrl), eq(testUserId));
@@ -124,6 +137,11 @@ class VideoControllerTest {
     void handleVideo_WhenServiceThrowsException_PropagatesException() throws Exception {
         // Arrange
         when(mockPrincipal.getId()).thenReturn(testUserId);
+        
+        // Mock rate limiting to allow the request
+        RateLimitResult allowedResult = RateLimitResult.allowed(4, java.time.Instant.now().plus(1, java.time.temporal.ChronoUnit.MINUTES), RateLimitResult.RateLimitType.PER_MINUTE);
+        when(rateLimitService.checkRateLimit(testUserId)).thenReturn(allowedResult);
+        
         when(videoService.processVideoAndCreateTranscript(testVideoUrl, testUserId))
             .thenThrow(new RuntimeException("Test exception"));
 
@@ -133,7 +151,10 @@ class VideoControllerTest {
             () -> videoController.handleVideo(Map.of("videoUrl", testVideoUrl), mockPrincipal)
         );
         
+        verify(rateLimitService).checkRateLimit(testUserId);
         verify(videoService).processVideoAndCreateTranscript(testVideoUrl, testUserId);
+        // Should not record transcription when service throws exception
+        verify(rateLimitService, never()).recordTranscription(testUserId);
         verifyNoMoreInteractions(videoService);
     }
 }

@@ -89,4 +89,12 @@ public interface UserTranscriptRepository extends JpaRepository<UserTranscriptEn
     Optional<UserTranscriptEntity> findByUserIdAndVideoUrlWithFullData(
             @Param("userId") UUID userId, 
             @Param("videoUrl") String videoUrl);
+    
+    /**
+     * Count total number of transcripts for a specific user
+     * Used for rate limiting total transcript count
+     * @param userId The user ID
+     * @return Total number of transcripts for the user
+     */
+    long countByUserId(UUID userId);
 }

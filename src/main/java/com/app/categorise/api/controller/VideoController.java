@@ -1,8 +1,11 @@
 package com.app.categorise.api.controller;
 
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
+import com.app.categorise.domain.model.RateLimitResult;
+import com.app.categorise.domain.service.RateLimitService;
 import com.app.categorise.domain.service.UntranscribedLinkService;
 import com.app.categorise.domain.service.VideoService;
+import com.app.categorise.exception.RateLimitExceededException;
 import com.app.categorise.security.UserPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -20,10 +23,13 @@ import java.util.UUID;
 public class VideoController {
     private final VideoService videoService;
     private final UntranscribedLinkService untranscribedLinkService;
+    private final RateLimitService rateLimitService;
 
-    public VideoController(VideoService videoService, UntranscribedLinkService untranscribedLinkService) {
+    public VideoController(VideoService videoService, UntranscribedLinkService untranscribedLinkService, 
+                          RateLimitService rateLimitService) {
         this.videoService = videoService;
         this.untranscribedLinkService = untranscribedLinkService;
+        this.rateLimitService = rateLimitService;
     }
 
     @Operation(summary = "Submit a video URL", description = "Downloads video, extracts transcript and metadata, and saves to DB")
@@ -37,7 +43,17 @@ public class VideoController {
         validateRequest(videoUrl, principal);
 
         UUID userId = principal.getId();
+        
+        // Check rate limits before processing
+        RateLimitResult rateLimitResult = rateLimitService.checkRateLimit(userId);
+        if (!rateLimitResult.isAllowed()) {
+            throw new RateLimitExceededException(rateLimitResult);
+        }
+
         TranscriptDtoWithAliases result = processVideo(videoUrl, userId);
+        
+        rateLimitService.recordTranscription(userId);
+        
         return ResponseEntity.ok(result);
     }
 
@@ -52,9 +68,16 @@ public class VideoController {
         
         UUID userId = principal.getId();
 
+        // Check rate limits before starting async processing
+        RateLimitResult rateLimitResult = rateLimitService.checkRateLimit(userId);
+        if (!rateLimitResult.isAllowed()) {
+            throw new RateLimitExceededException(rateLimitResult);
+        }
+
         CompletableFuture.runAsync(() -> {
             try {
                 processVideo(videoUrl, userId);
+                rateLimitService.recordTranscription(userId);
             } catch (Exception e) {
                 System.err.println("Error during async transcription: " + e.getMessage());
                 e.printStackTrace();

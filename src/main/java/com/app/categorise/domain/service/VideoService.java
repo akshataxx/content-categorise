@@ -14,6 +14,7 @@ import com.app.categorise.data.repository.UserTranscriptRepository;
 import com.app.categorise.data.dto.TranscriptCategorisationResult;
 import com.app.categorise.util.ProcessRunner;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
@@ -41,6 +42,9 @@ public class VideoService {
 
     private final BaseTranscriptRepository baseTranscriptRepository;
     private final UserTranscriptRepository userTranscriptRepository;
+    
+    @Value("${app.ffmpeg.location}")
+    private final String ffmpegLocation;
 
     public VideoService(
         WhisperClient whisperClient,
@@ -49,7 +53,8 @@ public class VideoService {
         CategoryAliasService categoryAliasService,
         VideoMapper videoMapper,
         BaseTranscriptRepository baseTranscriptRepository,
-        UserTranscriptRepository userTranscriptRepository
+        UserTranscriptRepository userTranscriptRepository,
+        @Value("${app.ffmpeg.location}") String ffmpegLocation
     ){
         this.whisperClient = whisperClient;
         this.categorisationService = categorisationService;
@@ -58,6 +63,7 @@ public class VideoService {
         this.videoMapper = videoMapper;
         this.baseTranscriptRepository = baseTranscriptRepository;
         this.userTranscriptRepository = userTranscriptRepository;
+        this.ffmpegLocation = ffmpegLocation;
     }
 
     /**
@@ -75,6 +81,7 @@ public class VideoService {
 
         ProcessRunner.runCommand(
                 "yt-dlp",
+                "--ffmpeg-location", ffmpegLocation,
                 "--write-info-json",
                 "-x", "--audio-format", "mp3", "--audio-quality", "5",
                 "-o", outputTemplate,

@@ -34,6 +34,12 @@ public class AuthService {
 
     @Autowired
     private RefreshTokenService refreshTokenService;
+    
+    @Autowired
+    private SubscriptionService subscriptionService;
+    
+    @Autowired 
+    private RateLimitService rateLimitService;
 
     @Value("${google.client-id}")
     private String googleClientId;
@@ -75,7 +81,13 @@ public class AuthService {
             newUser.setFirstName(firstName);
             newUser.setLastName(lastName);
             newUser.setPictureUrl(pictureUrl);
-            return userRepository.save(newUser);
+            UserEntity savedUser = userRepository.save(newUser);
+            
+            // Initialize free subscription and rate limits for new user
+            subscriptionService.initializeFreeSubscription(savedUser.getId());
+            rateLimitService.initializeDefaultLimits(savedUser.getId());
+            
+            return savedUser;
         });
 
         User user = new User(userEntity.getId(), userEntity.getName(), userEntity.getEmail(), userEntity.getPictureUrl());

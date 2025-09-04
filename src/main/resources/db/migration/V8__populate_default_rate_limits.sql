@@ -8,7 +8,7 @@ SELECT
     u.id as user_id,
     5 as transcripts_per_minute_limit,    -- Default: 5 transcripts per minute
     100 as transcripts_per_day_limit,     -- Default: 100 transcripts per day  
-    10000 as total_transcripts_limit,     -- Default: 10,000 total transcripts
+    3 as total_transcripts_limit,     -- Default: 3 total transcripts (free tier)
     CURRENT_TIMESTAMP as created_at,
     CURRENT_TIMESTAMP as updated_at
 FROM users u

@@ -1,11 +1,16 @@
 package com.app.categorise.api.controller;
 
 import com.app.categorise.api.dto.subscription.SubscriptionDto;
+import com.app.categorise.api.dto.subscription.StripeCheckoutRequest;
+import com.app.categorise.api.dto.subscription.StripeCheckoutResponse;
 import com.app.categorise.api.dto.subscription.UpgradeSubscriptionRequest;
 import com.app.categorise.api.dto.subscription.UsageInfoDto;
+import com.app.categorise.application.internal.StripeService;
 import com.app.categorise.domain.model.Subscription;
 import com.app.categorise.domain.service.SubscriptionService;
 import com.app.categorise.security.UserPrincipal;
+import com.stripe.exception.StripeException;
+import com.stripe.model.checkout.Session;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -22,11 +27,13 @@ import java.util.UUID;
 @RequestMapping("/api/subscription")
 @Tag(name = "Subscription", description = "Operations related to user subscriptions and billing")
 public class SubscriptionController {
-    
+
     private final SubscriptionService subscriptionService;
-    
-    public SubscriptionController(SubscriptionService subscriptionService) {
+    private final StripeService stripeService;
+
+    public SubscriptionController(SubscriptionService subscriptionService, StripeService stripeService) {
         this.subscriptionService = subscriptionService;
+        this.stripeService = stripeService;
     }
     
     @Operation(summary = "Get user subscription status")
@@ -75,6 +82,27 @@ public class SubscriptionController {
         return ResponseEntity.ok(mapToDto(upgraded));
     }
     
+    @Operation(summary = "Create Stripe checkout session")
+    @PostMapping("/create-checkout")
+    public ResponseEntity<StripeCheckoutResponse> createCheckout(
+            @Valid @RequestBody StripeCheckoutRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        try {
+            UUID userId = principal.getId();
+            Session session = stripeService.createCheckoutSession(userId, request.getPriceId());
+
+            StripeCheckoutResponse response = new StripeCheckoutResponse(
+                session.getUrl(),
+                session.getId()
+            );
+
+            return ResponseEntity.ok(response);
+        } catch (StripeException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
     @Operation(summary = "Cancel subscription")
     @PostMapping("/cancel")
     public ResponseEntity<Void> cancelSubscription(@AuthenticationPrincipal UserPrincipal principal) {

@@ -74,15 +74,16 @@ class VideoControllerTest {
         RateLimitResult allowedResult = RateLimitResult.allowed(4, java.time.Instant.now().plus(1, java.time.temporal.ChronoUnit.MINUTES), RateLimitResult.RateLimitType.PER_MINUTE);
         when(rateLimitService.checkRateLimit(testUserId)).thenReturn(allowedResult);
         
-        when(videoService.processVideoAndCreateTranscript(eq(testVideoUrl), eq(testUserId)))
-                .thenReturn(testTranscriptDtoWithAlias);
+        when(videoService.processVideoAndCreateTranscriptAsync(eq(testVideoUrl), eq(testUserId)))
+                .thenReturn(java.util.concurrent.CompletableFuture.completedFuture(testTranscriptDtoWithAlias));
 
         // Act
-        ResponseEntity<TranscriptDtoWithAliases> response = videoController.handleVideo(
+        java.util.concurrent.CompletableFuture<org.springframework.http.ResponseEntity<TranscriptDtoWithAliases>> responseFuture = videoController.handleVideo(
             Map.of("videoUrl", testVideoUrl), mockPrincipal);
 
         // Assert
-        assertNotNull(response);
+        assertNotNull(responseFuture);
+        org.springframework.http.ResponseEntity<TranscriptDtoWithAliases> response = responseFuture.get(2, java.util.concurrent.TimeUnit.SECONDS);
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals(testTranscriptDtoWithAlias.id(), response.getBody().id());
@@ -90,11 +91,12 @@ class VideoControllerTest {
         
         // Verify the rate limit check and recording
         verify(rateLimitService).checkRateLimit(testUserId);
-        verify(rateLimitService).recordTranscription(testUserId);
+        
         
         // Verify the new simplified method is called
-        verify(videoService).processVideoAndCreateTranscript(eq(testVideoUrl), eq(testUserId));
+        verify(videoService).processVideoAndCreateTranscriptAsync(eq(testVideoUrl), eq(testUserId));
         verify(untranscribedLinkService).deleteLink(testUserId, testVideoUrl);
+        verify(rateLimitService).recordTranscription(testUserId);
     }
 
     @Test
@@ -142,17 +144,17 @@ class VideoControllerTest {
         RateLimitResult allowedResult = RateLimitResult.allowed(4, java.time.Instant.now().plus(1, java.time.temporal.ChronoUnit.MINUTES), RateLimitResult.RateLimitType.PER_MINUTE);
         when(rateLimitService.checkRateLimit(testUserId)).thenReturn(allowedResult);
         
-        when(videoService.processVideoAndCreateTranscript(testVideoUrl, testUserId))
-            .thenThrow(new RuntimeException("Test exception"));
+        when(videoService.processVideoAndCreateTranscriptAsync(testVideoUrl, testUserId))
+            .thenReturn(java.util.concurrent.CompletableFuture.failedFuture(new RuntimeException("Test exception")));
 
         // Act & Assert
         assertThrows(
             RuntimeException.class,
-            () -> videoController.handleVideo(Map.of("videoUrl", testVideoUrl), mockPrincipal)
+            () -> videoController.handleVideo(Map.of("videoUrl", testVideoUrl), mockPrincipal).join()
         );
         
         verify(rateLimitService).checkRateLimit(testUserId);
-        verify(videoService).processVideoAndCreateTranscript(testVideoUrl, testUserId);
+        verify(videoService).processVideoAndCreateTranscriptAsync(testVideoUrl, testUserId);
         // Should not record transcription when service throws exception
         verify(rateLimitService, never()).recordTranscription(testUserId);
         verifyNoMoreInteractions(videoService);

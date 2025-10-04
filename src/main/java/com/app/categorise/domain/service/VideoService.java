@@ -12,14 +12,19 @@ import com.app.categorise.data.entity.UserTranscriptEntity;
 import com.app.categorise.data.repository.BaseTranscriptRepository;
 import com.app.categorise.data.repository.UserTranscriptRepository;
 import com.app.categorise.data.dto.TranscriptCategorisationResult;
+import com.app.categorise.domain.service.RateLimitService;
 import com.app.categorise.util.processExecutor.ProcessExecutor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Qualifier;
 
 import java.io.File;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.Executor;
 import java.util.UUID;
 
 /**
@@ -37,6 +42,8 @@ public class VideoService {
 
     private final WhisperClient whisperClient;
 
+    private final Executor mediaExecutor;
+
     private final CategorisationService categorisationService;
     private final CategoryService categoryService;
     private final CategoryAliasService categoryAliasService;
@@ -49,25 +56,27 @@ public class VideoService {
     private final String ffmpegLocation;
 
     public VideoService(
-        WhisperClient whisperClient,
-        ProcessExecutor processExecutor,
+        @Value("${app.ffmpeg.location}") String ffmpegLocation,
+        @Qualifier("mediaExecutor") Executor mediaExecutor,
+        BaseTranscriptRepository baseTranscriptRepository,
+        CategoryAliasService categoryAliasService,
         CategorisationService categorisationService,
         CategoryService categoryService,
-        CategoryAliasService categoryAliasService,
-        VideoMapper videoMapper,
-        BaseTranscriptRepository baseTranscriptRepository,
+        ProcessExecutor processExecutor,
         UserTranscriptRepository userTranscriptRepository,
-        @Value("${app.ffmpeg.location}") String ffmpegLocation
+        VideoMapper videoMapper,
+        WhisperClient whisperClient
     ){
-        this.whisperClient = whisperClient;
-        this.processExecutor = processExecutor;
+        this.ffmpegLocation = ffmpegLocation;
+        this.mediaExecutor = mediaExecutor;
+        this.baseTranscriptRepository = baseTranscriptRepository;
+        this.categoryAliasService = categoryAliasService;
         this.categorisationService = categorisationService;
         this.categoryService = categoryService;
-        this.categoryAliasService = categoryAliasService;
-        this.videoMapper = videoMapper;
-        this.baseTranscriptRepository = baseTranscriptRepository;
+        this.processExecutor = processExecutor;
         this.userTranscriptRepository = userTranscriptRepository;
-        this.ffmpegLocation = ffmpegLocation;
+        this.whisperClient = whisperClient;
+        this.videoMapper = videoMapper;
     }
 
     /**
@@ -120,7 +129,17 @@ public class VideoService {
      * @param userId The ID of the user submitting the video.
      * @return A {@link TranscriptDtoWithAliases} containing all the necessary information for the client.
      */
-    public TranscriptDtoWithAliases processVideoAndCreateTranscript(String videoUrl, UUID userId) throws Exception {
+    public CompletableFuture<TranscriptDtoWithAliases> processVideoAndCreateTranscriptAsync(String videoUrl, UUID userId) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return processVideoAndCreateTranscript(videoUrl, userId);
+            } catch (Exception e) {
+                throw new CompletionException(e);
+            }
+        }, mediaExecutor);
+    }
+
+    private TranscriptDtoWithAliases processVideoAndCreateTranscript(String videoUrl, UUID userId) throws Exception {
         
         // Check if transcript already exists
         Optional<BaseTranscriptEntity> existingTranscript = 

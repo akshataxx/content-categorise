@@ -82,8 +82,8 @@ class VideoControllerRateLimitIntegrationTest {
                     120.0, Instant.now(), "test-account-id", "Test Account", "test-identifier-id",
                     "Test Identifier", "Test Alias", UUID.randomUUID(), "Test Category", Instant.now()
             );
-            when(videoService.processVideoAndCreateTranscript(eq(videoUrl), eq(userId)))
-                    .thenReturn(mockResponse);
+            when(videoService.processVideoAndCreateTranscriptAsync(eq(videoUrl), eq(userId)))
+                    .thenReturn(java.util.concurrent.CompletableFuture.completedFuture(mockResponse));
 
             // When & Then
             mockMvc.perform(post("/api/video/transcribe")
@@ -94,8 +94,9 @@ class VideoControllerRateLimitIntegrationTest {
                     .andExpect(status().isOk());
 
             verify(rateLimitService).checkRateLimit(userId);
-            verify(videoService).processVideoAndCreateTranscript(videoUrl, userId);
+            verify(videoService).processVideoAndCreateTranscriptAsync(videoUrl, userId);
             verify(rateLimitService).recordTranscription(userId);
+            
         }
 
         @Test
@@ -125,7 +126,7 @@ class VideoControllerRateLimitIntegrationTest {
                     .andExpect(jsonPath("$.message").value("Per-minute transcript limit exceeded (5/5)"));
 
             verify(rateLimitService).checkRateLimit(userId);
-            verify(videoService, never()).processVideoAndCreateTranscript(anyString(), any(UUID.class));
+            verify(videoService, never()).processVideoAndCreateTranscriptAsync(anyString(), any(UUID.class));
             verify(rateLimitService, never()).recordTranscription(userId);
         }
     }

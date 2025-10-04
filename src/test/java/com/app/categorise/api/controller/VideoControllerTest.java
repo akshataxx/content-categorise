@@ -94,8 +94,8 @@ class VideoControllerTest {
         
         // Verify the rate limit check and recording
         verify(rateLimitService).checkRateLimit(testUserId);
-        
-        
+        verify(rateLimitService).recordTranscription(testUserId);
+
         // Verify the new simplified method is called
         verify(videoService).processVideoAndCreateTranscript(eq(testVideoUrl), eq(testUserId));
         verify(untranscribedLinkService).deleteLink(testUserId, testVideoUrl);

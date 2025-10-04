@@ -3,7 +3,6 @@ package com.app.categorise.domain.service;
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.application.mapper.VideoMapper;
 import com.app.categorise.data.client.whisper.WhisperClient;
-import com.app.categorise.data.dto.TikTokMetadata;
 import com.app.categorise.data.dto.TranscriptCategorisationResult;
 import com.app.categorise.data.entity.BaseTranscriptEntity;
 import com.app.categorise.data.entity.CategoryEntity;
@@ -18,8 +17,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
 
 import java.io.File;
 import java.time.Instant;
@@ -122,7 +119,7 @@ class VideoServiceTest {
             when(videoMapper.buildResponse(baseTranscript, userTranscript, "testCategory", "recipe"))
                     .thenReturn(expectedResponse);
 
-            TranscriptDtoWithAliases result = videoService.processVideoAndCreateTranscriptAsync(videoUrl, userId)
+            TranscriptDtoWithAliases result = videoService.processVideoAndCreateTranscript(videoUrl, userId)
                     .get(2, java.util.concurrent.TimeUnit.SECONDS);
 
             assertNotNull(result);
@@ -144,7 +141,7 @@ class VideoServiceTest {
             when(userTranscriptRepository.save(userTranscript)).thenReturn(userTranscript);
             when(videoMapper.buildResponse(baseTranscript, userTranscript)).thenReturn(expectedResponse);
 
-            TranscriptDtoWithAliases result = videoService.processVideoAndCreateTranscriptAsync(videoUrl, userId)
+            TranscriptDtoWithAliases result = videoService.processVideoAndCreateTranscript(videoUrl, userId)
                     .get(2, java.util.concurrent.TimeUnit.SECONDS);
 
             assertNotNull(result);

@@ -5,7 +5,6 @@ import com.app.categorise.domain.model.RateLimitResult;
 import com.app.categorise.domain.service.RateLimitService;
 import com.app.categorise.domain.service.UntranscribedLinkService;
 import com.app.categorise.domain.service.VideoService;
-import com.app.categorise.exception.RateLimitExceededException;
 import com.app.categorise.security.UserPrincipal;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,7 +15,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
@@ -82,7 +80,7 @@ class VideoControllerRateLimitIntegrationTest {
                     120.0, Instant.now(), "test-account-id", "Test Account", "test-identifier-id",
                     "Test Identifier", "Test Alias", UUID.randomUUID(), "Test Category", Instant.now()
             );
-            when(videoService.processVideoAndCreateTranscriptAsync(eq(videoUrl), eq(userId)))
+            when(videoService.processVideoAndCreateTranscript(eq(videoUrl), eq(userId)))
                     .thenReturn(java.util.concurrent.CompletableFuture.completedFuture(mockResponse));
 
             // When & Then
@@ -94,7 +92,7 @@ class VideoControllerRateLimitIntegrationTest {
                     .andExpect(status().isOk());
 
             verify(rateLimitService).checkRateLimit(userId);
-            verify(videoService).processVideoAndCreateTranscriptAsync(videoUrl, userId);
+            verify(videoService).processVideoAndCreateTranscript(videoUrl, userId);
             verify(rateLimitService).recordTranscription(userId);
             
         }
@@ -126,7 +124,7 @@ class VideoControllerRateLimitIntegrationTest {
                     .andExpect(jsonPath("$.message").value("Per-minute transcript limit exceeded (5/5)"));
 
             verify(rateLimitService).checkRateLimit(userId);
-            verify(videoService, never()).processVideoAndCreateTranscriptAsync(anyString(), any(UUID.class));
+            verify(videoService, never()).processVideoAndCreateTranscript(anyString(), any(UUID.class));
             verify(rateLimitService, never()).recordTranscription(userId);
         }
     }

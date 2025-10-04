@@ -76,7 +76,7 @@ public class VideoController {
     }
 
     private CompletableFuture<TranscriptDtoWithAliases> processVideoAsync(String videoUrl, UUID userId) {
-        return videoService.processVideoAndCreateTranscriptAsync(videoUrl, userId)
+        return videoService.processVideoAndCreateTranscript(videoUrl, userId)
                 .whenComplete((transcriptDto, ex) -> {
                     if (ex == null) {
                         untranscribedLinkService.deleteLink(userId, videoUrl);

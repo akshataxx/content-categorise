@@ -12,7 +12,6 @@ import com.app.categorise.data.entity.UserTranscriptEntity;
 import com.app.categorise.data.repository.BaseTranscriptRepository;
 import com.app.categorise.data.repository.UserTranscriptRepository;
 import com.app.categorise.data.dto.TranscriptCategorisationResult;
-import com.app.categorise.domain.service.RateLimitService;
 import com.app.categorise.util.processExecutor.ProcessExecutor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
@@ -129,17 +128,17 @@ public class VideoService {
      * @param userId The ID of the user submitting the video.
      * @return A {@link TranscriptDtoWithAliases} containing all the necessary information for the client.
      */
-    public CompletableFuture<TranscriptDtoWithAliases> processVideoAndCreateTranscriptAsync(String videoUrl, UUID userId) {
+    public CompletableFuture<TranscriptDtoWithAliases> processVideoAndCreateTranscript(String videoUrl, UUID userId) {
         return CompletableFuture.supplyAsync(() -> {
             try {
-                return processVideoAndCreateTranscript(videoUrl, userId);
+                return _processVideoAndCreateTranscript(videoUrl, userId);
             } catch (Exception e) {
                 throw new CompletionException(e);
             }
         }, mediaExecutor);
     }
 
-    private TranscriptDtoWithAliases processVideoAndCreateTranscript(String videoUrl, UUID userId) throws Exception {
+    private TranscriptDtoWithAliases _processVideoAndCreateTranscript(String videoUrl, UUID userId) throws Exception {
         
         // Check if transcript already exists
         Optional<BaseTranscriptEntity> existingTranscript = 

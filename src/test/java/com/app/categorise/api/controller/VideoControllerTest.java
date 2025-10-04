@@ -13,10 +13,14 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -70,19 +74,19 @@ class VideoControllerTest {
         when(mockPrincipal.getId()).thenReturn(testUserId);
         
         // Mock rate limiting to allow the request
-        RateLimitResult allowedResult = RateLimitResult.allowed(4, java.time.Instant.now().plus(1, java.time.temporal.ChronoUnit.MINUTES), RateLimitResult.RateLimitType.PER_MINUTE);
+        RateLimitResult allowedResult = RateLimitResult.allowed(4, Instant.now().plus(1, ChronoUnit.MINUTES), RateLimitResult.RateLimitType.PER_MINUTE);
         when(rateLimitService.checkRateLimit(testUserId)).thenReturn(allowedResult);
         
         when(videoService.processVideoAndCreateTranscript(eq(testVideoUrl), eq(testUserId)))
-                .thenReturn(java.util.concurrent.CompletableFuture.completedFuture(testTranscriptDtoWithAlias));
+                .thenReturn(CompletableFuture.completedFuture(testTranscriptDtoWithAlias));
 
         // Act
-        java.util.concurrent.CompletableFuture<org.springframework.http.ResponseEntity<TranscriptDtoWithAliases>> responseFuture = videoController.handleVideo(
+        CompletableFuture<ResponseEntity<TranscriptDtoWithAliases>> responseFuture = videoController.handleVideo(
             Map.of("videoUrl", testVideoUrl), mockPrincipal);
 
         // Assert
         assertNotNull(responseFuture);
-        org.springframework.http.ResponseEntity<TranscriptDtoWithAliases> response = responseFuture.get(2, java.util.concurrent.TimeUnit.SECONDS);
+        ResponseEntity<TranscriptDtoWithAliases> response = responseFuture.get(2, TimeUnit.SECONDS);
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
         assertEquals(testTranscriptDtoWithAlias.id(), response.getBody().id());
@@ -140,11 +144,11 @@ class VideoControllerTest {
         when(mockPrincipal.getId()).thenReturn(testUserId);
         
         // Mock rate limiting to allow the request
-        RateLimitResult allowedResult = RateLimitResult.allowed(4, java.time.Instant.now().plus(1, java.time.temporal.ChronoUnit.MINUTES), RateLimitResult.RateLimitType.PER_MINUTE);
+        RateLimitResult allowedResult = RateLimitResult.allowed(4, Instant.now().plus(1, java.time.temporal.ChronoUnit.MINUTES), RateLimitResult.RateLimitType.PER_MINUTE);
         when(rateLimitService.checkRateLimit(testUserId)).thenReturn(allowedResult);
         
         when(videoService.processVideoAndCreateTranscript(testVideoUrl, testUserId))
-            .thenReturn(java.util.concurrent.CompletableFuture.failedFuture(new RuntimeException("Test exception")));
+            .thenReturn(CompletableFuture.failedFuture(new RuntimeException("Test exception")));
 
         // Act & Assert
         assertThrows(

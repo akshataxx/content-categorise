@@ -21,6 +21,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -81,7 +82,7 @@ class VideoControllerRateLimitIntegrationTest {
                     "Test Identifier", "Test Alias", UUID.randomUUID(), "Test Category", Instant.now()
             );
             when(videoService.processVideoAndCreateTranscript(eq(videoUrl), eq(userId)))
-                    .thenReturn(java.util.concurrent.CompletableFuture.completedFuture(mockResponse));
+                    .thenReturn(CompletableFuture.completedFuture(mockResponse));
 
             // When & Then
             mockMvc.perform(post("/api/video/transcribe")
@@ -94,7 +95,6 @@ class VideoControllerRateLimitIntegrationTest {
             verify(rateLimitService).checkRateLimit(userId);
             verify(videoService).processVideoAndCreateTranscript(videoUrl, userId);
             verify(rateLimitService).recordTranscription(userId);
-            
         }
 
         @Test

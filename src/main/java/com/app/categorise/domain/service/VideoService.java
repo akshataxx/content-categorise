@@ -12,7 +12,7 @@ import com.app.categorise.data.entity.UserTranscriptEntity;
 import com.app.categorise.data.repository.BaseTranscriptRepository;
 import com.app.categorise.data.repository.UserTranscriptRepository;
 import com.app.categorise.data.dto.TranscriptCategorisationResult;
-import com.app.categorise.util.ProcessRunner;
+import com.app.categorise.util.processExecutor.ProcessExecutor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -33,6 +33,8 @@ import java.util.UUID;
 @Service
 public class VideoService {
 
+    private final ProcessExecutor processExecutor;
+
     private final WhisperClient whisperClient;
 
     private final CategorisationService categorisationService;
@@ -48,6 +50,7 @@ public class VideoService {
 
     public VideoService(
         WhisperClient whisperClient,
+        ProcessExecutor processExecutor,
         CategorisationService categorisationService,
         CategoryService categoryService,
         CategoryAliasService categoryAliasService,
@@ -57,6 +60,7 @@ public class VideoService {
         @Value("${app.ffmpeg.location}") String ffmpegLocation
     ){
         this.whisperClient = whisperClient;
+        this.processExecutor = processExecutor;
         this.categorisationService = categorisationService;
         this.categoryService = categoryService;
         this.categoryAliasService = categoryAliasService;
@@ -79,7 +83,7 @@ public class VideoService {
         String baseName = "output";
         String outputTemplate = baseName + ".%(ext)s";
 
-        ProcessRunner.runCommand(
+        processExecutor.run(
                 "yt-dlp",
                 "--ffmpeg-location", ffmpegLocation,
                 "--write-info-json",

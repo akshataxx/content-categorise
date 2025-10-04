@@ -1,4 +1,4 @@
-package com.app.categorise.service;
+package com.app.categorise.domain.service;
 
 import com.app.categorise.application.mapper.VideoMapper;
 import com.app.categorise.data.entity.BaseTranscriptEntity;
@@ -6,11 +6,8 @@ import com.app.categorise.data.entity.CategoryEntity;
 import com.app.categorise.data.entity.UserTranscriptEntity;
 import com.app.categorise.data.repository.BaseTranscriptRepository;
 import com.app.categorise.data.repository.UserTranscriptRepository;
-import com.app.categorise.domain.service.CategoryAliasService;
-import com.app.categorise.domain.service.TranscriptService;
 import com.app.categorise.exception.TranscriptDeletionException;
 import com.app.categorise.exception.TranscriptNotFoundException;
-import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -19,13 +16,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.dao.DataAccessException;
 
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;

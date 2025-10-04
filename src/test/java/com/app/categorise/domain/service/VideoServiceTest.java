@@ -1,7 +1,6 @@
-package com.app.categorise.service;
+package com.app.categorise.domain.service;
 
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
-import com.app.categorise.application.internal.ProcessedVideoFiles;
 import com.app.categorise.application.mapper.VideoMapper;
 import com.app.categorise.data.client.whisper.WhisperClient;
 import com.app.categorise.data.dto.TikTokMetadata;
@@ -11,18 +10,13 @@ import com.app.categorise.data.entity.CategoryEntity;
 import com.app.categorise.data.entity.UserTranscriptEntity;
 import com.app.categorise.data.repository.BaseTranscriptRepository;
 import com.app.categorise.data.repository.UserTranscriptRepository;
-import com.app.categorise.domain.service.CategorisationService;
-import com.app.categorise.domain.service.CategoryAliasService;
-import com.app.categorise.domain.service.CategoryService;
-import com.app.categorise.domain.service.VideoService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
+import com.app.categorise.util.processExecutor.ProcessExecutor;
 import org.mockito.Mock;
-import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.File;
@@ -59,7 +53,9 @@ class VideoServiceTest {
     @Mock
     private UserTranscriptRepository userTranscriptRepository;
 
-    @InjectMocks
+    @Mock
+    private ProcessExecutor processExecutor;
+
     private VideoService videoService;
 
     private UUID userId;
@@ -78,6 +74,19 @@ class VideoServiceTest {
     @BeforeEach
     void setUp() {
         userId = UUID.randomUUID();
+        // construct service with mocks and a mocked ProcessExecutor
+        videoService = new VideoService(
+                whisperClient,
+                processExecutor,
+                categorisationService,
+                categoryService,
+                categoryAliasService,
+                videoMapper,
+                baseTranscriptRepository,
+                userTranscriptRepository,
+                "/usr/bin/ffmpeg"
+        );
+
         baseTranscriptId = UUID.randomUUID();
         UUID userTranscriptId = UUID.randomUUID();
         categoryId = UUID.randomUUID();
@@ -101,7 +110,7 @@ class VideoServiceTest {
 
         // Setup expected response
         expectedResponse = new TranscriptDtoWithAliases(
-                userTranscriptId,
+            userTranscriptId,
             videoUrl,
             transcriptText,
             "Test Description",
@@ -179,6 +188,8 @@ class VideoServiceTest {
             verify(userTranscript).setLastAccessedAt(any(Instant.class));
             verify(userTranscriptRepository).save(userTranscript);
             verify(videoMapper).buildResponse(baseTranscript, userTranscript);
+             // media tools should not run when user already has access
+             verify(processExecutor, never()).run(any(String[].class));
             
             // Should not create new transcript or categorize
             verify(categorisationService, never()).classifyAndSuggestAlias(anyString(), anyString(), anyString());
@@ -187,22 +198,17 @@ class VideoServiceTest {
     }
 
     @Nested
-    @DisplayName("Extract Audio and Metadata")
+    @DisplayName("Extract Audio and Metadata and Process Execution")
     class ExtractAudioAndMetadataTests {
 
         @Test
         @DisplayName("Should extract audio and metadata successfully")
         void extractAudioAndMetadata_ValidUrl_ReturnsProcessedFiles() throws Exception {
-            // This test would require mocking ProcessRunner and file system operations
-            // For now, we'll test that the method signature is correct
             String testUrl = "https://example.com/video";
-            
-            // Note: This would require more complex mocking of ProcessRunner and File operations
-            // For the scope of this test, we're verifying the method exists and has correct signature
-            assertDoesNotThrow(() -> {
-                // We can't easily test this without mocking static methods and file operations
-                // This test verifies the method signature is correct
-            });
+            // With a no-op ProcessExecutor, calling extractAudioAndMetadata should attempt to read files.
+            // We only verify that the method can be invoked; deeper IO behaviour is covered in separate tests.
+            assertDoesNotThrow(() -> videoService.extractAudioAndMetadata(testUrl));
+            verify(processExecutor, atLeastOnce()).run(any(String[].class));
         }
     }
 

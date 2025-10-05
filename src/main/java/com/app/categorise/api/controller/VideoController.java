@@ -34,7 +34,7 @@ public class VideoController {
 
     @Operation(summary = "Submit a video URL", description = "Downloads video, extracts transcript and metadata, and saves to DB")
     @PostMapping("/transcribe")
-    public ResponseEntity<TranscriptDtoWithAliases> handleVideo(
+    public CompletableFuture<ResponseEntity<TranscriptDtoWithAliases>> handleVideo(
             @RequestBody Map<String, String> request,
             @AuthenticationPrincipal UserPrincipal principal) throws Exception {
         System.out.println("POST /api/video/transcribe received");
@@ -50,11 +50,8 @@ public class VideoController {
             throw new RateLimitExceededException(rateLimitResult);
         }
 
-        TranscriptDtoWithAliases result = processVideo(videoUrl, userId);
-        
-        rateLimitService.recordTranscription(userId);
-        
-        return ResponseEntity.ok(result);
+        return processVideoAsync(videoUrl, userId)
+                .thenApply(ResponseEntity::ok);
     }
 
     @PostMapping("/transcribe-async")
@@ -74,26 +71,18 @@ public class VideoController {
             throw new RateLimitExceededException(rateLimitResult);
         }
 
-        CompletableFuture.runAsync(() -> {
-            try {
-                processVideo(videoUrl, userId);
-                rateLimitService.recordTranscription(userId);
-            } catch (Exception e) {
-                System.err.println("Error during async transcription: " + e.getMessage());
-                e.printStackTrace();
-            }
-        });
-
+        processVideoAsync(videoUrl, userId);
         return ResponseEntity.accepted().build();
     }
 
-    private TranscriptDtoWithAliases processVideo(String videoUrl, UUID userId) throws Exception {
-        TranscriptDtoWithAliases transcriptDto = videoService.processVideoAndCreateTranscript(videoUrl, userId);
-        System.out.println("TranscriptDto: " + transcriptDto);
-
-        untranscribedLinkService.deleteLink(userId, videoUrl);
-
-        return transcriptDto;
+    private CompletableFuture<TranscriptDtoWithAliases> processVideoAsync(String videoUrl, UUID userId) {
+        return videoService.processVideoAndCreateTranscript(videoUrl, userId)
+                .whenComplete((transcriptDto, ex) -> {
+                    if (ex == null) {
+                        untranscribedLinkService.deleteLink(userId, videoUrl);
+                        rateLimitService.recordTranscription(userId);
+                    }
+                });
     }
 
     private void validateRequest(String videoUrl, UserPrincipal principal) {

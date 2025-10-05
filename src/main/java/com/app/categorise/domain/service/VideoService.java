@@ -51,7 +51,6 @@ public class VideoService {
     private final BaseTranscriptRepository baseTranscriptRepository;
     private final UserTranscriptRepository userTranscriptRepository;
     
-    @Value("${app.ffmpeg.location}")
     private final String ffmpegLocation;
 
     public VideoService(

@@ -29,7 +29,6 @@ COPY --from=builder /workspace/target/*.jar /app/app.jar
 # Default envs (can be overridden at runtime)
 # Map env to Spring properties via relaxed binding
 ENV JAVA_OPTS="-XX:InitialRAMPercentage=50 -XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError"
-ENV SPRING_PROFILES_ACTIVE=dev
 ENV APP_FFMPEG_LOCATION=/usr/bin/ffmpeg
 
 # Expose application port

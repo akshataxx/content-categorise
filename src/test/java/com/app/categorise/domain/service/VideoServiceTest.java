@@ -1,65 +1,45 @@
-package com.app.categorise.service;
+package com.app.categorise.domain.service;
 
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
-import com.app.categorise.application.internal.ProcessedVideoFiles;
 import com.app.categorise.application.mapper.VideoMapper;
 import com.app.categorise.data.client.whisper.WhisperClient;
-import com.app.categorise.data.dto.TikTokMetadata;
 import com.app.categorise.data.dto.TranscriptCategorisationResult;
 import com.app.categorise.data.entity.BaseTranscriptEntity;
 import com.app.categorise.data.entity.CategoryEntity;
 import com.app.categorise.data.entity.UserTranscriptEntity;
 import com.app.categorise.data.repository.BaseTranscriptRepository;
 import com.app.categorise.data.repository.UserTranscriptRepository;
-import com.app.categorise.domain.service.CategorisationService;
-import com.app.categorise.domain.service.CategoryAliasService;
-import com.app.categorise.domain.service.CategoryService;
-import com.app.categorise.domain.service.VideoService;
+import com.app.categorise.util.processExecutor.ProcessExecutor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.File;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class VideoServiceTest {
 
-    @Mock
-    private WhisperClient whisperClient;
+    @Mock private WhisperClient whisperClient;
+    @Mock private CategorisationService categorisationService;
+    @Mock private CategoryService categoryService;
+    @Mock private CategoryAliasService categoryAliasService;
+    @Mock private VideoMapper videoMapper;
+    @Mock private BaseTranscriptRepository baseTranscriptRepository;
+    @Mock private UserTranscriptRepository userTranscriptRepository;
+    @Mock private ProcessExecutor processExecutor;
 
-    @Mock
-    private CategorisationService categorisationService;
-
-    @Mock
-    private CategoryService categoryService;
-
-    @Mock
-    private CategoryAliasService categoryAliasService;
-
-    @Mock
-    private VideoMapper videoMapper;
-
-    @Mock
-    private BaseTranscriptRepository baseTranscriptRepository;
-
-    @Mock
-    private UserTranscriptRepository userTranscriptRepository;
-
-    @InjectMocks
     private VideoService videoService;
 
     private UUID userId;
@@ -68,86 +48,80 @@ class VideoServiceTest {
     private String videoUrl;
     private String transcriptText;
     private BaseTranscriptEntity baseTranscript;
-    
-    @Mock
-    private UserTranscriptEntity userTranscript;
-    
+    @Mock private UserTranscriptEntity userTranscript;
     private CategoryEntity category;
     private TranscriptDtoWithAliases expectedResponse;
 
     @BeforeEach
     void setUp() {
-        userId = UUID.randomUUID();
+        Executor direct = Runnable::run; // run async work on calling thread in tests
+        videoService = new VideoService(
+                "/usr/bin/ffmpeg",
+                direct,
+                baseTranscriptRepository,
+                categoryAliasService,
+                categorisationService,
+                categoryService,
+                processExecutor,
+                userTranscriptRepository,
+                videoMapper,
+                whisperClient
+        );
+
         baseTranscriptId = UUID.randomUUID();
-        UUID userTranscriptId = UUID.randomUUID();
         categoryId = UUID.randomUUID();
-        videoUrl = "https://example.com/video";
         transcriptText = "This is a test transcript";
+        userId = UUID.randomUUID();
+        videoUrl = "https://example.com/video";
 
-        // Setup TikTokMetadata
-        TikTokMetadata metadata = new TikTokMetadata();
-        metadata.setTitle("Test Video");
-        metadata.setDescription("Test Description");
-        metadata.setDuration(30);
-        metadata.setUploadedEpoch(System.currentTimeMillis() / 1000);
-        metadata.setAccountId("testAccountId");
-        metadata.setAccount("testAccount");
-        metadata.setIdentifierId("testChannelId");
-        metadata.setIdentifier("testChannel");
-
-        // Setup entities
         baseTranscript = createBaseTranscriptEntity();
         category = createCategoryEntity();
 
-        // Setup expected response
+        UUID userTranscriptId = UUID.randomUUID();
         expectedResponse = new TranscriptDtoWithAliases(
                 userTranscriptId,
-            videoUrl,
-            transcriptText,
-            "Test Description",
-            "Test Video",
-            30.0,
-            Instant.now(),
-            "testAccountId",
-            "testAccount",
-            "testChannelId",
-            "testChannel",
-            "recipe",
-            categoryId,
-            "testCategory",
-            Instant.now()
+                videoUrl,
+                transcriptText,
+                "Test Description",
+                "Test Video",
+                30.0,
+                Instant.now(),
+                "testAccountId",
+                "testAccount",
+                "testChannelId",
+                "testChannel",
+                "recipe",
+                categoryId,
+                "testCategory",
+                Instant.now()
         );
     }
 
     @Nested
-    @DisplayName("Process Video and Create Transcript")
+    @DisplayName("Process Video and Create Transcript (Async)")
     class ProcessVideoAndCreateTranscriptTests {
 
         @Test
-        @DisplayName("Should reuse existing base transcript and create new user transcript")
-        void processVideoAndCreateTranscript_ExistingBaseTranscript_CreatesNewUserTranscript() throws Exception {
-            // Arrange
+        @DisplayName("Reuses existing base transcript and creates new user transcript")
+        void reuseBaseTranscript_createsUserTranscript_async() throws Exception {
             when(baseTranscriptRepository.findByVideoUrl(videoUrl)).thenReturn(Optional.of(baseTranscript));
             when(userTranscriptRepository.findByUserIdAndBaseTranscriptIdWithBaseTranscript(userId, baseTranscriptId))
-                .thenReturn(Optional.empty());
-            
-            TranscriptCategorisationResult categorisationResult = new TranscriptCategorisationResult(
-                "testCategory", "genericTopic", "recipe"
-            );
+                    .thenReturn(Optional.empty());
+
+            TranscriptCategorisationResult catRes = new TranscriptCategorisationResult("testCategory", "genericTopic", "recipe");
             when(categorisationService.classifyAndSuggestAlias(anyString(), anyString(), anyString()))
-                .thenReturn(categorisationResult);
-            
+                    .thenReturn(catRes);
+
             when(categoryService.saveIfNotExists("testCategory", "", userId)).thenReturn(category);
             when(categoryAliasService.findByUserIdAndCategoryId(userId, categoryId)).thenReturn(Optional.empty());
             when(videoMapper.createUserTranscriptEntity(userId, baseTranscript, category)).thenReturn(userTranscript);
             when(userTranscriptRepository.save(userTranscript)).thenReturn(userTranscript);
             when(videoMapper.buildResponse(baseTranscript, userTranscript, "testCategory", "recipe"))
-                .thenReturn(expectedResponse);
+                    .thenReturn(expectedResponse);
 
-            // Act
-            TranscriptDtoWithAliases result = videoService.processVideoAndCreateTranscript(videoUrl, userId);
+            TranscriptDtoWithAliases result = videoService.processVideoAndCreateTranscript(videoUrl, userId)
+                    .get(2, java.util.concurrent.TimeUnit.SECONDS);
 
-            // Assert
             assertNotNull(result);
             assertEquals(expectedResponse, result);
             verify(baseTranscriptRepository).findByVideoUrl(videoUrl);
@@ -158,20 +132,18 @@ class VideoServiceTest {
         }
 
         @Test
-        @DisplayName("Should return existing user transcript when user already has access")
-        void processVideoAndCreateTranscript_ExistingUserTranscript_UpdatesLastAccessed() throws Exception {
-            // Arrange
+        @DisplayName("Returns existing user transcript when user already has access")
+        void existingUserTranscript_updatesLastAccessed_async() throws Exception {
             when(baseTranscriptRepository.findByVideoUrl(videoUrl)).thenReturn(Optional.of(baseTranscript));
             when(userTranscriptRepository.findByUserIdAndBaseTranscriptIdWithBaseTranscript(userId, baseTranscriptId))
-                .thenReturn(Optional.of(userTranscript));
-            
+                    .thenReturn(Optional.of(userTranscript));
+
             when(userTranscriptRepository.save(userTranscript)).thenReturn(userTranscript);
             when(videoMapper.buildResponse(baseTranscript, userTranscript)).thenReturn(expectedResponse);
 
-            // Act
-            TranscriptDtoWithAliases result = videoService.processVideoAndCreateTranscript(videoUrl, userId);
+            TranscriptDtoWithAliases result = videoService.processVideoAndCreateTranscript(videoUrl, userId)
+                    .get(2, java.util.concurrent.TimeUnit.SECONDS);
 
-            // Assert
             assertNotNull(result);
             assertEquals(expectedResponse, result);
             verify(baseTranscriptRepository).findByVideoUrl(videoUrl);
@@ -179,55 +151,42 @@ class VideoServiceTest {
             verify(userTranscript).setLastAccessedAt(any(Instant.class));
             verify(userTranscriptRepository).save(userTranscript);
             verify(videoMapper).buildResponse(baseTranscript, userTranscript);
-            
-            // Should not create new transcript or categorize
+            verify(processExecutor, never()).run(any(String[].class));
+
             verify(categorisationService, never()).classifyAndSuggestAlias(anyString(), anyString(), anyString());
             verify(videoMapper, never()).createUserTranscriptEntity(any(), any(), any());
         }
     }
 
     @Nested
-    @DisplayName("Extract Audio and Metadata")
+    @DisplayName("Extract Audio and Metadata and Process Execution")
     class ExtractAudioAndMetadataTests {
-
         @Test
-        @DisplayName("Should extract audio and metadata successfully")
-        void extractAudioAndMetadata_ValidUrl_ReturnsProcessedFiles() throws Exception {
-            // This test would require mocking ProcessRunner and file system operations
-            // For now, we'll test that the method signature is correct
+        @DisplayName("Extracts audio and metadata successfully")
+        void extractAudioAndMetadata_invokesProcessExecutor() throws Exception {
             String testUrl = "https://example.com/video";
-            
-            // Note: This would require more complex mocking of ProcessRunner and File operations
-            // For the scope of this test, we're verifying the method exists and has correct signature
-            assertDoesNotThrow(() -> {
-                // We can't easily test this without mocking static methods and file operations
-                // This test verifies the method signature is correct
-            });
+            assertDoesNotThrow(() -> videoService.extractAudioAndMetadata(testUrl));
+            verify(processExecutor, atLeastOnce()).run(any(String[].class));
         }
     }
 
     @Nested
     @DisplayName("Transcribe Audio")
     class TranscribeAudioTests {
-
         @Test
-        @DisplayName("Should transcribe audio using WhisperClient")
+        @DisplayName("Transcribes audio using WhisperClient")
         void transcribeAudio_ValidFile_ReturnsTranscript() {
-            // Arrange
             File audioFile = mock(File.class);
             String expectedTranscript = "This is the transcribed text";
             when(whisperClient.transcribeAudio(audioFile)).thenReturn(expectedTranscript);
 
-            // Act
             String result = videoService.transcribeAudio(audioFile);
 
-            // Assert
             assertEquals(expectedTranscript, result);
             verify(whisperClient).transcribeAudio(audioFile);
         }
     }
 
-    // Helper methods
     private BaseTranscriptEntity createBaseTranscriptEntity() {
         BaseTranscriptEntity entity = new BaseTranscriptEntity();
         entity.setId(baseTranscriptId);
@@ -244,7 +203,6 @@ class VideoServiceTest {
         entity.setCreatedAt(Instant.now());
         return entity;
     }
-
 
     private CategoryEntity createCategoryEntity() {
         CategoryEntity entity = new CategoryEntity();

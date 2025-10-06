@@ -5,7 +5,6 @@ import com.app.categorise.domain.model.RateLimitResult;
 import com.app.categorise.domain.service.RateLimitService;
 import com.app.categorise.domain.service.UntranscribedLinkService;
 import com.app.categorise.domain.service.VideoService;
-import com.app.categorise.exception.RateLimitExceededException;
 import com.app.categorise.security.UserPrincipal;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,13 +15,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -83,7 +82,7 @@ class VideoControllerRateLimitIntegrationTest {
                     "Test Identifier", "Test Alias", UUID.randomUUID(), "Test Category", Instant.now()
             );
             when(videoService.processVideoAndCreateTranscript(eq(videoUrl), eq(userId)))
-                    .thenReturn(mockResponse);
+                    .thenReturn(CompletableFuture.completedFuture(mockResponse));
 
             // When & Then
             mockMvc.perform(post("/api/video/transcribe")

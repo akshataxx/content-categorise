@@ -1,10 +1,10 @@
 ## 🚀 To get started 
 
-### Add your openai api key
-Add your key in `application-secrets.properties`:
+### Add your OpenAI API key
+Copy to `.env` and add your key there:
 
-```properties
-openai.api.key=<YOUR_API_KEY>
+```dotenv
+OPENAI_API_KEY=<YOUR_API_KEY>
 ```
 
 ### Setup Database
@@ -73,7 +73,7 @@ This project uses [Springdoc OpenAPI](https://springdoc.org/) to auto-generate A
 
 To avoid real OpenAI API calls (and cost), the app includes a mock implementation used in development mode.
 
-Set the profile in `application-secrets.properties`:
+Select the profile via environment variables (or Makefile targets):
 
 ```properties
 spring.profiles.active=dev   # ➜ enables mock client (returns dummy responses)

@@ -35,6 +35,13 @@ run-dev:
 run-prod:
 	SPRING_PROFILES_ACTIVE=prod ./mvnw spring-boot:run
 
+# Run by sourcing .env into the shell so Spring sees real environment variables
+run-dev-dotenv:
+	set -a; [ -f .env ] && . ./.env; set +a; ./mvnw spring-boot:run
+
+run-prod-dotenv:
+	set -a; [ -f .env ] && . ./.env; set +a; SPRING_PROFILES_ACTIVE=prod ./mvnw spring-boot:run
+
 # Container image build and run
 # Use `make docker-build TAG=prod` to tag differently
 

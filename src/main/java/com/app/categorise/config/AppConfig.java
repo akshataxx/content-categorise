@@ -10,7 +10,6 @@ import org.springframework.context.annotation.PropertySources;
 
 @Configuration
 @PropertySources({
-        @PropertySource("classpath:application-secrets.properties"),
         @PropertySource("classpath:application.properties")
 })
 public class AppConfig {

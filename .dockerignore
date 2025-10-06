@@ -1,0 +1,18 @@
+# Maven
+.mvn/
+**/.mvn/
+**/target/
+**/tmp/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store

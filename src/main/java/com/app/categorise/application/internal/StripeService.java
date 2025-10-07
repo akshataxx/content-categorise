@@ -33,8 +33,8 @@ public class StripeService {
     public Session createCheckoutSession(UUID userId, String priceId) throws StripeException {
         SessionCreateParams params = SessionCreateParams.builder()
             .setMode(SessionCreateParams.Mode.SUBSCRIPTION)
-            .setSuccessUrl(baseUrl + "/subscription/success?session_id={CHECKOUT_SESSION_ID}")
-            .setCancelUrl(baseUrl + "/subscription/cancel")
+            .setSuccessUrl("transcribeassistant://subscription/success?session_id={CHECKOUT_SESSION_ID}")
+            .setCancelUrl("transcribeassistant://subscription/cancel")
             .addLineItem(
                 SessionCreateParams.LineItem.builder()
                     .setPrice(priceId)

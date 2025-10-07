@@ -28,10 +28,16 @@ public class UserSubscriptionEntity {
     
     @Column(name = "google_play_purchase_token")
     private String googlePlayPurchaseToken;
-    
+
     @Column(name = "google_play_product_id")
     private String googlePlayProductId;
-    
+
+    @Column(name = "stripe_customer_id")
+    private String stripeCustomerId;
+
+    @Column(name = "stripe_subscription_id")
+    private String stripeSubscriptionId;
+
     @Column(name = "subscription_start_date", nullable = false)
     private Instant subscriptionStartDate;
     
@@ -103,7 +109,13 @@ public class UserSubscriptionEntity {
     
     public String getGooglePlayProductId() { return googlePlayProductId; }
     public void setGooglePlayProductId(String googlePlayProductId) { this.googlePlayProductId = googlePlayProductId; }
-    
+
+    public String getStripeCustomerId() { return stripeCustomerId; }
+    public void setStripeCustomerId(String stripeCustomerId) { this.stripeCustomerId = stripeCustomerId; }
+
+    public String getStripeSubscriptionId() { return stripeSubscriptionId; }
+    public void setStripeSubscriptionId(String stripeSubscriptionId) { this.stripeSubscriptionId = stripeSubscriptionId; }
+
     public Instant getSubscriptionStartDate() { return subscriptionStartDate; }
     public void setSubscriptionStartDate(Instant subscriptionStartDate) { this.subscriptionStartDate = subscriptionStartDate; }
     

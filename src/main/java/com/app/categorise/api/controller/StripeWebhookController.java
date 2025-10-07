@@ -78,20 +78,44 @@ public class StripeWebhookController {
                     UUID userId = UUID.fromString(clientReferenceId);
                     String subscriptionId = session.getSubscription();
 
-                    // Upgrade user to premium
-                    subscriptionService.upgradeToPremium(
+                    // Retrieve the full subscription to get price details
+                    com.stripe.model.Subscription stripeSubscription =
+                        com.stripe.model.Subscription.retrieve(subscriptionId);
+
+                    String priceId = stripeSubscription.getItems().getData().get(0).getPrice().getId();
+                    String customerId = stripeSubscription.getCustomer();
+
+                    // Determine subscription type from price ID
+                    Subscription.SubscriptionType type = determinePlanType(priceId);
+
+                    // Upgrade user to premium with Stripe details
+                    subscriptionService.upgradeToPremiumWithStripe(
                         userId,
-                        subscriptionId, // Use Stripe subscription ID as purchase token
-                        "stripe_premium_monthly", // Default product ID for Stripe
-                        Subscription.SubscriptionType.PREMIUM_MONTHLY
+                        customerId,
+                        subscriptionId,
+                        priceId,
+                        type
                     );
 
-                    logger.info("Successfully upgraded user {} to premium subscription", userId);
+                    logger.info("Successfully upgraded user {} to {} subscription", userId, type);
                 }
             }
         } catch (Exception e) {
             logger.error("Error processing checkout session completed event", e);
         }
+    }
+
+    private Subscription.SubscriptionType determinePlanType(String priceId) {
+        // Map Stripe price IDs to subscription types
+        // For MVP, we only have monthly plan
+        return switch (priceId) {
+            case "price_1SDccWBIj51ZSIefUfPLTqxf" -> Subscription.SubscriptionType.PREMIUM_MONTHLY;
+            // Add yearly plan when created: case "price_xxx" -> Subscription.SubscriptionType.PREMIUM_YEARLY;
+            default -> {
+                logger.warn("Unknown price ID: {}, defaulting to PREMIUM_MONTHLY", priceId);
+                yield Subscription.SubscriptionType.PREMIUM_MONTHLY;
+            }
+        };
     }
 
     private void handleSubscriptionDeleted(Event event) {

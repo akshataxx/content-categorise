@@ -28,8 +28,15 @@ public interface SubscriptionService {
     /**
      * Upgrade user to premium subscription
      */
-    Subscription upgradeToPremium(UUID userId, String googlePlayPurchaseToken, 
-                                 String googlePlayProductId, Subscription.SubscriptionType type);
+    Subscription upgradeToPremium(UUID userId, String purchaseToken,
+                                 String productId, Subscription.SubscriptionType type);
+
+    /**
+     * Upgrade user to premium subscription with Stripe details
+     */
+    Subscription upgradeToPremiumWithStripe(UUID userId, String stripeCustomerId,
+                                           String stripeSubscriptionId, String priceId,
+                                           Subscription.SubscriptionType type);
     
     /**
      * Verify and activate Google Play purchase

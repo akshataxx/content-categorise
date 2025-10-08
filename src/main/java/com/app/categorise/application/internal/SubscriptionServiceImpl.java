@@ -79,45 +79,6 @@ public class SubscriptionServiceImpl implements SubscriptionService {
             logger.info("Free subscription initialized for user: {}", userId);
         }
     }
-    
-    @Override
-    public Subscription upgradeToPremium(UUID userId, String purchaseToken,
-                                       String productId, Subscription.SubscriptionType type) {
-        logger.info("Upgrading user {} to premium subscription type: {}", userId, type);
-
-        // Find existing subscription or create new one
-        Optional<UserSubscriptionEntity> existingOpt = subscriptionRepository.findByUserId(userId);
-        UserSubscriptionEntity entity;
-
-        if (existingOpt.isPresent()) {
-            entity = existingOpt.get();
-        } else {
-            entity = new UserSubscriptionEntity(userId,
-                UserSubscriptionEntity.SubscriptionType.FREE,
-                UserSubscriptionEntity.SubscriptionStatus.ACTIVE);
-        }
-
-        // Update to premium
-        entity.setSubscriptionType(mapToEntityType(type));
-        entity.setStatus(UserSubscriptionEntity.SubscriptionStatus.ACTIVE);
-        entity.setGooglePlayPurchaseToken(purchaseToken);
-        entity.setGooglePlayProductId(productId);
-        entity.setSubscriptionStartDate(Instant.now());
-
-        // Set end date based on subscription type
-        if (type == Subscription.SubscriptionType.PREMIUM_MONTHLY) {
-            entity.setSubscriptionEndDate(Instant.now().plus(30, ChronoUnit.DAYS));
-        } else if (type == Subscription.SubscriptionType.PREMIUM_YEARLY) {
-            entity.setSubscriptionEndDate(Instant.now().plus(365, ChronoUnit.DAYS));
-        }
-
-        entity.setAutoRenew(true);
-
-        UserSubscriptionEntity saved = subscriptionRepository.save(entity);
-        logger.info("Successfully upgraded user {} to premium", userId);
-
-        return mapper.toDomainModel(saved);
-    }
 
     @Override
     public Subscription upgradeToPremiumWithStripe(UUID userId, String stripeCustomerId,
@@ -158,14 +119,6 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         logger.info("Successfully upgraded user {} to premium via Stripe", userId);
 
         return mapper.toDomainModel(saved);
-    }
-    
-    @Override
-    public boolean verifyGooglePlayPurchase(String purchaseToken, String productId) {
-        // TODO: Implement Google Play Developer API verification
-        // For MVP, we'll trust the client verification
-        logger.info("Verifying Google Play purchase: token={}, productId={}", purchaseToken, productId);
-        return true; // For MVP - implement proper verification later
     }
     
     @Override

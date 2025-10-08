@@ -3,7 +3,6 @@ package com.app.categorise.api.controller;
 import com.app.categorise.api.dto.subscription.SubscriptionDto;
 import com.app.categorise.api.dto.subscription.StripeCheckoutRequest;
 import com.app.categorise.api.dto.subscription.StripeCheckoutResponse;
-import com.app.categorise.api.dto.subscription.UpgradeSubscriptionRequest;
 import com.app.categorise.api.dto.subscription.UsageInfoDto;
 import com.app.categorise.application.internal.StripeService;
 import com.app.categorise.domain.model.Subscription;
@@ -57,29 +56,6 @@ public class SubscriptionController {
         
         UsageInfoDto usage = new UsageInfoDto(isPremium, remainingFree);
         return ResponseEntity.ok(usage);
-    }
-    
-    @Operation(summary = "Upgrade to premium subscription")
-    @PostMapping("/upgrade")
-    public ResponseEntity<SubscriptionDto> upgradeSubscription(
-            @Valid @RequestBody UpgradeSubscriptionRequest request,
-            @AuthenticationPrincipal UserPrincipal principal) {
-        
-        UUID userId = principal.getId();
-        
-        // Verify the Google Play purchase
-        boolean isValidPurchase = subscriptionService.verifyGooglePlayPurchase(
-                request.getPurchaseToken(), request.getProductId());
-        
-        if (!isValidPurchase) {
-            return ResponseEntity.badRequest().build();
-        }
-        
-        Subscription.SubscriptionType type = mapSubscriptionType(request.getProductId());
-        Subscription upgraded = subscriptionService.upgradeToPremium(
-                userId, request.getPurchaseToken(), request.getProductId(), type);
-        
-        return ResponseEntity.ok(mapToDto(upgraded));
     }
     
     @Operation(summary = "Create Stripe checkout session")

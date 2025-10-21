@@ -1,4 +1,4 @@
-package com.app.categorise.application.internal;
+package com.app.categorise.domain.service;
 
 import com.stripe.Stripe;
 import com.stripe.exception.StripeException;
@@ -11,10 +11,11 @@ import jakarta.annotation.PostConstruct;
 import java.util.UUID;
 
 /**
- * Service for handling Stripe payment operations
+ * Stripe implementation of PaymentService
+ * Handles Stripe-specific payment operations
  */
 @Service
-public class StripeService {
+public class StripeService implements PaymentService {
 
     @Value("${stripe.secret.key:sk_test_}")
     private String stripeSecretKey;
@@ -27,9 +28,7 @@ public class StripeService {
         Stripe.apiKey = stripeSecretKey;
     }
 
-    /**
-     * Create a Stripe checkout session for premium subscription
-     */
+    @Override
     public Session createCheckoutSession(UUID userId, String priceId) throws StripeException {
         SessionCreateParams params = SessionCreateParams.builder()
             .setMode(SessionCreateParams.Mode.SUBSCRIPTION)
@@ -48,9 +47,7 @@ public class StripeService {
         return Session.create(params);
     }
 
-    /**
-     * Retrieve a checkout session by ID
-     */
+    @Override
     public Session retrieveSession(String sessionId) throws StripeException {
         return Session.retrieve(sessionId);
     }

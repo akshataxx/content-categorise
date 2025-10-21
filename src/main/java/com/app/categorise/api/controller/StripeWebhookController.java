@@ -19,10 +19,10 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 /**
- * Controller for handling Stripe webhooks
+ * Controller for handling subscription webhooks
  */
 @RestController
-@RequestMapping("/api/webhooks")
+@RequestMapping("/api/webhook")
 @Hidden // Hide from Swagger documentation
 public class StripeWebhookController {
 
@@ -37,7 +37,7 @@ public class StripeWebhookController {
         this.subscriptionService = subscriptionService;
     }
 
-    @PostMapping("/stripe")
+    @PostMapping("/subscription")
     public ResponseEntity<String> handleStripeWebhook(
             @RequestBody String payload,
             @RequestHeader("Stripe-Signature") String sigHeader) {

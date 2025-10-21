@@ -4,9 +4,11 @@ import com.app.categorise.api.dto.subscription.SubscriptionDto;
 import com.app.categorise.api.dto.subscription.StripeCheckoutRequest;
 import com.app.categorise.api.dto.subscription.StripeCheckoutResponse;
 import com.app.categorise.api.dto.subscription.UsageInfoDto;
-import com.app.categorise.application.internal.StripeService;
 import com.app.categorise.domain.model.Subscription;
+import com.app.categorise.domain.service.PaymentService;
 import com.app.categorise.domain.service.SubscriptionService;
+import com.app.categorise.domain.service.UsageService;
+import com.app.categorise.exception.PaymentException;
 import com.app.categorise.security.UserPrincipal;
 import com.stripe.exception.StripeException;
 import com.stripe.model.checkout.Session;
@@ -28,11 +30,15 @@ import java.util.UUID;
 public class SubscriptionController {
 
     private final SubscriptionService subscriptionService;
-    private final StripeService stripeService;
+    private final PaymentService paymentService;
+    private final UsageService usageService;
 
-    public SubscriptionController(SubscriptionService subscriptionService, StripeService stripeService) {
+    public SubscriptionController(SubscriptionService subscriptionService,
+                                 PaymentService paymentService,
+                                 UsageService usageService) {
         this.subscriptionService = subscriptionService;
-        this.stripeService = stripeService;
+        this.paymentService = paymentService;
+        this.usageService = usageService;
     }
     
     @Operation(summary = "Get user subscription status")
@@ -50,11 +56,7 @@ public class SubscriptionController {
     @GetMapping("/usage")
     public ResponseEntity<UsageInfoDto> getUsageInfo(@AuthenticationPrincipal UserPrincipal principal) {
         UUID userId = principal.getId();
-        
-        boolean isPremium = subscriptionService.hasActivePremiumSubscription(userId);
-        int remainingFree = subscriptionService.getRemainingFreeTranscriptions(userId);
-        
-        UsageInfoDto usage = new UsageInfoDto(isPremium, remainingFree);
+        UsageInfoDto usage = usageService.getUserUsageInfo(userId);
         return ResponseEntity.ok(usage);
     }
     
@@ -66,7 +68,7 @@ public class SubscriptionController {
 
         try {
             UUID userId = principal.getId();
-            Session session = stripeService.createCheckoutSession(userId, request.getPriceId());
+            Session session = paymentService.createCheckoutSession(userId, request.getPriceId());
 
             StripeCheckoutResponse response = new StripeCheckoutResponse(
                 session.getUrl(),
@@ -75,7 +77,7 @@ public class SubscriptionController {
 
             return ResponseEntity.ok(response);
         } catch (StripeException e) {
-            return ResponseEntity.badRequest().build();
+            throw new PaymentException("Failed to create checkout session", e);
         }
     }
 

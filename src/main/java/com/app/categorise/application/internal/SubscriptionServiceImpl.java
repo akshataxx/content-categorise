@@ -103,7 +103,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         entity.setStatus(UserSubscriptionEntity.SubscriptionStatus.ACTIVE);
         entity.setStripeCustomerId(stripeCustomerId);
         entity.setStripeSubscriptionId(stripeSubscriptionId);
-        entity.setGooglePlayProductId(priceId); // Reuse this field for Stripe price ID
+        entity.setStripePriceId(priceId);
         entity.setSubscriptionStartDate(Instant.now());
 
         // Set end date based on subscription type

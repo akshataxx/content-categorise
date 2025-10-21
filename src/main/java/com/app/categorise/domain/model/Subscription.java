@@ -25,8 +25,9 @@ public class Subscription {
     private UUID userId;
     private SubscriptionType subscriptionType;
     private SubscriptionStatus status;
-    private String googlePlayPurchaseToken;
-    private String googlePlayProductId;
+    private String stripeCustomerId;
+    private String stripeSubscriptionId;
+    private String stripePriceId;
     private Instant subscriptionStartDate;
     private Instant subscriptionEndDate;
     private boolean autoRenew;
@@ -35,17 +36,18 @@ public class Subscription {
     
     public Subscription() {}
     
-    public Subscription(UUID id, UUID userId, SubscriptionType subscriptionType, 
-                       SubscriptionStatus status, String googlePlayPurchaseToken,
-                       String googlePlayProductId, Instant subscriptionStartDate,
-                       Instant subscriptionEndDate, boolean autoRenew,
-                       Instant createdAt, Instant updatedAt) {
+    public Subscription(UUID id, UUID userId, SubscriptionType subscriptionType,
+                       SubscriptionStatus status, String stripeCustomerId,
+                       String stripeSubscriptionId, String stripePriceId,
+                       Instant subscriptionStartDate, Instant subscriptionEndDate,
+                       boolean autoRenew, Instant createdAt, Instant updatedAt) {
         this.id = id;
         this.userId = userId;
         this.subscriptionType = subscriptionType;
         this.status = status;
-        this.googlePlayPurchaseToken = googlePlayPurchaseToken;
-        this.googlePlayProductId = googlePlayProductId;
+        this.stripeCustomerId = stripeCustomerId;
+        this.stripeSubscriptionId = stripeSubscriptionId;
+        this.stripePriceId = stripePriceId;
         this.subscriptionStartDate = subscriptionStartDate;
         this.subscriptionEndDate = subscriptionEndDate;
         this.autoRenew = autoRenew;
@@ -65,13 +67,16 @@ public class Subscription {
     
     public SubscriptionStatus getStatus() { return status; }
     public void setStatus(SubscriptionStatus status) { this.status = status; }
-    
-    public String getGooglePlayPurchaseToken() { return googlePlayPurchaseToken; }
-    public void setGooglePlayPurchaseToken(String googlePlayPurchaseToken) { this.googlePlayPurchaseToken = googlePlayPurchaseToken; }
-    
-    public String getGooglePlayProductId() { return googlePlayProductId; }
-    public void setGooglePlayProductId(String googlePlayProductId) { this.googlePlayProductId = googlePlayProductId; }
-    
+
+    public String getStripeCustomerId() { return stripeCustomerId; }
+    public void setStripeCustomerId(String stripeCustomerId) { this.stripeCustomerId = stripeCustomerId; }
+
+    public String getStripeSubscriptionId() { return stripeSubscriptionId; }
+    public void setStripeSubscriptionId(String stripeSubscriptionId) { this.stripeSubscriptionId = stripeSubscriptionId; }
+
+    public String getStripePriceId() { return stripePriceId; }
+    public void setStripePriceId(String stripePriceId) { this.stripePriceId = stripePriceId; }
+
     public Instant getSubscriptionStartDate() { return subscriptionStartDate; }
     public void setSubscriptionStartDate(Instant subscriptionStartDate) { this.subscriptionStartDate = subscriptionStartDate; }
     

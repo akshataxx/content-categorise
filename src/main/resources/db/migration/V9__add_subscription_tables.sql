@@ -6,14 +6,15 @@ CREATE TABLE user_subscriptions (
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     subscription_type VARCHAR(20) NOT NULL CHECK (subscription_type IN ('FREE', 'PREMIUM_MONTHLY', 'PREMIUM_YEARLY')),
     status VARCHAR(20) NOT NULL CHECK (status IN ('ACTIVE', 'CANCELLED', 'EXPIRED', 'PENDING')),
-    google_play_purchase_token VARCHAR(255), -- For Google Play Billing verification
-    google_play_product_id VARCHAR(100),
+    stripe_customer_id VARCHAR(255),
+    stripe_subscription_id VARCHAR(255),
+    stripe_price_id VARCHAR(100),
     subscription_start_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     subscription_end_date TIMESTAMP,
     auto_renew BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    
+
     CONSTRAINT unique_user_subscription UNIQUE(user_id)
 );
 

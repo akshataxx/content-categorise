@@ -132,4 +132,95 @@ public class OpenAIClientImpl implements OpenAIClient {
             throw new RuntimeException("Failed to parse OpenAI response", e);
         }
     }
+
+    @Override
+    public String extractStructuredContent(String transcript, String title, String category) {
+        String prompt = buildStructuredContentPrompt(transcript, title, category);
+        String response = callOpenAI("You are a helpful assistant that extracts structured information from video transcripts.", prompt);
+        return cleanJsonResponse(response);
+    }
+
+    private String buildStructuredContentPrompt(String transcript, String title, String category) {
+        // Determine content type based on category
+        boolean isCooking = category != null && (
+            category.equalsIgnoreCase("Cooking") ||
+            category.equalsIgnoreCase("Recipe") ||
+            category.equalsIgnoreCase("Food")
+        );
+
+        boolean isBeauty = category != null && (
+            category.equalsIgnoreCase("Skincare") ||
+            category.equalsIgnoreCase("Makeup") ||
+            category.equalsIgnoreCase("Beauty")
+        );
+
+        if (isCooking) {
+            return buildCookingPrompt(transcript, title);
+        } else if (isBeauty) {
+            return buildBeautyPrompt(transcript, title);
+        } else {
+            return buildGeneralPrompt(transcript, title);
+        }
+    }
+
+    private String buildCookingPrompt(String transcript, String title) {
+        return "Extract recipe information from this video transcript.\n\n" +
+            "Title: " + title + "\n" +
+            "Transcript: " + transcript + "\n\n" +
+            "Return ONLY a JSON object with this exact structure:\n" +
+            "{\n" +
+            "  \"type\": \"recipe\",\n" +
+            "  \"ingredients\": [\"ingredient 1\", \"ingredient 2\"],\n" +
+            "  \"steps\": [\"step 1\", \"step 2\"]\n" +
+            "}\n\n" +
+            "Rules:\n" +
+            "- Extract all ingredients with quantities\n" +
+            "- Break down recipe into clear, numbered steps\n" +
+            "- If no recipe found, return empty arrays\n" +
+            "- Return ONLY valid JSON, no explanations";
+    }
+
+    private String buildBeautyPrompt(String transcript, String title) {
+        return "Extract beauty/skincare routine information from this video transcript.\n\n" +
+            "Title: " + title + "\n" +
+            "Transcript: " + transcript + "\n\n" +
+            "Return ONLY a JSON object with this exact structure:\n" +
+            "{\n" +
+            "  \"type\": \"beauty\",\n" +
+            "  \"products\": [\"product 1\", \"product 2\"],\n" +
+            "  \"steps\": [\"step 1\", \"step 2\"]\n" +
+            "}\n\n" +
+            "Rules:\n" +
+            "- Extract all products/brands mentioned\n" +
+            "- Break down routine into clear steps\n" +
+            "- If no specific routine, return empty arrays\n" +
+            "- Return ONLY valid JSON, no explanations";
+    }
+
+    private String buildGeneralPrompt(String transcript, String title) {
+        return "Extract key points from this video transcript.\n\n" +
+            "Title: " + title + "\n" +
+            "Transcript: " + transcript + "\n\n" +
+            "Return ONLY a JSON object with this exact structure:\n" +
+            "{\n" +
+            "  \"type\": \"general\",\n" +
+            "  \"keyPoints\": [\"point 1\", \"point 2\", \"point 3\"]\n" +
+            "}\n\n" +
+            "Rules:\n" +
+            "- Extract 5-10 most important points\n" +
+            "- Keep each point concise (1-2 sentences max)\n" +
+            "- Focus on actionable takeaways or main ideas\n" +
+            "- Return ONLY valid JSON, no explanations";
+    }
+
+    private String cleanJsonResponse(String response) {
+        // Remove markdown code blocks if present
+        if (response.contains("```json")) {
+            response = response.substring(response.indexOf("```json") + 7);
+            response = response.substring(0, response.indexOf("```"));
+        } else if (response.contains("```")) {
+            response = response.substring(response.indexOf('{'), response.lastIndexOf('}') + 1);
+        }
+        return response.trim();
+    }
 }

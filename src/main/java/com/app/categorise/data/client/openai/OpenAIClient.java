@@ -7,4 +7,6 @@ import java.util.List;
 public interface OpenAIClient {
 
     TranscriptCategorisationResult classifyAndSuggestAlias(String transcript, String title, String description, List<String> categoryNames);
+
+    String extractStructuredContent(String transcript, String title, String category);
 }

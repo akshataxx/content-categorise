@@ -124,14 +124,29 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     @Override
     public void cancelSubscription(UUID userId) {
         logger.info("Cancelling subscription for user: {}", userId);
-        
+
         Optional<UserSubscriptionEntity> subscriptionOpt = subscriptionRepository.findByUserId(userId);
         if (subscriptionOpt.isPresent()) {
             UserSubscriptionEntity entity = subscriptionOpt.get();
+
+            // Cancel in Stripe first if subscription exists
+            if (entity.getStripeSubscriptionId() != null && !entity.getStripeSubscriptionId().isEmpty()) {
+                try {
+                    com.stripe.model.Subscription stripeSub =
+                        com.stripe.model.Subscription.retrieve(entity.getStripeSubscriptionId());
+                    stripeSub.cancel();
+                    logger.info("Cancelled Stripe subscription: {}", entity.getStripeSubscriptionId());
+                } catch (com.stripe.exception.StripeException e) {
+                    logger.error("Failed to cancel Stripe subscription: {}", entity.getStripeSubscriptionId(), e);
+                    throw new RuntimeException("Failed to cancel subscription in Stripe. Please contact support.", e);
+                }
+            }
+
+            // Update local DB
             entity.setStatus(UserSubscriptionEntity.SubscriptionStatus.CANCELLED);
             entity.setAutoRenew(false);
             subscriptionRepository.save(entity);
-            
+
             logger.info("Subscription cancelled for user: {}", userId);
         }
     }

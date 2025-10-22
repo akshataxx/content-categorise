@@ -11,6 +11,7 @@ public class BaseTranscript {
     private UUID id;
     private String videoUrl;
     private String transcript;
+    private String structuredContent;
     private String description;
     private String title;
     private Double duration;
@@ -24,13 +25,14 @@ public class BaseTranscript {
 
     public BaseTranscript() {}
 
-    public BaseTranscript(UUID id, String videoUrl, String transcript, String description, 
-                         String title, Double duration, Instant uploadedAt, String accountId, 
-                         String account, String identifierId, String identifier, 
+    public BaseTranscript(UUID id, String videoUrl, String transcript, String structuredContent,
+                         String description, String title, Double duration, Instant uploadedAt,
+                         String accountId, String account, String identifierId, String identifier,
                          Instant createdAt, Instant transcribedAt) {
         this.id = id;
         this.videoUrl = videoUrl;
         this.transcript = transcript;
+        this.structuredContent = structuredContent;
         this.description = description;
         this.title = title;
         this.duration = duration;
@@ -66,6 +68,14 @@ public class BaseTranscript {
 
     public void setTranscript(String transcript) {
         this.transcript = transcript;
+    }
+
+    public String getStructuredContent() {
+        return structuredContent;
+    }
+
+    public void setStructuredContent(String structuredContent) {
+        this.structuredContent = structuredContent;
     }
 
     public String getDescription() {

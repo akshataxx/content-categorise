@@ -40,7 +40,6 @@ class AuthControllerTest {
         @Test
         void register_success_returns200() throws Exception {
             RegisterRequest req = new RegisterRequest();
-            req.setUsername("alice");
             req.setEmail("alice@example.com");
             req.setPassword("StrongPass!123");
 
@@ -59,7 +58,7 @@ class AuthControllerTest {
         @Test
         void login_success_returns200() throws Exception {
             LoginRequest req = new LoginRequest();
-            req.setUsernameOrEmail("alice");
+            req.setEmail("alice@example.com");
             req.setPassword("StrongPass!123");
 
             when(authService.login(any())).thenReturn(new JwtAuthResponse("access","refresh"));

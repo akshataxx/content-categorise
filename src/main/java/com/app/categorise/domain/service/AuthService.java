@@ -132,19 +132,15 @@ public class AuthService {
 
     public JwtAuthResponse register(RegisterRequest req) {
         // Enforce uniqueness
-        if (userRepository.findByUsername(req.getUsername()).isPresent()) {
-            throw new IllegalArgumentException("Username already taken");
-        }
         if (userRepository.findByEmail(req.getEmail()).isPresent()) {
             throw new IllegalArgumentException("Email already registered");
         }
 
         UserEntity user = new UserEntity();
-        user.setUsername(req.getUsername());
         user.setEmail(req.getEmail());
         user.setFirstName(req.getFirstName());
         user.setLastName(req.getLastName());
-        user.setName(req.getFirstName() != null ? req.getFirstName() + " " + (req.getLastName() != null ? req.getLastName() : "") : req.getUsername());
+        user.setName(req.getFirstName() != null ? req.getFirstName() + " " + (req.getLastName() != null ? req.getLastName() : "") : req.getEmail());
         user.setPasswordHash(passwordEncoder.encode(req.getPassword()));
 
         UserEntity saved = userRepository.save(user);
@@ -160,8 +156,7 @@ public class AuthService {
     }
 
     public JwtAuthResponse login(LoginRequest req) {
-        UserEntity user = userRepository.findByUsername(req.getUsernameOrEmail())
-                .or(() -> userRepository.findByEmail(req.getUsernameOrEmail()))
+        UserEntity user = userRepository.findByEmail(req.getEmail())
                 .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
 
         if (user.getPasswordHash() == null || !passwordEncoder.matches(req.getPassword(), user.getPasswordHash())) {

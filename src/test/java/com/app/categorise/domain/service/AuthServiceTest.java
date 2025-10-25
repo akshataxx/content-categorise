@@ -60,13 +60,11 @@ class AuthServiceTest {
         @Test
         void register_Success_HashesPasswordAndReturnsTokens() {
             RegisterRequest req = new RegisterRequest();
-            req.setUsername("alice");
             req.setEmail("alice@example.com");
             req.setPassword("StrongPass!123");
             req.setFirstName("Alice");
             req.setLastName("Doe");
 
-            when(userRepository.findByUsername("alice")).thenReturn(Optional.empty());
             when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.empty());
 
             ArgumentCaptor<UserEntity> captor = ArgumentCaptor.forClass(UserEntity.class);
@@ -91,7 +89,6 @@ class AuthServiceTest {
             assertEquals("refresh", res.getRefreshToken());
 
             UserEntity saved = captor.getValue();
-            assertEquals("alice", saved.getUsername());
             assertEquals("alice@example.com", saved.getEmail());
             assertNotNull(saved.getPasswordHash());
             assertTrue(passwordEncoder.matches("StrongPass!123", saved.getPasswordHash()));
@@ -99,26 +96,14 @@ class AuthServiceTest {
             verify(refreshTokenService).save(any(UUID.class), eq("refresh"), any(Instant.class));
         }
 
-        @Test
-        void register_DuplicateUsername_Throws() {
-            RegisterRequest req = new RegisterRequest();
-            req.setUsername("alice");
-            req.setEmail("alice@example.com");
-            req.setPassword("StrongPass!123");
-
-            when(userRepository.findByUsername("alice")).thenReturn(Optional.of(new UserEntity()));
-
-            assertThrows(IllegalArgumentException.class, () -> authService.register(req));
-        }
+        
 
         @Test
         void register_DuplicateEmail_Throws() {
             RegisterRequest req = new RegisterRequest();
-            req.setUsername("alice");
             req.setEmail("alice@example.com");
             req.setPassword("StrongPass!123");
 
-            when(userRepository.findByUsername("alice")).thenReturn(Optional.empty());
             when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(new UserEntity()));
 
             assertThrows(IllegalArgumentException.class, () -> authService.register(req));
@@ -130,17 +115,16 @@ class AuthServiceTest {
         @Test
         void login_Success_ReturnsTokens() {
             LoginRequest req = new LoginRequest();
-            req.setUsernameOrEmail("alice");
+            req.setEmail("alice@example.com");
             req.setPassword("StrongPass!123");
 
             UserEntity user = new UserEntity();
             user.setId(UUID.randomUUID());
-            user.setUsername("alice");
             user.setEmail("alice@example.com");
             user.setName("Alice Doe");
             user.setPasswordHash(passwordEncoder.encode("StrongPass!123"));
 
-            when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
+            when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(user));
             when(tokenProvider.generateToken(any())).thenReturn("access");
             when(tokenProvider.generateRefreshToken(any())).thenReturn("refresh");
 
@@ -153,14 +137,14 @@ class AuthServiceTest {
         @Test
         void login_WrongPassword_ThrowsBadCredentials() {
             LoginRequest req = new LoginRequest();
-            req.setUsernameOrEmail("alice");
+            req.setEmail("alice@example.com");
             req.setPassword("Wrong");
 
             UserEntity user = new UserEntity();
-            user.setUsername("alice");
+            user.setEmail("alice@example.com");
             user.setPasswordHash(passwordEncoder.encode("StrongPass!123"));
 
-            when(userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
+            when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(user));
 
             assertThrows(BadCredentialsException.class, () -> authService.login(req));
         }
@@ -168,11 +152,10 @@ class AuthServiceTest {
         @Test
         void login_UserNotFound_ThrowsBadCredentials() {
             LoginRequest req = new LoginRequest();
-            req.setUsernameOrEmail("unknown");
+            req.setEmail("unknown@example.com");
             req.setPassword("whatever");
 
-            when(userRepository.findByUsername("unknown")).thenReturn(Optional.empty());
-            when(userRepository.findByEmail("unknown")).thenReturn(Optional.empty());
+            when(userRepository.findByEmail("unknown@example.com")).thenReturn(Optional.empty());
 
             assertThrows(BadCredentialsException.class, () -> authService.login(req));
         }

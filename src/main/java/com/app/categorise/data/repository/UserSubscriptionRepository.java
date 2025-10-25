@@ -24,12 +24,7 @@ public interface UserSubscriptionRepository extends JpaRepository<UserSubscripti
      * Check if user exists in subscriptions table
      */
     boolean existsByUserId(UUID userId);
-    
-    /**
-     * Find subscription by Google Play purchase token
-     */
-    Optional<UserSubscriptionEntity> findByGooglePlayPurchaseToken(String purchaseToken);
-    
+
     /**
      * Count active premium subscriptions
      */

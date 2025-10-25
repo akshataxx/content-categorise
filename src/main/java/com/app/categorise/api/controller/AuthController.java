@@ -2,6 +2,8 @@ package com.app.categorise.api.controller;
 
 import com.app.categorise.api.dto.auth.GoogleAuthRequest;
 import com.app.categorise.api.dto.auth.JwtAuthResponse;
+    import com.app.categorise.api.dto.auth.LoginRequest;
+import com.app.categorise.api.dto.auth.RegisterRequest;
 import com.app.categorise.domain.service.AuthService;
 import com.app.categorise.api.dto.auth.RefreshTokenRequest;
 import jakarta.validation.Valid;
@@ -36,5 +38,23 @@ public class AuthController {
     public ResponseEntity<JwtAuthResponse> refreshToken(@Valid @RequestBody RefreshTokenRequest req) throws Exception {
         JwtAuthResponse tokens = authService.refreshAccessToken(req);
         return ResponseEntity.ok(tokens);
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest req) {
+        try {
+            return ResponseEntity.ok(authService.register(req));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req) {
+        try {
+            return ResponseEntity.ok(authService.login(req));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Invalid credentials");
+        }
     }
 }

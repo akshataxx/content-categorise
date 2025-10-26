@@ -13,6 +13,7 @@ public record TranscriptDtoWithAliases(
     UUID id,
     String videoUrl,
     String transcript,
+    String structuredContent,
     String description,
     String title,
     Double duration,

@@ -2,7 +2,7 @@ package com.app.categorise.api.controller;
 
 import com.app.categorise.api.dto.auth.GoogleAuthRequest;
 import com.app.categorise.api.dto.auth.JwtAuthResponse;
-    import com.app.categorise.api.dto.auth.LoginRequest;
+import com.app.categorise.api.dto.auth.LoginRequest;
 import com.app.categorise.api.dto.auth.RegisterRequest;
 import com.app.categorise.domain.service.AuthService;
 import com.app.categorise.api.dto.auth.RefreshTokenRequest;

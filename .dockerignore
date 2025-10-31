@@ -16,3 +16,6 @@
 
 # OS
 .DS_Store
+
+# Local logs directory (not needed in build context)
+logs/

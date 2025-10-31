@@ -71,6 +71,37 @@ This project uses [Springdoc OpenAPI](https://springdoc.org/) to auto-generate A
 
 ## 🧩 Development Mode (Mocking OpenAI API)
 
+## 📜 Logging
+
+This repo is configured for cost-efficient file logging with rolling rotation.
+
+- Default file: `logs/content-app.log`
+- Rotation: size + daily, compressed archives
+- Defaults can be overridden via environment variables:
+
+```bash
+# examples
+LOG_LEVEL_ROOT=DEBUG \
+LOG_FILE_NAME=logs/content-app.log \
+LOG_FILE_PATTERN=logs/content-app-%d{yyyy-MM-dd}.%i.log.gz \
+LOG_MAX_FILE_SIZE=10MB \
+LOG_MAX_HISTORY=7 \
+LOG_TOTAL_SIZE_CAP=1GB \
+./mvnw spring-boot:run
+```
+
+In Docker (compose), logs are persisted to the host at `./logs` via a volume mount. You can tail the logs with:
+
+```bash
+# host
+tail -f logs/content-app.log
+```
+
+Tip: At runtime, you can change log levels dynamically using Spring Boot Actuator's `/actuator/loggers` endpoint (expose it if desired).
+
+Extensibility: If you later want to ship logs to a platform (e.g., Logstash/ELK, Datadog), add a custom `logback-spring.xml` with an additional appender and optionally the `logstash-logback-encoder` dependency. The current property-based setup continues to work unchanged.
+
+
 To avoid real OpenAI API calls (and cost), the app includes a mock implementation used in development mode.
 
 Select the profile via environment variables (or Makefile targets):

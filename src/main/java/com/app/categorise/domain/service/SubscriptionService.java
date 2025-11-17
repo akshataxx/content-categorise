@@ -1,6 +1,6 @@
 package com.app.categorise.domain.service;
 
-import com.app.categorise.domain.model.Subscription;
+import com.app.categorise.domain.model.UserSubscription;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -9,17 +9,17 @@ import java.util.UUID;
  * Domain service interface for subscription management
  */
 public interface SubscriptionService {
-    
+
     /**
      * Get user's current subscription
      */
-    Optional<Subscription> getUserSubscription(UUID userId);
-    
+    Optional<UserSubscription> getUserSubscription(UUID userId);
+
     /**
      * Check if user has premium subscription
      */
     boolean hasActivePremiumSubscription(UUID userId);
-    
+
     /**
      * Initialize free subscription for new user
      */
@@ -28,15 +28,15 @@ public interface SubscriptionService {
     /**
      * Upgrade user to premium subscription with Stripe details
      */
-    Subscription upgradeToPremiumWithStripe(UUID userId, String stripeCustomerId,
+    UserSubscription upgradeToPremiumWithStripe(UUID userId, String stripeCustomerId,
                                            String stripeSubscriptionId, String priceId,
-                                           Subscription.SubscriptionType type);
-    
+                                           UserSubscription.SubscriptionType type);
+
     /**
      * Cancel user's subscription
      */
     void cancelSubscription(UUID userId);
-    
+
     /**
      * Get remaining free transcriptions for user
      */

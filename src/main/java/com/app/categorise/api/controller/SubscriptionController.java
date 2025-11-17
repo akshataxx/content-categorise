@@ -4,7 +4,7 @@ import com.app.categorise.api.dto.subscription.SubscriptionDto;
 import com.app.categorise.api.dto.subscription.StripeCheckoutRequest;
 import com.app.categorise.api.dto.subscription.StripeCheckoutResponse;
 import com.app.categorise.api.dto.subscription.UsageInfoDto;
-import com.app.categorise.domain.model.Subscription;
+import com.app.categorise.domain.model.UserSubscription;
 import com.app.categorise.domain.service.PaymentService;
 import com.app.categorise.domain.service.SubscriptionService;
 import com.app.categorise.domain.service.UsageService;
@@ -89,7 +89,7 @@ public class SubscriptionController {
         return ResponseEntity.noContent().build();
     }
     
-    private SubscriptionDto mapToDto(Subscription subscription) {
+    private SubscriptionDto mapToDto(UserSubscription subscription) {
         return new SubscriptionDto(
                 subscription.getId(),
                 subscription.getUserId(),
@@ -102,10 +102,10 @@ public class SubscriptionController {
         );
     }
     
-    private Subscription.SubscriptionType mapSubscriptionType(String productId) {
+    private UserSubscription.SubscriptionType mapSubscriptionType(String productId) {
         return switch (productId) {
-            case "premium_monthly" -> Subscription.SubscriptionType.PREMIUM_MONTHLY;
-            case "premium_yearly" -> Subscription.SubscriptionType.PREMIUM_YEARLY;
+            case "premium_monthly" -> UserSubscription.SubscriptionType.PREMIUM_MONTHLY;
+            case "premium_yearly" -> UserSubscription.SubscriptionType.PREMIUM_YEARLY;
             default -> throw new IllegalArgumentException("Unknown product ID: " + productId);
         };
     }

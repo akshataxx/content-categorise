@@ -50,19 +50,34 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     @Transactional(readOnly = true)
     public boolean hasActivePremiumSubscription(UUID userId) {
         Optional<UserSubscriptionEntity> subscription = subscriptionRepository.findByUserId(userId);
-        
+
         if (subscription.isEmpty()) {
             return false;
         }
-        
+
         UserSubscriptionEntity sub = subscription.get();
+
+        // Must be a premium subscription type
         boolean isPremium = sub.getSubscriptionType() == UserSubscriptionEntity.SubscriptionType.PREMIUM_MONTHLY ||
                            sub.getSubscriptionType() == UserSubscriptionEntity.SubscriptionType.PREMIUM_YEARLY;
-        boolean isActive = sub.getStatus() == UserSubscriptionEntity.SubscriptionStatus.ACTIVE;
-        boolean notExpired = sub.getSubscriptionEndDate() == null || 
-                            sub.getSubscriptionEndDate().isAfter(Instant.now());
-        
-        return isPremium && isActive && notExpired;
+
+        if (!isPremium) {
+            return false;
+        }
+
+        // Expired subscriptions have no access
+        if (sub.getStatus() == UserSubscriptionEntity.SubscriptionStatus.EXPIRED) {
+            return false;
+        }
+
+        // If no end date, only ACTIVE subscriptions have access (auto-renewing)
+        if (sub.getSubscriptionEndDate() == null) {
+            return sub.getStatus() == UserSubscriptionEntity.SubscriptionStatus.ACTIVE;
+        }
+
+        // If end date exists, user has access until it expires (even if CANCELLED)
+        // User paid for the period, so they get access until the end date
+        return sub.getSubscriptionEndDate().isAfter(Instant.now());
     }
     
     @Override

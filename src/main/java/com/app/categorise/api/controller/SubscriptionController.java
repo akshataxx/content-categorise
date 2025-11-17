@@ -101,12 +101,4 @@ public class SubscriptionController {
                 subscription.isPremium()
         );
     }
-    
-    private UserSubscription.SubscriptionType mapSubscriptionType(String productId) {
-        return switch (productId) {
-            case "premium_monthly" -> UserSubscription.SubscriptionType.PREMIUM_MONTHLY;
-            case "premium_yearly" -> UserSubscription.SubscriptionType.PREMIUM_YEARLY;
-            default -> throw new IllegalArgumentException("Unknown product ID: " + productId);
-        };
-    }
 }

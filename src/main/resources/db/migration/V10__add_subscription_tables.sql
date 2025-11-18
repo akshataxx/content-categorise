@@ -1,4 +1,4 @@
--- V9: Add subscription tables for user billing management
+-- V10: Add subscription tables for user billing management
 
 -- User subscription status and plan information
 CREATE TABLE user_subscriptions (
@@ -17,11 +17,6 @@ CREATE TABLE user_subscriptions (
 
     CONSTRAINT unique_user_subscription UNIQUE(user_id)
 );
-
--- Create indexes for efficient querying
-CREATE INDEX idx_user_subscriptions_user_id ON user_subscriptions(user_id);
-CREATE INDEX idx_user_subscriptions_status ON user_subscriptions(status);
-CREATE INDEX idx_user_subscriptions_type ON user_subscriptions(subscription_type);
 
 -- Initialize all existing users with FREE subscription
 INSERT INTO user_subscriptions (user_id, subscription_type, status)

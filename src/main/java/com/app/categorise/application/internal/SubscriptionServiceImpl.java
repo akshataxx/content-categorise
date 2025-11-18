@@ -4,8 +4,9 @@ import com.app.categorise.application.mapper.SubscriptionMapper;
 import com.app.categorise.data.entity.UserSubscriptionEntity;
 import com.app.categorise.data.repository.UserSubscriptionRepository;
 import com.app.categorise.data.repository.UserTranscriptRepository;
-import com.app.categorise.domain.model.Subscription;
+import com.app.categorise.domain.model.UserSubscription;
 import com.app.categorise.domain.service.SubscriptionService;
+import com.stripe.model.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -40,7 +41,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     
     @Override
     @Transactional(readOnly = true)
-    public Optional<Subscription> getUserSubscription(UUID userId) {
+    public Optional<UserSubscription> getUserSubscription(UUID userId) {
         return subscriptionRepository.findByUserId(userId)
                 .map(mapper::toDomainModel);
     }
@@ -49,19 +50,34 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     @Transactional(readOnly = true)
     public boolean hasActivePremiumSubscription(UUID userId) {
         Optional<UserSubscriptionEntity> subscription = subscriptionRepository.findByUserId(userId);
-        
+
         if (subscription.isEmpty()) {
             return false;
         }
-        
+
         UserSubscriptionEntity sub = subscription.get();
+
+        // Must be a premium subscription type
         boolean isPremium = sub.getSubscriptionType() == UserSubscriptionEntity.SubscriptionType.PREMIUM_MONTHLY ||
                            sub.getSubscriptionType() == UserSubscriptionEntity.SubscriptionType.PREMIUM_YEARLY;
-        boolean isActive = sub.getStatus() == UserSubscriptionEntity.SubscriptionStatus.ACTIVE;
-        boolean notExpired = sub.getSubscriptionEndDate() == null || 
-                            sub.getSubscriptionEndDate().isAfter(Instant.now());
-        
-        return isPremium && isActive && notExpired;
+
+        if (!isPremium) {
+            return false;
+        }
+
+        // Expired subscriptions have no access
+        if (sub.getStatus() == UserSubscriptionEntity.SubscriptionStatus.EXPIRED) {
+            return false;
+        }
+
+        // If no end date, only ACTIVE subscriptions have access (auto-renewing)
+        if (sub.getSubscriptionEndDate() == null) {
+            return sub.getStatus() == UserSubscriptionEntity.SubscriptionStatus.ACTIVE;
+        }
+
+        // If end date exists, user has access until it expires (even if CANCELLED)
+        // User paid for the period, so they get access until the end date
+        return sub.getSubscriptionEndDate().isAfter(Instant.now());
     }
     
     @Override
@@ -81,9 +97,9 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     }
 
     @Override
-    public Subscription upgradeToPremiumWithStripe(UUID userId, String stripeCustomerId,
+    public UserSubscription upgradeToPremiumWithStripe(UUID userId, String stripeCustomerId,
                                                   String stripeSubscriptionId, String priceId,
-                                                  Subscription.SubscriptionType type) {
+                                                  UserSubscription.SubscriptionType type) {
         logger.info("Upgrading user {} to premium via Stripe: {}", userId, type);
 
         // Find existing subscription or create new one
@@ -107,9 +123,9 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         entity.setSubscriptionStartDate(Instant.now());
 
         // Set end date based on subscription type
-        if (type == Subscription.SubscriptionType.PREMIUM_MONTHLY) {
+        if (type == UserSubscription.SubscriptionType.PREMIUM_MONTHLY) {
             entity.setSubscriptionEndDate(Instant.now().plus(30, ChronoUnit.DAYS));
-        } else if (type == Subscription.SubscriptionType.PREMIUM_YEARLY) {
+        } else if (type == UserSubscription.SubscriptionType.PREMIUM_YEARLY) {
             entity.setSubscriptionEndDate(Instant.now().plus(365, ChronoUnit.DAYS));
         }
 
@@ -132,8 +148,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
             // Cancel in Stripe first if subscription exists
             if (entity.getStripeSubscriptionId() != null && !entity.getStripeSubscriptionId().isEmpty()) {
                 try {
-                    com.stripe.model.Subscription stripeSub =
-                        com.stripe.model.Subscription.retrieve(entity.getStripeSubscriptionId());
+                    var stripeSub = Subscription.retrieve(entity.getStripeSubscriptionId());
                     stripeSub.cancel();
                     logger.info("Cancelled Stripe subscription: {}", entity.getStripeSubscriptionId());
                 } catch (com.stripe.exception.StripeException e) {
@@ -165,7 +180,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         return Math.max(0, remaining);
     }
     
-    private UserSubscriptionEntity.SubscriptionType mapToEntityType(Subscription.SubscriptionType domainType) {
+    private UserSubscriptionEntity.SubscriptionType mapToEntityType(UserSubscription.SubscriptionType domainType) {
         return switch (domainType) {
             case FREE -> UserSubscriptionEntity.SubscriptionType.FREE;
             case PREMIUM_MONTHLY -> UserSubscriptionEntity.SubscriptionType.PREMIUM_MONTHLY;

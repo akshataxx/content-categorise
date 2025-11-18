@@ -1,7 +1,7 @@
 package com.app.categorise.application.mapper;
 
 import com.app.categorise.data.entity.UserSubscriptionEntity;
-import com.app.categorise.domain.model.Subscription;
+import com.app.categorise.domain.model.UserSubscription;
 import org.springframework.stereotype.Component;
 
 /**
@@ -10,12 +10,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class SubscriptionMapper {
     
-    public Subscription toDomainModel(UserSubscriptionEntity entity) {
+    public UserSubscription toDomainModel(UserSubscriptionEntity entity) {
         if (entity == null) {
             return null;
         }
-        
-        return new Subscription(
+
+        return new UserSubscription(
             entity.getId(),
             entity.getUserId(),
             mapToDomainType(entity.getSubscriptionType()),
@@ -31,7 +31,7 @@ public class SubscriptionMapper {
         );
     }
     
-    public UserSubscriptionEntity toEntity(Subscription domain) {
+    public UserSubscriptionEntity toEntity(UserSubscription domain) {
         if (domain == null) {
             return null;
         }
@@ -53,15 +53,15 @@ public class SubscriptionMapper {
         return entity;
     }
     
-    private Subscription.SubscriptionType mapToDomainType(UserSubscriptionEntity.SubscriptionType entityType) {
+    private UserSubscription.SubscriptionType mapToDomainType(UserSubscriptionEntity.SubscriptionType entityType) {
         return switch (entityType) {
-            case FREE -> Subscription.SubscriptionType.FREE;
-            case PREMIUM_MONTHLY -> Subscription.SubscriptionType.PREMIUM_MONTHLY;
-            case PREMIUM_YEARLY -> Subscription.SubscriptionType.PREMIUM_YEARLY;
+            case FREE -> UserSubscription.SubscriptionType.FREE;
+            case PREMIUM_MONTHLY -> UserSubscription.SubscriptionType.PREMIUM_MONTHLY;
+            case PREMIUM_YEARLY -> UserSubscription.SubscriptionType.PREMIUM_YEARLY;
         };
     }
-    
-    private UserSubscriptionEntity.SubscriptionType mapToEntityType(Subscription.SubscriptionType domainType) {
+
+    private UserSubscriptionEntity.SubscriptionType mapToEntityType(UserSubscription.SubscriptionType domainType) {
         return switch (domainType) {
             case FREE -> UserSubscriptionEntity.SubscriptionType.FREE;
             case PREMIUM_MONTHLY -> UserSubscriptionEntity.SubscriptionType.PREMIUM_MONTHLY;
@@ -69,16 +69,16 @@ public class SubscriptionMapper {
         };
     }
     
-    private Subscription.SubscriptionStatus mapToDomainStatus(UserSubscriptionEntity.SubscriptionStatus entityStatus) {
+    private UserSubscription.SubscriptionStatus mapToDomainStatus(UserSubscriptionEntity.SubscriptionStatus entityStatus) {
         return switch (entityStatus) {
-            case ACTIVE -> Subscription.SubscriptionStatus.ACTIVE;
-            case CANCELLED -> Subscription.SubscriptionStatus.CANCELLED;
-            case EXPIRED -> Subscription.SubscriptionStatus.EXPIRED;
-            case PENDING -> Subscription.SubscriptionStatus.PENDING;
+            case ACTIVE -> UserSubscription.SubscriptionStatus.ACTIVE;
+            case CANCELLED -> UserSubscription.SubscriptionStatus.CANCELLED;
+            case EXPIRED -> UserSubscription.SubscriptionStatus.EXPIRED;
+            case PENDING -> UserSubscription.SubscriptionStatus.PENDING;
         };
     }
-    
-    private UserSubscriptionEntity.SubscriptionStatus mapToEntityStatus(Subscription.SubscriptionStatus domainStatus) {
+
+    private UserSubscriptionEntity.SubscriptionStatus mapToEntityStatus(UserSubscription.SubscriptionStatus domainStatus) {
         return switch (domainStatus) {
             case ACTIVE -> UserSubscriptionEntity.SubscriptionStatus.ACTIVE;
             case CANCELLED -> UserSubscriptionEntity.SubscriptionStatus.CANCELLED;

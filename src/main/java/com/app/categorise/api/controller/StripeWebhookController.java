@@ -1,10 +1,11 @@
 package com.app.categorise.api.controller;
 
-import com.app.categorise.domain.model.Subscription;
+import com.app.categorise.domain.model.UserSubscription;
 import com.app.categorise.domain.service.SubscriptionService;
 import com.stripe.exception.SignatureVerificationException;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Event;
+import com.stripe.model.Subscription;
 import com.stripe.model.StripeObject;
 import com.stripe.model.checkout.Session;
 import com.stripe.net.Webhook;
@@ -32,6 +33,12 @@ public class StripeWebhookController {
 
     @Value("${stripe.webhook.secret:whsec_}")
     private String webhookSecret;
+
+    @Value("${STRIPE_PRICE_MONTHLY:}")
+    private String stripePriceMonthly;
+
+    @Value("${STRIPE_PRICE_YEARLY:}")
+    private String stripePriceYearly;
 
     public StripeWebhookController(SubscriptionService subscriptionService) {
         this.subscriptionService = subscriptionService;
@@ -79,14 +86,13 @@ public class StripeWebhookController {
                     String subscriptionId = session.getSubscription();
 
                     // Retrieve the full subscription to get price details
-                    com.stripe.model.Subscription stripeSubscription =
-                        com.stripe.model.Subscription.retrieve(subscriptionId);
+                    var stripeSubscription = Subscription.retrieve(subscriptionId);
 
                     String priceId = stripeSubscription.getItems().getData().get(0).getPrice().getId();
                     String customerId = stripeSubscription.getCustomer();
 
                     // Determine subscription type from price ID
-                    Subscription.SubscriptionType type = determinePlanType(priceId);
+                    UserSubscription.SubscriptionType type = determinePlanType(priceId);
 
                     // Upgrade user to premium with Stripe details
                     subscriptionService.upgradeToPremiumWithStripe(
@@ -105,17 +111,16 @@ public class StripeWebhookController {
         }
     }
 
-    private Subscription.SubscriptionType determinePlanType(String priceId) {
+    private UserSubscription.SubscriptionType determinePlanType(String priceId) {
         // Map Stripe price IDs to subscription types
-        // For MVP, we only have monthly plan
-        return switch (priceId) {
-            case "price_1SDccWBIj51ZSIefUfPLTqxf" -> Subscription.SubscriptionType.PREMIUM_MONTHLY;
-            // Add yearly plan when created: case "price_xxx" -> Subscription.SubscriptionType.PREMIUM_YEARLY;
-            default -> {
-                logger.warn("Unknown price ID: {}, defaulting to PREMIUM_MONTHLY", priceId);
-                yield Subscription.SubscriptionType.PREMIUM_MONTHLY;
-            }
-        };
+        if (priceId.equals(stripePriceMonthly)) {
+            return UserSubscription.SubscriptionType.PREMIUM_MONTHLY;
+        } else if (stripePriceYearly != null && priceId.equals(stripePriceYearly)) {
+            return UserSubscription.SubscriptionType.PREMIUM_YEARLY;
+        } else {
+            logger.warn("Unknown price ID: {}, defaulting to PREMIUM_MONTHLY", priceId);
+            return UserSubscription.SubscriptionType.PREMIUM_MONTHLY;
+        }
     }
 
     private void handleSubscriptionDeleted(Event event) {

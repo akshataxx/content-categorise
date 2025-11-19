@@ -39,6 +39,12 @@ public class AuthService {
     private RefreshTokenService refreshTokenService;
 
     @Autowired
+    private SubscriptionService subscriptionService;
+
+    @Autowired
+    private RateLimitService rateLimitService;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Value("${google.client-id}")
@@ -90,9 +96,16 @@ public class AuthService {
                 newUser.setFirstName(firstName);
                 newUser.setLastName(lastName);
                 newUser.setPictureUrl(pictureUrl);
-                return userRepository.save(newUser);
+                UserEntity savedUser = userRepository.save(newUser);
+
+                // Initialize free subscription and rate limits for new user
+                subscriptionService.initializeFreeSubscription(savedUser.getId());
+                rateLimitService.initializeDefaultLimits(savedUser.getId());
+
+                return savedUser;
             });
         });
+
 
         User user = new User(userEntity.getId(), userEntity.getName(), userEntity.getEmail(), userEntity.getPictureUrl());
 
@@ -171,4 +184,4 @@ public class AuthService {
 
         return new JwtAuthResponse(accessToken, refreshToken);
     }
-} 
+}

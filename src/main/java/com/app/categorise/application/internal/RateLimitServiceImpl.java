@@ -9,6 +9,7 @@ import com.app.categorise.data.repository.UserTranscriptRepository;
 import com.app.categorise.domain.model.RateLimitConfig;
 import com.app.categorise.domain.model.RateLimitResult;
 import com.app.categorise.domain.service.RateLimitService;
+import com.app.categorise.domain.service.SubscriptionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -33,21 +34,24 @@ public class RateLimitServiceImpl implements RateLimitService {
     private final UserRateLimitTrackingRepository trackingRepository;
     private final UserTranscriptRepository transcriptRepository;
     private final RateLimitMapper mapper;
+    private final SubscriptionService subscriptionService;
 
     // Default rate limits
     private static final int DEFAULT_TRANSCRIPTS_PER_MINUTE = 5;
     private static final int DEFAULT_TRANSCRIPTS_PER_DAY = 100;
-    private static final int DEFAULT_TOTAL_TRANSCRIPTS = 10000;
+    private static final int DEFAULT_TOTAL_TRANSCRIPTS = 3;
 
     public RateLimitServiceImpl(UserRateLimitRepository rateLimitRepository,
        UserRateLimitTrackingRepository trackingRepository,
        UserTranscriptRepository transcriptRepository,
-       RateLimitMapper mapper
+       RateLimitMapper mapper,
+       SubscriptionService subscriptionService
     ) {
         this.rateLimitRepository = rateLimitRepository;
         this.trackingRepository = trackingRepository;
         this.transcriptRepository = transcriptRepository;
         this.mapper = mapper;
+        this.subscriptionService = subscriptionService;
     }
 
     @Override
@@ -55,10 +59,16 @@ public class RateLimitServiceImpl implements RateLimitService {
     public RateLimitResult checkRateLimit(UUID userId) {
         logger.debug("Checking rate limits for user: {}", userId);
 
+        // Check if user has premium subscription - bypass most limits for premium users
+        if (subscriptionService.hasActivePremiumSubscription(userId)) {
+            logger.debug("User {} has premium subscription, allowing request", userId);
+            return RateLimitResult.allowed(Integer.MAX_VALUE, null, RateLimitResult.RateLimitType.TOTAL);
+        }
+
         // Get user's rate limit configuration
         RateLimitConfig config = getUserRateLimits(userId);
 
-        // Check total transcript limit first (most restrictive)
+        // Check total transcript limit first (most restrictive for free users)
         RateLimitResult totalLimitResult = checkTotalTranscriptLimit(userId, config);
         if (!totalLimitResult.isAllowed()) {
             logger.info("User {} exceeded total transcript limit", userId);

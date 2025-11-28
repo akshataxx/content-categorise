@@ -19,6 +19,7 @@ public class UserEntity {
 
     private String sub; // from `sub` in OAuth2 response
     private String email;
+    private String passwordHash;
     private String firstName;
     private String lastName;
     private String name;
@@ -41,6 +42,13 @@ public class UserEntity {
     }
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
     }
 
     public String getFirstName() {

@@ -17,7 +17,9 @@ FROM eclipse-temurin:24-jre-alpine
 RUN apk add --no-cache curl ffmpeg yt-dlp
 
 # Create a non-root user
-RUN addgroup -S app && adduser -S app -G app
+RUN addgroup -S app && adduser -S app -G app \
+  && mkdir -p /app/logs \
+  && chown -R app:app /app
 USER app
 
 # Workdir

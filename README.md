@@ -71,10 +71,6 @@ This project uses [Springdoc OpenAPI](https://springdoc.org/) to auto-generate A
 
 ## 🧩 Development Mode (Mocking OpenAI API)
 
-To avoid real OpenAI API calls (and cost), the app includes a mock implementation used in development mode.
-
-Select the profile via environment variables (or Makefile targets):
-
 ```properties
 spring.profiles.active=dev   # ➜ enables mock client (returns dummy responses)
 spring.profiles.active=prod  # ➜ uses actual OpenAI API

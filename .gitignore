@@ -36,3 +36,8 @@ build/
 !.env.example
 
 .DS_Store
+
+# Application logs
+logs/
+*.log
+*.log.*

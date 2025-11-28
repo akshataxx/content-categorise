@@ -21,6 +21,8 @@ import org.springframework.beans.factory.annotation.Qualifier;
 
 import java.io.File;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -95,14 +97,27 @@ public class VideoService {
         String baseName = "output";
         String outputTemplate = baseName + ".%(ext)s";
 
-        processExecutor.run(
-                "yt-dlp",
-                "--ffmpeg-location", ffmpegLocation,
-                "--write-info-json",
-                "-x", "--audio-format", "mp3", "--audio-quality", "5",
-                "-o", outputTemplate,
-                videoUrl
-        );
+        List<String> command = new ArrayList<>();
+        command.add("yt-dlp");
+
+        if (isFfmpegLocationValid()) {
+            command.add("--ffmpeg-location");
+            command.add(ffmpegLocation);
+        } else {
+            System.out.println("FFmpeg location not configured or invalid; falling back to PATH resolution.");
+        }
+
+        command.add("--write-info-json");
+        command.add("-x");
+        command.add("--audio-format");
+        command.add("mp3");
+        command.add("--audio-quality");
+        command.add("5");
+        command.add("-o");
+        command.add(outputTemplate);
+        command.add(videoUrl);
+
+        processExecutor.run(command.toArray(new String[0]));
 
         File audioFile = new File(baseName + ".mp3");
         File metadataFile = new File(baseName + ".info.json");
@@ -210,6 +225,12 @@ public class VideoService {
         userTranscript = userTranscriptRepository.save(userTranscript);
 
         return videoMapper.buildResponse(baseTranscript, userTranscript, category.getName(), alias);
+    }
+
+    private boolean isFfmpegLocationValid() {
+        return ffmpegLocation != null
+            && !ffmpegLocation.isBlank()
+            && new File(ffmpegLocation).exists();
     }
 
 

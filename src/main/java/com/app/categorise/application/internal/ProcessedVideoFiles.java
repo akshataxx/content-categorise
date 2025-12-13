@@ -8,10 +8,12 @@ import java.io.File;
 public class ProcessedVideoFiles implements AutoCloseable {
     private final File audioFile;
     private final File metadataFile;
+    private final File videoFile;
 
-    public ProcessedVideoFiles(File audioFile, File metadataFile) {
+    public ProcessedVideoFiles(File audioFile, File metadataFile, File videoFile) {
         this.audioFile = audioFile;
         this.metadataFile = metadataFile;
+        this.videoFile = videoFile;
     }
 
     public File getAudioFile() {
@@ -29,6 +31,10 @@ public class ProcessedVideoFiles implements AutoCloseable {
         }
         if (!metadataFile.delete()) {
             System.err.println("Failed to delete metadata file: " + metadataFile.getAbsolutePath());
+        }
+        // Clean up video file if it exists (leftover from yt-dlp)
+        if (videoFile != null && videoFile.exists() && !videoFile.delete()) {
+            System.err.println("Failed to delete video file: " + videoFile.getAbsolutePath());
         }
     }
 }

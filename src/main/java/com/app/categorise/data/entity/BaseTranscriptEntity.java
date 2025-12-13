@@ -1,6 +1,8 @@
 package com.app.categorise.data.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -22,6 +24,7 @@ public class BaseTranscriptEntity {
     @Column(columnDefinition = "TEXT")
     private String transcript;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "JSONB")
     private String structuredContent;
 

@@ -176,6 +176,7 @@ public class VideoService {
             try (ProcessedVideoFiles files = extractAudioAndMetadata(videoUrl)) {
                 String transcriptText = transcribeAudio(files.getAudioFile());
                 TikTokMetadata metadata = extractMetadata(files.getMetadataFile());
+                System.out.println(metadata);
 
                 // Create new base transcript
                 baseTranscript = videoMapper.createBaseTranscriptEntity(videoUrl, transcriptText, metadata);
@@ -214,7 +215,8 @@ public class VideoService {
             String structuredContent = openAIClient.extractStructuredContent(
                 baseTranscript.getTranscript(),
                 baseTranscript.getTitle(),
-                categoryName
+                categoryName,
+                baseTranscript.getDescription()
             );
             baseTranscript.setStructuredContent(structuredContent);
             baseTranscriptRepository.save(baseTranscript);

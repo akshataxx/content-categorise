@@ -29,7 +29,7 @@ public class MockOpenAIClient implements OpenAIClient {
     }
 
     @Override
-    public String extractStructuredContent(String transcript, String title, String category) {
+    public String extractStructuredContent(String transcript, String title, String category, String description) {
         System.out.println("--- MOCK extractStructuredContent ---");
         System.out.println("Category: " + category);
 

@@ -134,13 +134,13 @@ public class OpenAIClientImpl implements OpenAIClient {
     }
 
     @Override
-    public String extractStructuredContent(String transcript, String title, String category) {
-        String prompt = buildStructuredContentPrompt(transcript, title, category);
+    public String extractStructuredContent(String transcript, String title, String category, String description) {
+        String prompt = buildStructuredContentPrompt(transcript, title, category, description);
         String response = callOpenAI("You are a helpful assistant that extracts structured information from video transcripts.", prompt);
         return cleanJsonResponse(response);
     }
 
-    private String buildStructuredContentPrompt(String transcript, String title, String category) {
+    private String buildStructuredContentPrompt(String transcript, String title, String category, String description) {
         // Determine content type based on category
         boolean isCooking = category != null && (
             category.equalsIgnoreCase("Cooking") ||
@@ -155,7 +155,7 @@ public class OpenAIClientImpl implements OpenAIClient {
         );
 
         if (isCooking) {
-            return buildCookingPrompt(transcript, title);
+            return buildCookingPrompt(transcript, title, description);
         } else if (isBeauty) {
             return buildBeautyPrompt(transcript, title);
         } else {
@@ -163,10 +163,11 @@ public class OpenAIClientImpl implements OpenAIClient {
         }
     }
 
-    private String buildCookingPrompt(String transcript, String title) {
+    private String buildCookingPrompt(String transcript, String title, String description) {
         return "Extract recipe information from this video transcript.\n\n" +
             "Title: " + title + "\n" +
             "Transcript: " + transcript + "\n\n" +
+            "Description: " + description + "\n\n" +
             "Return ONLY a JSON object with this exact structure:\n" +
             "{\n" +
             "  \"type\": \"recipe\",\n" +
@@ -177,7 +178,11 @@ public class OpenAIClientImpl implements OpenAIClient {
             "- Extract all ingredients with quantities\n" +
             "- Break down recipe into clear, numbered steps\n" +
             "- If no recipe found, return empty arrays\n" +
-            "- Return ONLY valid JSON, no explanations";
+            "- Return ONLY valid JSON, no explanations\n" +
+            "- If the transcript is unrelated to food, usually that's because a song is playing over the video, " +
+                "discard transcript information in this case\n" +
+            "- If you cannot find a recipe in the provided information, create one for the dish referenced in the " +
+                "transcript, title or description\n";
     }
 
     private String buildBeautyPrompt(String transcript, String title) {

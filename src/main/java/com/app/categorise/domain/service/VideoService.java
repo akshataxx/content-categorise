@@ -103,6 +103,8 @@ public class VideoService {
         }
 
         command.add("--write-info-json");
+        command.add("-f");
+        command.add("worstaudio/worst");  // Try audio-only, fallback to worst quality video
         command.add("-x");
         command.add("--audio-format");
         command.add("mp3");
@@ -116,8 +118,9 @@ public class VideoService {
 
         File audioFile = new File(baseName + ".mp3");
         File metadataFile = new File(baseName + ".info.json");
+        File videoFile = new File(baseName + ".mp4");  // Potential leftover video file
 
-        return new ProcessedVideoFiles(audioFile, metadataFile);
+        return new ProcessedVideoFiles(audioFile, metadataFile, videoFile);
     }
 
     // Transcribe audio using OpenAI Whisper API

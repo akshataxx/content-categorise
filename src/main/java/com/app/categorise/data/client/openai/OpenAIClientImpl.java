@@ -145,6 +145,7 @@ public class OpenAIClientImpl implements OpenAIClient {
         boolean isCooking = category != null && (
             category.equalsIgnoreCase("Cooking") ||
             category.equalsIgnoreCase("Recipe") ||
+            category.equalsIgnoreCase("Recipes") ||  // Support plural form
             category.equalsIgnoreCase("Food")
         );
 

@@ -1,5 +1,6 @@
 package com.app.categorise.api.controller;
 
+import com.app.categorise.api.dto.auth.GoogleAuthRequest;
 import com.app.categorise.api.dto.auth.JwtAuthResponse;
 import com.app.categorise.api.dto.auth.LoginRequest;
 import com.app.categorise.api.dto.auth.RefreshTokenRequest;
@@ -12,7 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -31,7 +32,7 @@ class AuthControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @MockBean
+    @MockitoBean
     private AuthService authService;
 
     @Nested
@@ -81,6 +82,23 @@ class AuthControllerTest {
             when(authService.refreshAccessToken(any())).thenReturn(new JwtAuthResponse("new-access","refresh"));
 
             mockMvc.perform(post("/api/auth/refresh")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(req)))
+                    .andExpect(status().isOk());
+        }
+    }
+
+    @Nested
+    @DisplayName("/api/auth/google")
+    class GoogleAuth {
+        @Test
+        void googleAuth_success_returns200() throws Exception {
+            GoogleAuthRequest req = new GoogleAuthRequest();
+            req.setIdToken("valid-google-token");
+
+            when(authService.authenticateWithGoogle(any())).thenReturn(new JwtAuthResponse("access","refresh"));
+
+            mockMvc.perform(post("/api/auth/google")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(req)))
                     .andExpect(status().isOk());

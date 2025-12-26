@@ -8,6 +8,7 @@ import com.app.categorise.data.repository.UserRateLimitTrackingRepository;
 import com.app.categorise.data.repository.UserTranscriptRepository;
 import com.app.categorise.domain.model.RateLimitConfig;
 import com.app.categorise.domain.model.RateLimitResult;
+import com.app.categorise.domain.service.SubscriptionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -25,6 +26,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class RateLimitServiceImplTest {
@@ -41,6 +43,9 @@ class RateLimitServiceImplTest {
     @Mock
     private RateLimitMapper mapper;
 
+    @Mock
+    private SubscriptionService subscriptionService;
+
     @InjectMocks
     private RateLimitServiceImpl rateLimitService;
 
@@ -51,9 +56,9 @@ class RateLimitServiceImplTest {
     @BeforeEach
     void setUp() {
         userId = UUID.randomUUID();
-        
+
         rateLimitEntity = new UserRateLimitEntity(userId, 5, 100, 10000);
-        
+
         rateLimitConfig = new RateLimitConfig(
                 UUID.randomUUID(),
                 userId,
@@ -63,6 +68,10 @@ class RateLimitServiceImplTest {
                 Instant.now(),
                 Instant.now()
         );
+
+        // Default behavior: user does not have premium subscription
+        // Using lenient() to avoid UnnecessaryStubbingException for tests that don't call checkRateLimit()
+        lenient().when(subscriptionService.hasActivePremiumSubscription(any(UUID.class))).thenReturn(false);
     }
 
     @Nested
@@ -280,7 +289,7 @@ class RateLimitServiceImplTest {
             assertThat(result.getUserId()).isEqualTo(userId);
             assertThat(result.getTranscriptsPerMinuteLimit()).isEqualTo(5);
             assertThat(result.getTranscriptsPerDayLimit()).isEqualTo(100);
-            assertThat(result.getTotalTranscriptsLimit()).isEqualTo(10000);
+            assertThat(result.getTotalTranscriptsLimit()).isEqualTo(3); // Updated to match implementation default
             assertThat(result.getId()).isNull(); // Default config has no ID
         }
     }

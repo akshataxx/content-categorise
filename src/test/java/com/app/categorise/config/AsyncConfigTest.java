@@ -32,4 +32,13 @@ class AsyncConfigTest {
                 .get(3, TimeUnit.SECONDS);
         assertThat(threadName).startsWith("media-");
     }
+
+    @Test
+    void mediaExecutorHasCorrectQueueCapacity() {
+        ThreadPoolTaskExecutor exec = applicationContext.getBean("mediaExecutor", ThreadPoolTaskExecutor.class);
+        assertThat(exec).isNotNull();
+
+        // Verify queue capacity is set correctly
+        assertThat(exec.getQueueCapacity()).isEqualTo(20);
+    }
 }

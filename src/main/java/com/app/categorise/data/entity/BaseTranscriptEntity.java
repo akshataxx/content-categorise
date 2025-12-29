@@ -1,6 +1,8 @@
 package com.app.categorise.data.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -18,10 +20,14 @@ public class BaseTranscriptEntity {
     
     @Column(unique = true, columnDefinition = "TEXT")
     private String videoUrl;
-    
+
     @Column(columnDefinition = "TEXT")
     private String transcript;
-    
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "JSONB")
+    private String structuredContent;
+
     private String description;
     private String title;
     private Double duration;
@@ -35,12 +41,13 @@ public class BaseTranscriptEntity {
 
     public BaseTranscriptEntity() {}
 
-    public BaseTranscriptEntity(String videoUrl, String transcript, String description, 
-                               String title, Double duration, Instant uploadedAt, 
-                               String accountId, String account, String identifierId, 
+    public BaseTranscriptEntity(String videoUrl, String transcript, String structuredContent,
+                               String description, String title, Double duration, Instant uploadedAt,
+                               String accountId, String account, String identifierId,
                                String identifier) {
         this.videoUrl = videoUrl;
         this.transcript = transcript;
+        this.structuredContent = structuredContent;
         this.description = description;
         this.title = title;
         this.duration = duration;
@@ -86,6 +93,14 @@ public class BaseTranscriptEntity {
 
     public void setTranscript(String transcript) {
         this.transcript = transcript;
+    }
+
+    public String getStructuredContent() {
+        return structuredContent;
+    }
+
+    public void setStructuredContent(String structuredContent) {
+        this.structuredContent = structuredContent;
     }
 
     public String getDescription() {

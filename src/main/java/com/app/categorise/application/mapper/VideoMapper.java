@@ -32,6 +32,7 @@ public class VideoMapper {
         return new BaseTranscriptEntity(
             videoUrl,
             transcriptText,
+            null, // structuredContent will be filled later after categorization
             metadata.getDescription(),
             metadata.getTitle(),
             (double) metadata.getDuration(),
@@ -58,12 +59,13 @@ public class VideoMapper {
     /**
      * Builds response DTO from BaseTranscriptEntity, UserTranscriptEntity, category name, and alias
      */
-    public TranscriptDtoWithAliases buildResponse(BaseTranscriptEntity baseTranscript, UserTranscriptEntity userTranscript, 
+    public TranscriptDtoWithAliases buildResponse(BaseTranscriptEntity baseTranscript, UserTranscriptEntity userTranscript,
                                                   String categoryName, String alias) {
         return new TranscriptDtoWithAliases(
             userTranscript.getId(),
             baseTranscript.getVideoUrl(),
             baseTranscript.getTranscript(),
+            baseTranscript.getStructuredContent(),
             baseTranscript.getDescription(),
             baseTranscript.getTitle(),
             baseTranscript.getDuration() != null ? baseTranscript.getDuration() : 0.0,

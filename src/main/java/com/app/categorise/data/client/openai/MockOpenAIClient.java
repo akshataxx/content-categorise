@@ -27,4 +27,18 @@ public class MockOpenAIClient implements OpenAIClient {
         System.out.println("Result: Default match");
         return new TranscriptCategorisationResult(null, "general", "Mock-Cool-Vibes");
     }
+
+    @Override
+    public String extractStructuredContent(String transcript, String title, String category, String description) {
+        System.out.println("--- MOCK extractStructuredContent ---");
+        System.out.println("Category: " + category);
+
+        if (category != null && (category.equalsIgnoreCase("Cooking") || category.equalsIgnoreCase("Recipe"))) {
+            return "{\"type\":\"recipe\",\"ingredients\":[\"2 cups flour\",\"1 egg\",\"1 cup milk\"],\"steps\":[\"Mix dry ingredients\",\"Add wet ingredients\",\"Bake at 350°F for 30 minutes\"]}";
+        } else if (category != null && (category.equalsIgnoreCase("Skincare") || category.equalsIgnoreCase("Makeup"))) {
+            return "{\"type\":\"beauty\",\"products\":[\"Cleanser - CeraVe\",\"Moisturizer - Cetaphil\",\"Sunscreen - La Roche-Posay\"],\"steps\":[\"Cleanse face\",\"Apply moisturizer\",\"Apply sunscreen\"]}";
+        } else {
+            return "{\"type\":\"general\",\"keyPoints\":[\"Main topic discussed in video\",\"Key takeaway number one\",\"Important tip mentioned\",\"Final conclusion\"]}";
+        }
+    }
 }

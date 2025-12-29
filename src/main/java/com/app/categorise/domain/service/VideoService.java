@@ -4,6 +4,7 @@ import com.app.categorise.data.dto.TikTokMetadata;
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.application.internal.ProcessedVideoFiles;
 import com.app.categorise.application.mapper.VideoMapper;
+import com.app.categorise.data.client.openai.OpenAIClient;
 import com.app.categorise.data.client.whisper.WhisperClient;
 import com.app.categorise.data.entity.CategoryAliasEntity;
 import com.app.categorise.data.entity.CategoryEntity;
@@ -43,6 +44,8 @@ public class VideoService {
 
     private final WhisperClient whisperClient;
 
+    private final OpenAIClient openAIClient;
+
     private final Executor mediaExecutor;
 
     private final CategorisationService categorisationService;
@@ -52,7 +55,7 @@ public class VideoService {
 
     private final BaseTranscriptRepository baseTranscriptRepository;
     private final UserTranscriptRepository userTranscriptRepository;
-    
+
     private final String ffmpegLocation;
 
     public VideoService(
@@ -62,6 +65,7 @@ public class VideoService {
         CategoryAliasService categoryAliasService,
         CategorisationService categorisationService,
         CategoryService categoryService,
+        OpenAIClient openAIClient,
         ProcessExecutor processExecutor,
         UserTranscriptRepository userTranscriptRepository,
         VideoMapper videoMapper,
@@ -73,6 +77,7 @@ public class VideoService {
         this.categoryAliasService = categoryAliasService;
         this.categorisationService = categorisationService;
         this.categoryService = categoryService;
+        this.openAIClient = openAIClient;
         this.processExecutor = processExecutor;
         this.userTranscriptRepository = userTranscriptRepository;
         this.whisperClient = whisperClient;
@@ -171,6 +176,7 @@ public class VideoService {
             try (ProcessedVideoFiles files = extractAudioAndMetadata(videoUrl)) {
                 String transcriptText = transcribeAudio(files.getAudioFile());
                 TikTokMetadata metadata = extractMetadata(files.getMetadataFile());
+                System.out.println(metadata);
 
                 // Create new base transcript
                 baseTranscript = videoMapper.createBaseTranscriptEntity(videoUrl, transcriptText, metadata);
@@ -193,10 +199,10 @@ public class VideoService {
         }
         
         // Create new user association with categorization
-        TranscriptCategorisationResult categorisationResult = 
+        TranscriptCategorisationResult categorisationResult =
             categorisationService.classifyAndSuggestAlias(
-                baseTranscript.getTranscript(), 
-                baseTranscript.getTitle(), 
+                baseTranscript.getTranscript(),
+                baseTranscript.getTitle(),
                 baseTranscript.getDescription()
             );
 
@@ -204,13 +210,25 @@ public class VideoService {
         String categoryName = determineCategory(categorisationResult, videoUrl);
         CategoryEntity category = categoryService.saveIfNotExists(categoryName, "", userId);
 
+        // Extract structured content if not already present
+        if (baseTranscript.getStructuredContent() == null || baseTranscript.getStructuredContent().isEmpty()) {
+            String structuredContent = openAIClient.extractStructuredContent(
+                baseTranscript.getTranscript(),
+                baseTranscript.getTitle(),
+                categoryName,
+                baseTranscript.getDescription()
+            );
+            baseTranscript.setStructuredContent(structuredContent);
+            baseTranscriptRepository.save(baseTranscript);
+        }
+
         // Resolve the alias, use the pre-existing one if it exists, saving the mapping to a category it doesn't exist
         String alias = resolveAlias(userId, category.getId(), categorisationResult.suggestedAlias());
-        
+
         // Create user transcript association
         UserTranscriptEntity userTranscript = videoMapper.createUserTranscriptEntity(userId, baseTranscript, category);
         userTranscript = userTranscriptRepository.save(userTranscript);
-        
+
         return videoMapper.buildResponse(baseTranscript, userTranscript, category.getName(), alias);
     }
 

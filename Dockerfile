@@ -1,5 +1,6 @@
 # ---- Build stage ----
-FROM maven:3.9.9-eclipse-temurin-24 AS builder
+# Use --platform to ensure consistent builds across architectures
+FROM --platform=linux/amd64 maven:3.9.9-eclipse-temurin-21 AS builder
 WORKDIR /workspace
 
 # Leverage build cache for dependencies
@@ -11,7 +12,7 @@ COPY src ./src
 RUN mvn -q -Dmaven.test.skip=true package
 
 # ---- Runtime stage ----
-FROM eclipse-temurin:24-jre-alpine
+FROM --platform=linux/amd64 eclipse-temurin:21-jre-alpine
 
 # Install runtime dependencies (curl for healthcheck, ffmpeg for app functionality)
 RUN apk add --no-cache curl ffmpeg yt-dlp

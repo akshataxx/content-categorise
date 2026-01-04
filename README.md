@@ -1,14 +1,16 @@
-## 🚀 To get started 
+## 🚀 Quick Start
 
-### Add your OpenAI API key
+### Local Development Setup
+
+#### 1. Add your OpenAI API key
 Copy to `.env` and add your key there:
 
 ```dotenv
 OPENAI_API_KEY=<YOUR_API_KEY>
 ```
 
-### Setup Database
-#### Install Postgres
+#### 2. Setup Database
+##### Install Postgres
 ```shell
 brew install postgresql
 brew services restart postgresql@14
@@ -21,7 +23,7 @@ This will:
 - Run it in the background,
 - Install pgAdmin (GUI for Postgres).
 
-#### Create Database
+##### Create Database
 ```shell
 psql -U postgres 
 # Once the shell is open, run the following command:
@@ -30,11 +32,20 @@ CREATE DATABASE contentdb;
 This will create a new database called "contentdb" with the default user "postgres".
 You can choose to use a different user or database name if desired, just have update the `application.properties` accordingly.
 
-### Install other dependencies
-```declarative
+#### 3. Install other dependencies
+```shell
 brew install yt-dlp
 brew install ffmpeg
 ```
+
+#### 4. Run the application
+```shell
+./mvnw spring-boot:run
+```
+
+Visit http://localhost:8081/swagger-ui.html to see the API documentation.
+
+---
 
 ## 🧱 Project Structure Overview
 

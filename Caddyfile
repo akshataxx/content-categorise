@@ -1,0 +1,4 @@
+# Replace with your VM's IP (dots replaced with dashes)
+34-151-189-90.sslip.io {
+    reverse_proxy app:8081
+}

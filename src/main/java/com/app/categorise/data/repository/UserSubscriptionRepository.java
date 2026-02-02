@@ -30,4 +30,9 @@ public interface UserSubscriptionRepository extends JpaRepository<UserSubscripti
      */
     @Query("SELECT COUNT(s) FROM UserSubscriptionEntity s WHERE s.status = 'ACTIVE' AND s.subscriptionType IN ('PREMIUM_MONTHLY', 'PREMIUM_YEARLY')")
     long countActivePremiumSubscriptions();
+
+    /**
+     * Find subscription by Google Play purchase token
+     */
+    Optional<UserSubscriptionEntity> findByGooglePlayPurchaseToken(String purchaseToken);
 }

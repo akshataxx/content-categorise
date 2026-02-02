@@ -25,9 +25,9 @@ public class UserSubscription {
     private UUID userId;
     private SubscriptionType subscriptionType;
     private SubscriptionStatus status;
-    private String stripeCustomerId;
-    private String stripeSubscriptionId;
-    private String stripePriceId;
+    private String googlePlayPurchaseToken;
+    private String googlePlayProductId;
+    private String googlePlayOrderId;
     private Instant subscriptionStartDate;
     private Instant subscriptionEndDate;
     private boolean autoRenew;
@@ -37,17 +37,17 @@ public class UserSubscription {
     public UserSubscription() {}
 
     public UserSubscription(UUID id, UUID userId, SubscriptionType subscriptionType,
-                       SubscriptionStatus status, String stripeCustomerId,
-                       String stripeSubscriptionId, String stripePriceId,
+                       SubscriptionStatus status, String googlePlayPurchaseToken,
+                       String googlePlayProductId, String googlePlayOrderId,
                        Instant subscriptionStartDate, Instant subscriptionEndDate,
                        boolean autoRenew, Instant createdAt, Instant updatedAt) {
         this.id = id;
         this.userId = userId;
         this.subscriptionType = subscriptionType;
         this.status = status;
-        this.stripeCustomerId = stripeCustomerId;
-        this.stripeSubscriptionId = stripeSubscriptionId;
-        this.stripePriceId = stripePriceId;
+        this.googlePlayPurchaseToken = googlePlayPurchaseToken;
+        this.googlePlayProductId = googlePlayProductId;
+        this.googlePlayOrderId = googlePlayOrderId;
         this.subscriptionStartDate = subscriptionStartDate;
         this.subscriptionEndDate = subscriptionEndDate;
         this.autoRenew = autoRenew;
@@ -68,14 +68,14 @@ public class UserSubscription {
     public SubscriptionStatus getStatus() { return status; }
     public void setStatus(SubscriptionStatus status) { this.status = status; }
 
-    public String getStripeCustomerId() { return stripeCustomerId; }
-    public void setStripeCustomerId(String stripeCustomerId) { this.stripeCustomerId = stripeCustomerId; }
+    public String getGooglePlayPurchaseToken() { return googlePlayPurchaseToken; }
+    public void setGooglePlayPurchaseToken(String googlePlayPurchaseToken) { this.googlePlayPurchaseToken = googlePlayPurchaseToken; }
 
-    public String getStripeSubscriptionId() { return stripeSubscriptionId; }
-    public void setStripeSubscriptionId(String stripeSubscriptionId) { this.stripeSubscriptionId = stripeSubscriptionId; }
+    public String getGooglePlayProductId() { return googlePlayProductId; }
+    public void setGooglePlayProductId(String googlePlayProductId) { this.googlePlayProductId = googlePlayProductId; }
 
-    public String getStripePriceId() { return stripePriceId; }
-    public void setStripePriceId(String stripePriceId) { this.stripePriceId = stripePriceId; }
+    public String getGooglePlayOrderId() { return googlePlayOrderId; }
+    public void setGooglePlayOrderId(String googlePlayOrderId) { this.googlePlayOrderId = googlePlayOrderId; }
 
     public Instant getSubscriptionStartDate() { return subscriptionStartDate; }
     public void setSubscriptionStartDate(Instant subscriptionStartDate) { this.subscriptionStartDate = subscriptionStartDate; }

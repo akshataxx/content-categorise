@@ -6,7 +6,6 @@ import com.app.categorise.data.repository.UserSubscriptionRepository;
 import com.app.categorise.data.repository.UserTranscriptRepository;
 import com.app.categorise.domain.model.UserSubscription;
 import com.app.categorise.domain.service.SubscriptionService;
-import com.stripe.model.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -97,10 +96,10 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     }
 
     @Override
-    public UserSubscription upgradeToPremiumWithStripe(UUID userId, String stripeCustomerId,
-                                                  String stripeSubscriptionId, String priceId,
-                                                  UserSubscription.SubscriptionType type) {
-        logger.info("Upgrading user {} to premium via Stripe: {}", userId, type);
+    public UserSubscription upgradeToPremiumWithGooglePlay(UUID userId, String purchaseToken,
+                                                           String productId, String orderId,
+                                                           UserSubscription.SubscriptionType type) {
+        logger.info("Upgrading user {} to premium via Google Play: {}", userId, type);
 
         // Find existing subscription or create new one
         Optional<UserSubscriptionEntity> existingOpt = subscriptionRepository.findByUserId(userId);
@@ -114,15 +113,16 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                 UserSubscriptionEntity.SubscriptionStatus.ACTIVE);
         }
 
-        // Update to premium with Stripe details
+        // Update to premium with Google Play details
         entity.setSubscriptionType(mapToEntityType(type));
         entity.setStatus(UserSubscriptionEntity.SubscriptionStatus.ACTIVE);
-        entity.setStripeCustomerId(stripeCustomerId);
-        entity.setStripeSubscriptionId(stripeSubscriptionId);
-        entity.setStripePriceId(priceId);
+        entity.setGooglePlayPurchaseToken(purchaseToken);
+        entity.setGooglePlayProductId(productId);
+        entity.setGooglePlayOrderId(orderId);
         entity.setSubscriptionStartDate(Instant.now());
 
         // Set end date based on subscription type
+        // Note: For Google Play, actual expiry is managed by Google and synced via RTDN
         if (type == UserSubscription.SubscriptionType.PREMIUM_MONTHLY) {
             entity.setSubscriptionEndDate(Instant.now().plus(30, ChronoUnit.DAYS));
         } else if (type == UserSubscription.SubscriptionType.PREMIUM_YEARLY) {
@@ -132,7 +132,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         entity.setAutoRenew(true);
 
         UserSubscriptionEntity saved = subscriptionRepository.save(entity);
-        logger.info("Successfully upgraded user {} to premium via Stripe", userId);
+        logger.info("Successfully upgraded user {} to premium via Google Play", userId);
 
         return mapper.toDomainModel(saved);
     }
@@ -145,24 +145,16 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         if (subscriptionOpt.isPresent()) {
             UserSubscriptionEntity entity = subscriptionOpt.get();
 
-            // Cancel in Stripe first if subscription exists
-            if (entity.getStripeSubscriptionId() != null && !entity.getStripeSubscriptionId().isEmpty()) {
-                try {
-                    var stripeSub = Subscription.retrieve(entity.getStripeSubscriptionId());
-                    stripeSub.cancel();
-                    logger.info("Cancelled Stripe subscription: {}", entity.getStripeSubscriptionId());
-                } catch (com.stripe.exception.StripeException e) {
-                    logger.error("Failed to cancel Stripe subscription: {}", entity.getStripeSubscriptionId(), e);
-                    throw new RuntimeException("Failed to cancel subscription in Stripe. Please contact support.", e);
-                }
-            }
-
-            // Update local DB
+            // For Google Play, cancellation is handled through the Play Store
+            // The user must cancel via Google Play subscription management
+            // We receive RTDN notifications when they do
+            // Here we just mark it as cancelled in our DB
             entity.setStatus(UserSubscriptionEntity.SubscriptionStatus.CANCELLED);
             entity.setAutoRenew(false);
             subscriptionRepository.save(entity);
 
-            logger.info("Subscription cancelled for user: {}", userId);
+            logger.info("Subscription marked as cancelled for user: {}. " +
+                    "User should cancel via Google Play Store to stop billing.", userId);
         }
     }
     

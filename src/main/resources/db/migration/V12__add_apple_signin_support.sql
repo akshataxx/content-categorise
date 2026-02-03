@@ -12,5 +12,5 @@ DROP INDEX IF EXISTS users_sub_email_unique;
 
 -- Remove the unique constraint on sub column - Apple users don't have a sub,
 -- and Google's sub is still looked up but doesn't need to be globally unique.
-DROP INDEX IF EXISTS users_sub_key;
+-- Note: Dropping the constraint also removes its backing index automatically.
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_sub_key;

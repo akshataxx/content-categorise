@@ -26,14 +26,14 @@ public class UserSubscriptionEntity {
     @Column(name = "status", nullable = false)
     private SubscriptionStatus status;
 
-    @Column(name = "stripe_customer_id")
-    private String stripeCustomerId;
+    @Column(name = "google_play_purchase_token")
+    private String googlePlayPurchaseToken;
 
-    @Column(name = "stripe_subscription_id")
-    private String stripeSubscriptionId;
+    @Column(name = "google_play_product_id")
+    private String googlePlayProductId;
 
-    @Column(name = "stripe_price_id")
-    private String stripePriceId;
+    @Column(name = "google_play_order_id")
+    private String googlePlayOrderId;
 
     @Column(name = "subscription_start_date", nullable = false)
     private Instant subscriptionStartDate;
@@ -101,14 +101,14 @@ public class UserSubscriptionEntity {
     public SubscriptionStatus getStatus() { return status; }
     public void setStatus(SubscriptionStatus status) { this.status = status; }
 
-    public String getStripeCustomerId() { return stripeCustomerId; }
-    public void setStripeCustomerId(String stripeCustomerId) { this.stripeCustomerId = stripeCustomerId; }
+    public String getGooglePlayPurchaseToken() { return googlePlayPurchaseToken; }
+    public void setGooglePlayPurchaseToken(String googlePlayPurchaseToken) { this.googlePlayPurchaseToken = googlePlayPurchaseToken; }
 
-    public String getStripeSubscriptionId() { return stripeSubscriptionId; }
-    public void setStripeSubscriptionId(String stripeSubscriptionId) { this.stripeSubscriptionId = stripeSubscriptionId; }
+    public String getGooglePlayProductId() { return googlePlayProductId; }
+    public void setGooglePlayProductId(String googlePlayProductId) { this.googlePlayProductId = googlePlayProductId; }
 
-    public String getStripePriceId() { return stripePriceId; }
-    public void setStripePriceId(String stripePriceId) { this.stripePriceId = stripePriceId; }
+    public String getGooglePlayOrderId() { return googlePlayOrderId; }
+    public void setGooglePlayOrderId(String googlePlayOrderId) { this.googlePlayOrderId = googlePlayOrderId; }
 
     public Instant getSubscriptionStartDate() { return subscriptionStartDate; }
     public void setSubscriptionStartDate(Instant subscriptionStartDate) { this.subscriptionStartDate = subscriptionStartDate; }

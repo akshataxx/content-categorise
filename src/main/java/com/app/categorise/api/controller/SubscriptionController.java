@@ -1,24 +1,26 @@
 package com.app.categorise.api.controller;
 
+import com.app.categorise.api.dto.subscription.GooglePlayPurchaseVerificationRequest;
+import com.app.categorise.api.dto.subscription.GooglePlayVerificationResponse;
 import com.app.categorise.api.dto.subscription.SubscriptionDto;
-import com.app.categorise.api.dto.subscription.StripeCheckoutRequest;
-import com.app.categorise.api.dto.subscription.StripeCheckoutResponse;
 import com.app.categorise.api.dto.subscription.UsageInfoDto;
 import com.app.categorise.domain.model.UserSubscription;
-import com.app.categorise.domain.service.PaymentService;
+import com.app.categorise.domain.service.GooglePlayBillingService;
 import com.app.categorise.domain.service.SubscriptionService;
 import com.app.categorise.domain.service.UsageService;
-import com.app.categorise.exception.PaymentException;
 import com.app.categorise.security.UserPrincipal;
-import com.stripe.exception.StripeException;
-import com.stripe.model.checkout.Session;
+import com.google.api.services.androidpublisher.model.SubscriptionPurchase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
+import java.time.Instant;
 import java.util.UUID;
 
 /**
@@ -29,29 +31,31 @@ import java.util.UUID;
 @Tag(name = "Subscription", description = "Operations related to user subscriptions and billing")
 public class SubscriptionController {
 
+    private static final Logger logger = LoggerFactory.getLogger(SubscriptionController.class);
+
     private final SubscriptionService subscriptionService;
-    private final PaymentService paymentService;
+    private final GooglePlayBillingService googlePlayBillingService;
     private final UsageService usageService;
 
     public SubscriptionController(SubscriptionService subscriptionService,
-                                 PaymentService paymentService,
+                                 GooglePlayBillingService googlePlayBillingService,
                                  UsageService usageService) {
         this.subscriptionService = subscriptionService;
-        this.paymentService = paymentService;
+        this.googlePlayBillingService = googlePlayBillingService;
         this.usageService = usageService;
     }
-    
+
     @Operation(summary = "Get user subscription status")
     @GetMapping("/status")
     public ResponseEntity<SubscriptionDto> getSubscriptionStatus(@AuthenticationPrincipal UserPrincipal principal) {
         UUID userId = principal.getId();
-        
+
         return subscriptionService.getUserSubscription(userId)
                 .map(this::mapToDto)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
-    
+
     @Operation(summary = "Get usage information")
     @GetMapping("/usage")
     public ResponseEntity<UsageInfoDto> getUsageInfo(@AuthenticationPrincipal UserPrincipal principal) {
@@ -59,25 +63,69 @@ public class SubscriptionController {
         UsageInfoDto usage = usageService.getUserUsageInfo(userId);
         return ResponseEntity.ok(usage);
     }
-    
-    @Operation(summary = "Create Stripe checkout session")
-    @PostMapping("/create-checkout")
-    public ResponseEntity<StripeCheckoutResponse> createCheckout(
-            @Valid @RequestBody StripeCheckoutRequest request,
+
+    @Operation(summary = "Verify Google Play purchase and activate subscription")
+    @PostMapping("/google-play/verify")
+    public ResponseEntity<GooglePlayVerificationResponse> verifyGooglePlayPurchase(
+            @Valid @RequestBody GooglePlayPurchaseVerificationRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
 
-        try {
-            UUID userId = principal.getId();
-            Session session = paymentService.createCheckoutSession(userId, request.getPriceId());
+        UUID userId = principal.getId();
+        logger.info("Verifying Google Play purchase for user {}: productId={}", userId, request.getProductId());
 
-            StripeCheckoutResponse response = new StripeCheckoutResponse(
-                session.getUrl(),
-                session.getId()
+        try {
+            // Verify purchase with Google Play
+            SubscriptionPurchase purchase = googlePlayBillingService.verifySubscription(
+                    request.getProductId(),
+                    request.getPurchaseToken()
             );
 
-            return ResponseEntity.ok(response);
-        } catch (StripeException e) {
-            throw new PaymentException("Failed to create checkout session", e);
+            // Check if subscription is active
+            boolean isActive = googlePlayBillingService.isSubscriptionActive(purchase);
+
+            if (!isActive) {
+                logger.warn("Google Play subscription not active for user {}", userId);
+                return ResponseEntity.ok(GooglePlayVerificationResponse.failure("Subscription is not active"));
+            }
+
+            // Acknowledge the purchase if needed
+            if (googlePlayBillingService.needsAcknowledgement(purchase)) {
+                googlePlayBillingService.acknowledgeSubscription(
+                        request.getProductId(),
+                        request.getPurchaseToken()
+                );
+                logger.info("Acknowledged Google Play subscription for user {}", userId);
+            }
+
+            // Determine subscription type from product ID
+            UserSubscription.SubscriptionType subscriptionType =
+                    request.getProductId().contains("yearly")
+                            ? UserSubscription.SubscriptionType.PREMIUM_YEARLY
+                            : UserSubscription.SubscriptionType.PREMIUM_MONTHLY;
+
+            // Upgrade user subscription in our database
+            subscriptionService.upgradeToPremiumWithGooglePlay(
+                    userId,
+                    request.getPurchaseToken(),
+                    request.getProductId(),
+                    request.getOrderId(),
+                    subscriptionType
+            );
+
+            // Calculate expiration time
+            Instant expirationTime = purchase.getExpiryTimeMillis() != null
+                    ? Instant.ofEpochMilli(purchase.getExpiryTimeMillis())
+                    : null;
+
+            logger.info("Successfully verified and activated Google Play subscription for user {}", userId);
+            return ResponseEntity.ok(GooglePlayVerificationResponse.success(true, expirationTime));
+
+        } catch (IOException e) {
+            logger.error("Failed to verify Google Play purchase for user {}: {}", userId, e.getMessage(), e);
+            return ResponseEntity.ok(GooglePlayVerificationResponse.failure("Failed to verify purchase: " + e.getMessage()));
+        } catch (Exception e) {
+            logger.error("Unexpected error verifying Google Play purchase for user {}: {}", userId, e.getMessage(), e);
+            return ResponseEntity.ok(GooglePlayVerificationResponse.failure("An unexpected error occurred"));
         }
     }
 
@@ -88,7 +136,7 @@ public class SubscriptionController {
         subscriptionService.cancelSubscription(userId);
         return ResponseEntity.noContent().build();
     }
-    
+
     private SubscriptionDto mapToDto(UserSubscription subscription) {
         return new SubscriptionDto(
                 subscription.getId(),

@@ -152,11 +152,16 @@
 			<version>4.0.0</version>
 		</dependency>
 
-		<!-- Stripe for payment processing -->
+		<!-- Google Play Developer API for billing verification -->
 		<dependency>
-			<groupId>com.stripe</groupId>
-			<artifactId>stripe-java</artifactId>
-			<version>24.16.0</version>
+			<groupId>com.google.apis</groupId>
+			<artifactId>google-api-services-androidpublisher</artifactId>
+			<version>v3-rev20231115-2.0.0</version>
+		</dependency>
+		<dependency>
+			<groupId>com.google.auth</groupId>
+			<artifactId>google-auth-library-oauth2-http</artifactId>
+			<version>1.19.0</version>
 		</dependency>
 		
 		<!-- Nimbus JOSE JWT for Apple Sign-In token verification -->

@@ -35,6 +35,10 @@ build/
 .env
 !.env.example
 
+# Google Play service account credentials
+config/google-play-service-account.json
+config/*.json
+
 .DS_Store
 
 # Application logs

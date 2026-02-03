@@ -20,9 +20,9 @@ public class SubscriptionMapper {
             entity.getUserId(),
             mapToDomainType(entity.getSubscriptionType()),
             mapToDomainStatus(entity.getStatus()),
-            entity.getStripeCustomerId(),
-            entity.getStripeSubscriptionId(),
-            entity.getStripePriceId(),
+            entity.getGooglePlayPurchaseToken(),
+            entity.getGooglePlayProductId(),
+            entity.getGooglePlayOrderId(),
             entity.getSubscriptionStartDate(),
             entity.getSubscriptionEndDate(),
             entity.isAutoRenew(),
@@ -41,9 +41,9 @@ public class SubscriptionMapper {
         entity.setUserId(domain.getUserId());
         entity.setSubscriptionType(mapToEntityType(domain.getSubscriptionType()));
         entity.setStatus(mapToEntityStatus(domain.getStatus()));
-        entity.setStripeCustomerId(domain.getStripeCustomerId());
-        entity.setStripeSubscriptionId(domain.getStripeSubscriptionId());
-        entity.setStripePriceId(domain.getStripePriceId());
+        entity.setGooglePlayPurchaseToken(domain.getGooglePlayPurchaseToken());
+        entity.setGooglePlayProductId(domain.getGooglePlayProductId());
+        entity.setGooglePlayOrderId(domain.getGooglePlayOrderId());
         entity.setSubscriptionStartDate(domain.getSubscriptionStartDate());
         entity.setSubscriptionEndDate(domain.getSubscriptionEndDate());
         entity.setAutoRenew(domain.isAutoRenew());

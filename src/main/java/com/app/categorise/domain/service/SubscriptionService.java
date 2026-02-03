@@ -26,11 +26,11 @@ public interface SubscriptionService {
     void initializeFreeSubscription(UUID userId);
 
     /**
-     * Upgrade user to premium subscription with Stripe details
+     * Upgrade user to premium subscription with Google Play details
      */
-    UserSubscription upgradeToPremiumWithStripe(UUID userId, String stripeCustomerId,
-                                           String stripeSubscriptionId, String priceId,
-                                           UserSubscription.SubscriptionType type);
+    UserSubscription upgradeToPremiumWithGooglePlay(UUID userId, String purchaseToken,
+                                                    String productId, String orderId,
+                                                    UserSubscription.SubscriptionType type);
 
     /**
      * Cancel user's subscription

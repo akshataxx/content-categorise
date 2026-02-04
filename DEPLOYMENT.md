@@ -1,21 +1,74 @@
 # Deployment Guide - Content Categorization Backend
 
-## How to Update the Instance with New Code
+## Architecture Overview
 
-When you make code changes and want to deploy them to production, follow these steps:
+```
+Internet (HTTPS:443) → Caddy → App (8081) → Postgres
+                         ↓
+                   Auto SSL via
+                   Let's Encrypt
+```
+
+- **URL:** `https://34-151-189-90.sslip.io`
+- Uses **sslip.io** for free DNS (maps `34-151-189-90.sslip.io` → `34.151.189.90`)
+- **Caddy** handles HTTPS termination with auto-renewing Let's Encrypt certificates
+
+---
+
+## Files to Deploy
+
+Copy these files to your VM's home directory (`~`):
+
+| File | Purpose |
+|------|---------|
+| `docker-compose.prod.yml` | Container orchestration |
+| `Caddyfile` | Caddy reverse proxy config |
+| `.env` | Environment variables (secrets) |
+
+---
+
+## Initial Setup
+
+### 1. GCP Firewall Rules
+
+Ensure ports 80 and 443 are open:
+- GCP Console → VPC Network → Firewall → Create rule
+- Allow TCP ports `80` and `443` from `0.0.0.0/0`
+
+### 2. Copy Files to VM
+
+```bash
+# From your local machine
+gcloud compute scp docker-compose.prod.yml Caddyfile .env content-backend-vm:~ --zone=australia-southeast1-b
+```
+
+### 3. Start Services
+
+```bash
+# SSH into VM
+gcloud compute ssh content-backend-vm --zone=australia-southeast1-b
+
+# Start all services
+docker-compose -f docker-compose.prod.yml up -d
+
+# Verify Caddy got the SSL certificate
+docker logs caddy
+```
+
+### 4. Test HTTPS
+
+```bash
+curl https://34-151-189-90.sslip.io/actuator/health
+```
+
+---
+
+## How to Update the Instance with New Code
 
 ### Step 1: Build and Push New Docker Image (Local Machine)
 
 ```bash
-# Make sure you're in the project root directory
-# Build for AMD64 architecture and push to GCR
 docker buildx build --platform linux/amd64 -t gcr.io/content-categorisation/content-app:latest --push .
-```
-
-**Alternative (if buildx has issues):**
-```bash
-docker build -t gcr.io/content-categorisation/content-app:latest .
-docker push gcr.io/content-categorisation/content-app:latest
 ```
 
 ### Step 2: SSH into GCE Instance
@@ -27,87 +80,79 @@ gcloud compute ssh content-backend-vm --zone=australia-southeast1-b
 ### Step 3: Pull Latest Image and Restart
 
 ```bash
-# Pull the new image from GCR
-docker-compose pull app
-
-# Restart only the app container (keeps database running)
-docker-compose up -d app
+docker-compose -f docker-compose.prod.yml pull app
+docker-compose -f docker-compose.prod.yml up -d app
 ```
 
 ### Step 4: Verify Deployment
 
 ```bash
-# Check container status
-docker-compose ps
-
-# Watch logs to ensure successful startup
-docker-compose logs -f app
+docker-compose -f docker-compose.prod.yml logs -f app
 ```
 
-Press `Ctrl+C` to exit logs once you see "Started ContentApplication"
+Press `Ctrl+C` once you see "Started ContentApplication"
 
 ### Step 5: Test from Outside
 
 ```bash
-# Exit SSH
-exit
-
-# Test from your local machine
-curl http://34.151.189.90:8080/actuator/health
+curl https://34-151-189-90.sslip.io/actuator/health
 ```
 
 ---
 
 ## Quick Commands Reference
 
-### View Running Containers
 ```bash
-docker-compose ps
-```
+# View all containers
+docker-compose -f docker-compose.prod.yml ps
 
-### View App Logs
-```bash
-docker-compose logs -f app
-```
+# View app logs
+docker-compose -f docker-compose.prod.yml logs -f app
 
-### View Database Logs
-```bash
-docker-compose logs -f postgres
-```
+# View Caddy logs (SSL issues)
+docker-compose -f docker-compose.prod.yml logs -f caddy
 
-### Restart Everything (App + Database)
-```bash
-docker-compose restart
-```
+# View database logs
+docker-compose -f docker-compose.prod.yml logs -f postgres
 
-### Stop Everything
-```bash
-docker-compose down
-```
+# Restart everything
+docker-compose -f docker-compose.prod.yml restart
 
-### Stop and Remove Containers (keeps data volume)
-```bash
-docker-compose down
-```
+# Stop everything
+docker-compose -f docker-compose.prod.yml down
 
-### Check Docker Images on Server
-```bash
-docker images | grep content-app
-```
-
-### Remove Old/Unused Images (cleanup)
-```bash
+# Cleanup unused images
 docker image prune -a
 ```
 
 ---
 
+## Using a Custom Domain (Optional)
+
+When you get a domain:
+
+1. Point your domain's DNS A record to `34.151.189.90`
+2. Update `Caddyfile`:
+   ```
+   api.yourdomain.com {
+       reverse_proxy app:8081
+   }
+   ```
+3. Restart Caddy:
+   ```bash
+   docker-compose -f docker-compose.prod.yml restart caddy
+   ```
+
+Caddy will automatically get a new certificate for your domain.
+
+---
+
 ## Database Migrations
 
-Your Flyway migrations run automatically on app startup. When you:
+Flyway migrations run automatically on app startup:
 1. Add new migration files in `src/main/resources/db/migration/`
 2. Build and deploy the new image
-3. The app will automatically apply new migrations on startup
+3. Migrations apply automatically on startup
 
 ---
 
@@ -115,42 +160,36 @@ Your Flyway migrations run automatically on app startup. When you:
 
 To update environment variables:
 
-### Step 1: SSH into Instance
 ```bash
+# SSH into VM
 gcloud compute ssh content-backend-vm --zone=australia-southeast1-b
-```
 
-### Step 2: Edit .env File
-```bash
+# Edit .env file
 nano ~/.env
-```
 
-Make your changes, then `Ctrl+X`, `Y`, `Enter` to save.
-
-### Step 3: Restart Containers
-```bash
-docker-compose up -d
+# Restart containers to pick up changes
+docker-compose -f docker-compose.prod.yml up -d
 ```
 
 ---
 
 ## Troubleshooting
 
+### SSL Certificate Issues
+```bash
+docker-compose -f docker-compose.prod.yml logs caddy
+# Check that ports 80/443 are open in GCP firewall
+```
+
 ### App Won't Start
 ```bash
-# Check logs for errors
-docker-compose logs app
-
-# Common issues:
-# - Missing environment variables in .env
-# - Database connection issues
-# - Port conflicts
+docker-compose -f docker-compose.prod.yml logs app
+# Check .env file has all required variables
 ```
 
 ### Database Issues
 ```bash
-# Check database logs
-docker-compose logs postgres
+docker-compose -f docker-compose.prod.yml logs postgres
 
 # Connect to database directly
 docker exec -it content-postgres psql -U postgres -d contentdb
@@ -163,37 +202,31 @@ docker stats
 
 ### Complete Reset (WARNING: Deletes all data)
 ```bash
-docker-compose down -v  # Removes containers AND data volumes
-docker-compose up -d    # Start fresh
+docker-compose -f docker-compose.prod.yml down -v
+docker-compose -f docker-compose.prod.yml up -d
 ```
 
 ---
 
 ## Important Files on GCE Instance
 
-- `~/docker-compose.yml` - Container orchestration config
-- `~/.env` - Environment variables and secrets
-- Docker volume `pgdata` - PostgreSQL data (persistent)
+| File | Purpose |
+|------|---------|
+| `~/docker-compose.prod.yml` | Container orchestration |
+| `~/Caddyfile` | Caddy reverse proxy config |
+| `~/.env` | Environment variables and secrets |
+| Docker volume `pgdata` | PostgreSQL data (persistent) |
+| Docker volume `caddy_data` | SSL certificates |
 
 ---
 
 ## GCP Project Details
 
-- **Project ID:** `content-categorisation`
-- **Instance Name:** `content-backend-vm`
-- **Zone:** `australia-southeast1-b`
-- **External IP:** `34.151.189.90`
-- **App Port:** `8080`
-- **Container Registry:** `gcr.io/content-categorisation/content-app:latest`
-
----
-
-## CI/CD Integration (Future)
-
-When you're ready to automate deployments:
-
-1. Use **Google Cloud Build** to build and push images automatically on git push
-2. Use **Cloud Run** for serverless container deployment (alternative to GCE)
-3. Use **Kubernetes (GKE)** for advanced orchestration and scaling
-
-For now, the manual process above works great for development and small-scale production!
+| Setting | Value |
+|---------|-------|
+| Project ID | `content-categorisation` |
+| Instance Name | `content-backend-vm` |
+| Zone | `australia-southeast1-b` |
+| External IP | `34.151.189.90` |
+| HTTPS URL | `https://34-151-189-90.sslip.io` |
+| Container Registry | `gcr.io/content-categorisation/content-app:latest` |

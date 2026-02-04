@@ -8,16 +8,16 @@ import java.util.UUID;
 
 @Entity
 @Data
-@Table(
-    name = "users",
-    uniqueConstraints = @UniqueConstraint(columnNames = {"sub", "email"})
-)
+@Table(name = "users")
 public class UserEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    private String sub; // from `sub` in OAuth2 response
+    private String sub; // Google OAuth2 subject identifier
+    
+    private String appleUserId; // Apple Sign-In user identifier (unique constraint in DB, allows NULL)
+    
     private String email;
     private String passwordHash;
     private String firstName;

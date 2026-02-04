@@ -9,8 +9,6 @@ services:
       POSTGRES_DB: contentdb
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-    ports:
-      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -41,20 +39,39 @@ services:
       JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-604800000}
       JWT_REFRESH_EXPIRATION_MS: ${JWT_REFRESH_EXPIRATION_MS:-864000000}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8081}
-      # Google Play Billing
-      GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_PATH: ${GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_PATH}
-      GOOGLE_PLAY_PACKAGE_NAME: ${GOOGLE_PLAY_PACKAGE_NAME}
-      GOOGLE_PLAY_PRODUCT_ID_MONTHLY: ${GOOGLE_PLAY_PRODUCT_ID_MONTHLY}
+    # App only exposed internally to Caddy reverse proxy
+    expose:
+      - "8081"
+    networks:
+      - app-network
+
+  # Caddy reverse proxy for HTTPS
+  # Uses sslip.io for free SSL - your URL will be https://<your-ip>.sslip.io
+  # Example: https://34-151-189-90.sslip.io
+  # Replace dots in your IP with dashes!
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy
+    restart: unless-stopped
+    depends_on:
+      - app
     ports:
-      - "8080:8081"
+      - "80:80"
+      - "443:443"
     volumes:
-      - ./config:/app/config:ro
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
     networks:
       - app-network
 
 volumes:
   pgdata:
+  caddy_data:
+  caddy_config:
 
 networks:
   app-network:

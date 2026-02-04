@@ -23,7 +23,7 @@ import java.util.UUID;
 @Tag(name = "Video", description = "Operations related to processing video URLs")
 @RequestMapping("/api/video")
 public class VideoController {
-    private static final Logger logger = LoggerFactory.getLogger(VideoController.class);
+    private static final Logger log = LoggerFactory.getLogger(VideoController.class);
     
     private final VideoService videoService;
     private final UntranscribedLinkService untranscribedLinkService;
@@ -41,35 +41,24 @@ public class VideoController {
     public CompletableFuture<ResponseEntity<TranscriptDtoWithAliases>> handleVideo(
             @RequestBody Map<String, String> request,
             @AuthenticationPrincipal UserPrincipal principal) throws Exception {
-        long startTime = System.currentTimeMillis();
-        logger.info("POST /api/video/transcribe - START - principal: {}", principal != null ? principal.getId() : "NULL");
-
         String videoUrl = request.get("videoUrl");
+        log.info("POST /api/video/transcribe received for videoUrl={}", videoUrl);
+
         validateRequest(videoUrl, principal);
 
         UUID userId = principal.getId();
-        logger.info("POST /api/video/transcribe - userId: {}, videoUrl: {}", userId, videoUrl);
         
         // Check rate limits before processing
         RateLimitResult rateLimitResult = rateLimitService.checkRateLimit(userId);
         if (!rateLimitResult.isAllowed()) {
-            logger.warn("POST /api/video/transcribe - RATE LIMITED for userId: {}", userId);
             throw new RateLimitExceededException(rateLimitResult);
         }
 
-        logger.info("POST /api/video/transcribe - Starting async processing...");
         return processVideoAsync(videoUrl, userId)
-                .thenApply(result -> {
-                    long duration = System.currentTimeMillis() - startTime;
-                    logger.info("POST /api/video/transcribe - SUCCESS - duration: {}ms, transcriptId: {}", 
-                        duration, result.id());
-                    return ResponseEntity.ok(result);
-                })
-                .exceptionally(ex -> {
-                    long duration = System.currentTimeMillis() - startTime;
-                    logger.error("POST /api/video/transcribe - FAILED - duration: {}ms, error: {}", 
-                        duration, ex.getMessage(), ex);
-                    throw new RuntimeException(ex);
+                .thenApply(transcriptDto -> {
+                    log.info("POST /api/video/transcribe completed successfully for videoUrl={}, transcriptId={}", 
+                            videoUrl, transcriptDto.id());
+                    return ResponseEntity.ok(transcriptDto);
                 });
     }
 
@@ -77,9 +66,9 @@ public class VideoController {
     public ResponseEntity<Void> transcribeAsync(
             @RequestBody Map<String, String> request,
             @AuthenticationPrincipal UserPrincipal principal) {
-        System.out.println("POST /api/video/transcribe-async received");
-
         String videoUrl = request.get("videoUrl");
+        log.info("POST /api/video/transcribe-async received for videoUrl={}", videoUrl);
+
         validateRequest(videoUrl, principal);
         
         UUID userId = principal.getId();

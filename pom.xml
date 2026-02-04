@@ -163,6 +163,13 @@
 			<artifactId>google-auth-library-oauth2-http</artifactId>
 			<version>1.19.0</version>
 		</dependency>
+		
+		<!-- Nimbus JOSE JWT for Apple Sign-In token verification -->
+		<dependency>
+			<groupId>com.nimbusds</groupId>
+			<artifactId>nimbus-jose-jwt</artifactId>
+			<version>9.31</version>
+		</dependency>
 	</dependencies>
 
 	<build>

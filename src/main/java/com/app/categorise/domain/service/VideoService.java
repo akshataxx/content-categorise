@@ -20,6 +20,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Qualifier;
 
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -94,7 +96,9 @@ public class VideoService {
      * @throws Exception If the download or extraction process fails.
      */
     public ProcessedVideoFiles extractAudioAndMetadata(String videoUrl) throws Exception {
-        String baseName = "output";
+        // Create a unique temp directory per request to avoid file collisions
+        Path tempDir = Files.createTempDirectory("media-" + UUID.randomUUID());
+        String baseName = tempDir.resolve("output").toString();
         String outputTemplate = baseName + ".%(ext)s";
 
         List<String> command = new ArrayList<>();
@@ -125,7 +129,7 @@ public class VideoService {
         File metadataFile = new File(baseName + ".info.json");
         File videoFile = new File(baseName + ".mp4");  // Potential leftover video file
 
-        return new ProcessedVideoFiles(audioFile, metadataFile, videoFile);
+        return new ProcessedVideoFiles(audioFile, metadataFile, videoFile, tempDir);
     }
 
     // Transcribe audio using OpenAI Whisper API

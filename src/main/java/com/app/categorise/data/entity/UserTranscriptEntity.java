@@ -1,6 +1,8 @@
 package com.app.categorise.data.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.Fetch;
+import org.hibernate.annotations.FetchMode;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -21,13 +23,13 @@ public class UserTranscriptEntity {
     private Instant createdAt;
     private Instant lastAccessedAt;
 
-    // Lazy-loaded relationship to base transcript
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
+    @Fetch(FetchMode.JOIN)
     @JoinColumn(name = "base_transcript_id")
     private BaseTranscriptEntity baseTranscript;
 
-    // Lazy-loaded relationship to category
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
+    @Fetch(FetchMode.JOIN)
     @JoinColumn(name = "category_id")
     private CategoryEntity category;
 

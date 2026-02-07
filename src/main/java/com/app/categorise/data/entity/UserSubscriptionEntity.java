@@ -1,5 +1,6 @@
 package com.app.categorise.data.entity;
 
+import com.app.categorise.domain.model.SubscriptionSource;
 import jakarta.persistence.*;
 import java.time.Instant;
 import java.util.UUID;
@@ -34,6 +35,19 @@ public class UserSubscriptionEntity {
 
     @Column(name = "google_play_order_id")
     private String googlePlayOrderId;
+
+    @Column(name = "apple_original_transaction_id", length = 100)
+    private String appleOriginalTransactionId;
+
+    @Column(name = "apple_transaction_id", length = 100)
+    private String appleTransactionId;
+
+    @Column(name = "apple_product_id", length = 100)
+    private String appleProductId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "subscription_source", length = 20)
+    private SubscriptionSource subscriptionSource;
 
     @Column(name = "subscription_start_date", nullable = false)
     private Instant subscriptionStartDate;
@@ -109,6 +123,18 @@ public class UserSubscriptionEntity {
 
     public String getGooglePlayOrderId() { return googlePlayOrderId; }
     public void setGooglePlayOrderId(String googlePlayOrderId) { this.googlePlayOrderId = googlePlayOrderId; }
+
+    public String getAppleOriginalTransactionId() { return appleOriginalTransactionId; }
+    public void setAppleOriginalTransactionId(String appleOriginalTransactionId) { this.appleOriginalTransactionId = appleOriginalTransactionId; }
+
+    public String getAppleTransactionId() { return appleTransactionId; }
+    public void setAppleTransactionId(String appleTransactionId) { this.appleTransactionId = appleTransactionId; }
+
+    public String getAppleProductId() { return appleProductId; }
+    public void setAppleProductId(String appleProductId) { this.appleProductId = appleProductId; }
+
+    public SubscriptionSource getSubscriptionSource() { return subscriptionSource; }
+    public void setSubscriptionSource(SubscriptionSource subscriptionSource) { this.subscriptionSource = subscriptionSource; }
 
     public Instant getSubscriptionStartDate() { return subscriptionStartDate; }
     public void setSubscriptionStartDate(Instant subscriptionStartDate) { this.subscriptionStartDate = subscriptionStartDate; }

@@ -21,20 +21,16 @@ public class UserTranscriptRepositoryImpl implements CustomUserTranscriptReposit
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public List<UserTranscriptEntity> filterByUser(UUID userId, List<UUID> categories, String account, Instant from, Instant to) {
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
         CriteriaQuery<UserTranscriptEntity> query = cb.createQuery(UserTranscriptEntity.class);
         Root<UserTranscriptEntity> root = query.from(UserTranscriptEntity.class);
 
-        // Fetch join baseTranscript and category to avoid lazy loading
-        Join<UserTranscriptEntity, BaseTranscriptEntity> baseTranscriptJoin =
-            (Join<UserTranscriptEntity, BaseTranscriptEntity>) (Join<?, ?>) root.fetch("baseTranscript", JoinType.INNER);
-        root.fetch("category", JoinType.LEFT);
+        // Join baseTranscript for filtering on its fields (eager loading handles data fetching)
+        Join<UserTranscriptEntity, BaseTranscriptEntity> baseTranscriptJoin = root.join("baseTranscript", JoinType.INNER);
 
         List<Predicate> predicates = new ArrayList<>();
 
-        // Always filter by userId
         predicates.add(cb.equal(root.get("userId"), userId));
 
         if (categories != null && !categories.isEmpty()) {

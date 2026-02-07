@@ -186,7 +186,7 @@ public class VideoService {
         
         // Check if user already has this transcript
         Optional<UserTranscriptEntity> existingUserTranscript = 
-            userTranscriptRepository.findByUserIdAndBaseTranscriptIdWithBaseTranscript(
+            userTranscriptRepository.findByUserIdAndBaseTranscriptId(
                 userId, baseTranscript.getId());
         
         if (existingUserTranscript.isPresent()) {

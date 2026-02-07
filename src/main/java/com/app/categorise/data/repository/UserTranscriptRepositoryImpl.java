@@ -21,13 +21,16 @@ public class UserTranscriptRepositoryImpl implements CustomUserTranscriptReposit
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public List<UserTranscriptEntity> filterByUser(UUID userId, List<UUID> categories, String account, Instant from, Instant to) {
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
         CriteriaQuery<UserTranscriptEntity> query = cb.createQuery(UserTranscriptEntity.class);
         Root<UserTranscriptEntity> root = query.from(UserTranscriptEntity.class);
-        
-        // Join with BaseTranscriptEntity to access video metadata
-        Join<UserTranscriptEntity, BaseTranscriptEntity> baseTranscriptJoin = root.join("baseTranscript");
+
+        // Fetch join baseTranscript and category to avoid lazy loading
+        Join<UserTranscriptEntity, BaseTranscriptEntity> baseTranscriptJoin =
+            (Join<UserTranscriptEntity, BaseTranscriptEntity>) (Join<?, ?>) root.fetch("baseTranscript", JoinType.INNER);
+        root.fetch("category", JoinType.LEFT);
 
         List<Predicate> predicates = new ArrayList<>();
 
@@ -35,7 +38,7 @@ public class UserTranscriptRepositoryImpl implements CustomUserTranscriptReposit
         predicates.add(cb.equal(root.get("userId"), userId));
 
         if (categories != null && !categories.isEmpty()) {
-            predicates.add(root.get("categoryId").in(categories));
+            predicates.add(root.get("category").get("id").in(categories));
         }
 
         if (account != null && !account.isBlank()) {

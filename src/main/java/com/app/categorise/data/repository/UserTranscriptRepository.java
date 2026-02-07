@@ -20,9 +20,10 @@ public interface UserTranscriptRepository extends JpaRepository<UserTranscriptEn
      */
     @Query("SELECT ut FROM UserTranscriptEntity ut " +
            "JOIN FETCH ut.baseTranscript bt " +
+           "LEFT JOIN FETCH ut.category " +
            "WHERE ut.userId = :userId AND bt.id = :baseTranscriptId")
     Optional<UserTranscriptEntity> findByUserIdAndBaseTranscriptIdWithBaseTranscript(
-            @Param("userId") UUID userId, 
+            @Param("userId") UUID userId,
             @Param("baseTranscriptId") UUID baseTranscriptId);
     
     /**
@@ -90,6 +91,16 @@ public interface UserTranscriptRepository extends JpaRepository<UserTranscriptEn
             @Param("userId") UUID userId, 
             @Param("videoUrl") String videoUrl);
     
+    /**
+     * Find a user transcript by ID with all related data loaded
+     * Uses JOIN FETCH to avoid lazy loading issues
+     */
+    @Query("SELECT ut FROM UserTranscriptEntity ut " +
+           "JOIN FETCH ut.baseTranscript " +
+           "LEFT JOIN FETCH ut.category " +
+           "WHERE ut.id = :id")
+    Optional<UserTranscriptEntity> findByIdWithFullData(@Param("id") UUID id);
+
     /**
      * Count total number of transcripts for a specific user
      * Used for rate limiting total transcript count

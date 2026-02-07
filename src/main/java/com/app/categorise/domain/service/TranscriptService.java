@@ -47,10 +47,10 @@ public class TranscriptService {
 
     public Optional<TranscriptDtoWithAliases> findTranscript(UUID userTranscriptId, UUID userId) {
         if (userTranscriptId != null) {
-            Optional<UserTranscriptEntity> userTranscript = userTranscriptRepository.findById(userTranscriptId);
+            Optional<UserTranscriptEntity> userTranscript = userTranscriptRepository.findByIdWithFullData(userTranscriptId);
             if (userTranscript.isPresent()) {
                 return Optional.of(videoMapper.buildResponse(
-                    userTranscript.get().getBaseTranscript(), 
+                    userTranscript.get().getBaseTranscript(),
                     userTranscript.get()
                 ));
             }

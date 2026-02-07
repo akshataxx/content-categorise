@@ -1,10 +1,14 @@
 package com.app.categorise.api.controller;
 
+import com.app.categorise.api.dto.appstore.AppStoreVerificationRequest;
+import com.app.categorise.api.dto.appstore.AppStoreVerificationResponse;
+import com.app.categorise.api.dto.appstore.AppStoreVerificationResult;
 import com.app.categorise.api.dto.subscription.GooglePlayPurchaseVerificationRequest;
 import com.app.categorise.api.dto.subscription.GooglePlayVerificationResponse;
 import com.app.categorise.api.dto.subscription.SubscriptionDto;
 import com.app.categorise.api.dto.subscription.UsageInfoDto;
 import com.app.categorise.domain.model.UserSubscription;
+import com.app.categorise.domain.service.AppleAppStoreBillingService;
 import com.app.categorise.domain.service.GooglePlayBillingService;
 import com.app.categorise.domain.service.SubscriptionService;
 import com.app.categorise.domain.service.UsageService;
@@ -35,13 +39,16 @@ public class SubscriptionController {
 
     private final SubscriptionService subscriptionService;
     private final GooglePlayBillingService googlePlayBillingService;
+    private final AppleAppStoreBillingService appleAppStoreBillingService;
     private final UsageService usageService;
 
     public SubscriptionController(SubscriptionService subscriptionService,
                                  GooglePlayBillingService googlePlayBillingService,
+                                 AppleAppStoreBillingService appleAppStoreBillingService,
                                  UsageService usageService) {
         this.subscriptionService = subscriptionService;
         this.googlePlayBillingService = googlePlayBillingService;
+        this.appleAppStoreBillingService = appleAppStoreBillingService;
         this.usageService = usageService;
     }
 
@@ -126,6 +133,46 @@ public class SubscriptionController {
         } catch (Exception e) {
             logger.error("Unexpected error verifying Google Play purchase for user {}: {}", userId, e.getMessage(), e);
             return ResponseEntity.ok(GooglePlayVerificationResponse.failure("An unexpected error occurred"));
+        }
+    }
+
+    @Operation(summary = "Verify App Store purchase and activate subscription")
+    @PostMapping("/app-store/verify")
+    public ResponseEntity<AppStoreVerificationResponse> verifyAppStorePurchase(
+            @Valid @RequestBody AppStoreVerificationRequest request,
+            @AuthenticationPrincipal UserPrincipal principal) {
+
+        UUID userId = principal.getId();
+        logger.info("Verifying App Store purchase for user {}: productId={}", userId, request.getProductId());
+
+        try {
+            // Verify with Apple
+            AppStoreVerificationResult result = appleAppStoreBillingService
+                    .verifyTransaction(request.getSignedTransaction());
+
+            if (result.isVerified() && result.isSubscriptionActive()) {
+                // Upgrade user to premium
+                subscriptionService.upgradeToPremiumWithAppStore(
+                        userId,
+                        result.getOriginalTransactionId(),
+                        result.getTransactionId(),
+                        result.getProductId(),
+                        result.getExpirationTime()
+                );
+
+                logger.info("Successfully verified and activated App Store subscription for user {}", userId);
+                return ResponseEntity.ok(AppStoreVerificationResponse.success(true, result.getExpirationTime()));
+            } else {
+                logger.warn("App Store subscription verification failed for user {}: {}",
+                        userId, result.getErrorMessage());
+                return ResponseEntity.ok(AppStoreVerificationResponse.failure(
+                        result.getErrorMessage() != null ? result.getErrorMessage() : "Subscription not active"));
+            }
+
+        } catch (Exception e) {
+            logger.error("Unexpected error verifying App Store purchase for user {}: {}",
+                    userId, e.getMessage(), e);
+            return ResponseEntity.ok(AppStoreVerificationResponse.failure("An unexpected error occurred"));
         }
     }
 

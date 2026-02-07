@@ -4,6 +4,7 @@ import com.app.categorise.application.mapper.SubscriptionMapper;
 import com.app.categorise.data.entity.UserSubscriptionEntity;
 import com.app.categorise.data.repository.UserSubscriptionRepository;
 import com.app.categorise.data.repository.UserTranscriptRepository;
+import com.app.categorise.domain.model.SubscriptionSource;
 import com.app.categorise.domain.model.UserSubscription;
 import com.app.categorise.domain.service.SubscriptionService;
 import org.slf4j.Logger;
@@ -119,6 +120,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         entity.setGooglePlayPurchaseToken(purchaseToken);
         entity.setGooglePlayProductId(productId);
         entity.setGooglePlayOrderId(orderId);
+        entity.setSubscriptionSource(SubscriptionSource.GOOGLE_PLAY);
         entity.setSubscriptionStartDate(Instant.now());
 
         // Set end date based on subscription type
@@ -137,6 +139,52 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         return mapper.toDomainModel(saved);
     }
     
+    @Override
+    public void upgradeToPremiumWithAppStore(UUID userId, String originalTransactionId,
+                                             String transactionId, String productId,
+                                             Instant expirationDate) {
+        logger.info("Upgrading user {} to premium via App Store", userId);
+
+        // Find existing subscription or create new one
+        UserSubscriptionEntity entity = subscriptionRepository.findByUserId(userId)
+                .orElseGet(() -> {
+                    UserSubscriptionEntity newSub = new UserSubscriptionEntity(
+                            userId,
+                            UserSubscriptionEntity.SubscriptionType.FREE,
+                            UserSubscriptionEntity.SubscriptionStatus.ACTIVE
+                    );
+                    return newSub;
+                });
+
+        // Log platform switch if applicable
+        if (entity.getSubscriptionSource() != null
+                && entity.getSubscriptionSource() != SubscriptionSource.APP_STORE) {
+            logger.info("User {} switching subscription platform from {} to APP_STORE",
+                    userId, entity.getSubscriptionSource());
+        }
+
+        // Determine subscription type from product ID
+        UserSubscriptionEntity.SubscriptionType type = productId.contains("yearly")
+                ? UserSubscriptionEntity.SubscriptionType.PREMIUM_YEARLY
+                : UserSubscriptionEntity.SubscriptionType.PREMIUM_MONTHLY;
+
+        // Update subscription details
+        entity.setSubscriptionType(type);
+        entity.setStatus(UserSubscriptionEntity.SubscriptionStatus.ACTIVE);
+        entity.setAppleOriginalTransactionId(originalTransactionId);
+        entity.setAppleTransactionId(transactionId);
+        entity.setAppleProductId(productId);
+        entity.setSubscriptionSource(SubscriptionSource.APP_STORE);
+        entity.setSubscriptionStartDate(Instant.now());
+        entity.setSubscriptionEndDate(expirationDate);
+        entity.setAutoRenew(true);
+
+        subscriptionRepository.save(entity);
+
+        logger.info("User {} upgraded to {} via App Store, expires {}",
+                userId, type, expirationDate);
+    }
+
     @Override
     public void cancelSubscription(UUID userId) {
         logger.info("Cancelling subscription for user: {}", userId);

@@ -1,17 +1,14 @@
 package com.app.categorise.domain.service;
 
 import com.app.categorise.application.mapper.VideoMapper;
-import com.app.categorise.data.entity.BaseTranscriptEntity;
 import com.app.categorise.data.entity.UserTranscriptEntity;
 import com.app.categorise.data.repository.BaseTranscriptRepository;
 import com.app.categorise.data.repository.UserTranscriptRepository;
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
-import com.app.categorise.domain.service.CategoryAliasService;
 import com.app.categorise.exception.TranscriptDeletionException;
 import com.app.categorise.exception.TranscriptNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,22 +29,19 @@ public class TranscriptService {
     private static final Logger logger = LoggerFactory.getLogger(TranscriptService.class);
 
     private final UserTranscriptRepository userTranscriptRepository;
-    private final BaseTranscriptRepository baseTranscriptRepository;
     private final VideoMapper videoMapper;
 
     public TranscriptService(
         UserTranscriptRepository userTranscriptRepository,
-        BaseTranscriptRepository baseTranscriptRepository,
         VideoMapper videoMapper
     ) {
         this.userTranscriptRepository = userTranscriptRepository;
-        this.baseTranscriptRepository = baseTranscriptRepository;
         this.videoMapper = videoMapper;
     }
 
     public Optional<TranscriptDtoWithAliases> findTranscript(UUID userTranscriptId, UUID userId) {
         if (userTranscriptId != null) {
-            Optional<UserTranscriptEntity> userTranscript = userTranscriptRepository.findByIdWithFullData(userTranscriptId);
+            Optional<UserTranscriptEntity> userTranscript = userTranscriptRepository.findByIdAndUserId(userTranscriptId, userId);
             if (userTranscript.isPresent()) {
                 return Optional.of(videoMapper.buildResponse(
                     userTranscript.get().getBaseTranscript(),

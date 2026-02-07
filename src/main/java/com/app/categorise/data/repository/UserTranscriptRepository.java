@@ -16,7 +16,7 @@ public interface UserTranscriptRepository extends JpaRepository<UserTranscriptEn
     /**
      * Find user transcript association by user ID and base transcript ID
      */
-    Optional<UserTranscriptEntity> findByUserIdAndBaseTranscriptId(UUID userId, UUID baseTranscriptId);
+    Optional<UserTranscriptEntity> findByUserIdAndBaseTranscript_Id(UUID userId, UUID baseTranscriptId);
     
     /**
      * Find all user transcripts for a user ordered by creation date
@@ -39,7 +39,7 @@ public interface UserTranscriptRepository extends JpaRepository<UserTranscriptEn
     /**
      * Check if user already has access to a specific base transcript
      */
-    boolean existsByUserIdAndBaseTranscriptId(UUID userId, UUID baseTranscriptId);
+    boolean existsByUserIdAndBaseTranscript_Id(UUID userId, UUID baseTranscriptId);
     
     /**
      * Find user transcript by user and video URL
@@ -50,12 +50,6 @@ public interface UserTranscriptRepository extends JpaRepository<UserTranscriptEn
     Optional<UserTranscriptEntity> findByUserIdAndVideoUrl(
             @Param("userId") UUID userId, 
             @Param("videoUrl") String videoUrl);
-    
-    /**
-     * Find a user transcript by ID and user ID
-     * Ensures the transcript belongs to the requesting user (prevents IDOR)
-     */
-    Optional<UserTranscriptEntity> findByIdAndUserId(UUID id, UUID userId);
 
     /**
      * Count total number of transcripts for a specific user
@@ -64,4 +58,12 @@ public interface UserTranscriptRepository extends JpaRepository<UserTranscriptEn
      * @return Total number of transcripts for the user
      */
     long countByUserId(UUID userId);
+
+    /**
+     * Find user transcript by ID and user ID for ownership validation
+     * @param id The user transcript ID
+     * @param userId The user ID
+     * @return The user transcript if found and owned by the user
+     */
+    Optional<UserTranscriptEntity> findByIdAndUserId(UUID id, UUID userId);
 }

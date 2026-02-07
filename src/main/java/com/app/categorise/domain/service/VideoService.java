@@ -20,6 +20,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Qualifier;
 
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -94,38 +96,60 @@ public class VideoService {
      * @throws Exception If the download or extraction process fails.
      */
     public ProcessedVideoFiles extractAudioAndMetadata(String videoUrl) throws Exception {
-        String baseName = "output";
-        String outputTemplate = baseName + ".%(ext)s";
+        // Create a unique temp directory per request to avoid file collisions
+        Path tempDir = Files.createTempDirectory("media-" + UUID.randomUUID());
+        try {
+            String baseName = tempDir.resolve("output").toString();
+            String outputTemplate = baseName + ".%(ext)s";
 
-        List<String> command = new ArrayList<>();
-        command.add("yt-dlp");
+            List<String> command = new ArrayList<>();
+            command.add("yt-dlp");
 
-        if (isFfmpegLocationValid()) {
-            command.add("--ffmpeg-location");
-            command.add(ffmpegLocation);
-        } else {
-            System.out.println("FFmpeg location not configured or invalid; falling back to PATH resolution.");
+            if (isFfmpegLocationValid()) {
+                command.add("--ffmpeg-location");
+                command.add(ffmpegLocation);
+            } else {
+                System.out.println("FFmpeg location not configured or invalid; falling back to PATH resolution.");
+            }
+
+            command.add("--write-info-json");
+            command.add("-f");
+            command.add("worstaudio/worst");  // Try audio-only, fallback to worst quality video
+            command.add("-x");
+            command.add("--audio-format");
+            command.add("mp3");
+            command.add("--audio-quality");
+            command.add("5");
+            command.add("-o");
+            command.add(outputTemplate);
+            command.add(videoUrl);
+
+            processExecutor.run(command.toArray(new String[0]));
+
+            File audioFile = new File(baseName + ".mp3");
+            File metadataFile = new File(baseName + ".info.json");
+            File videoFile = new File(baseName + ".mp4");  // Potential leftover video file
+
+            return new ProcessedVideoFiles(audioFile, metadataFile, videoFile, tempDir);
+        } catch (Exception e) {
+            // Clean up temp directory if yt-dlp fails, so partial files don't pile up
+            deleteTempDirectory(tempDir);
+            throw e;
         }
+    }
 
-        command.add("--write-info-json");
-        command.add("-f");
-        command.add("worstaudio/worst");  // Try audio-only, fallback to worst quality video
-        command.add("-x");
-        command.add("--audio-format");
-        command.add("mp3");
-        command.add("--audio-quality");
-        command.add("5");
-        command.add("-o");
-        command.add(outputTemplate);
-        command.add(videoUrl);
-
-        processExecutor.run(command.toArray(new String[0]));
-
-        File audioFile = new File(baseName + ".mp3");
-        File metadataFile = new File(baseName + ".info.json");
-        File videoFile = new File(baseName + ".mp4");  // Potential leftover video file
-
-        return new ProcessedVideoFiles(audioFile, metadataFile, videoFile);
+    private void deleteTempDirectory(Path dir) {
+        try {
+            File[] files = dir.toFile().listFiles();
+            if (files != null) {
+                for (File file : files) {
+                    file.delete();
+                }
+            }
+            Files.deleteIfExists(dir);
+        } catch (Exception e) {
+            System.err.println("Failed to clean up temp directory: " + dir);
+        }
     }
 
     // Transcribe audio using OpenAI Whisper API
@@ -186,7 +210,7 @@ public class VideoService {
         
         // Check if user already has this transcript
         Optional<UserTranscriptEntity> existingUserTranscript = 
-            userTranscriptRepository.findByUserIdAndBaseTranscriptId(
+            userTranscriptRepository.findByUserIdAndBaseTranscript_Id(
                 userId, baseTranscript.getId());
         
         if (existingUserTranscript.isPresent()) {

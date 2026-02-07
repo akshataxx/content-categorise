@@ -67,6 +67,26 @@ public class TranscriptService {
         return videoMapper.buildResponse(entity.getBaseTranscript(), entity);
     }
 
+    /**
+     * Update notes for a user transcript.
+     * Validates that the transcript belongs to the requesting user.
+     * @param userId The authenticated user's ID
+     * @param userTranscriptId The user transcript ID to update
+     * @param notes The new notes content (null to clear)
+     */
+    @Transactional
+    public void updateNotes(UUID userId, UUID userTranscriptId, String notes) {
+        UserTranscriptEntity entity = userTranscriptRepository
+            .findByIdAndUserId(userTranscriptId, userId)
+            .orElseThrow(() -> new TranscriptNotFoundException(
+                "Transcript not found: " + userTranscriptId,
+                List.of(userTranscriptId)
+            ));
+
+        entity.setNotes(notes);
+        userTranscriptRepository.save(entity);
+    }
+
     @Transactional
     public void deleteTranscripts(List<UUID> userTranscriptIds) {
         if (userTranscriptIds == null || userTranscriptIds.isEmpty()) {

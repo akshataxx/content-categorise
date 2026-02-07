@@ -64,7 +64,8 @@ class VideoControllerTest {
                 "recipe",                    // alias
                 UUID.randomUUID(),           // categoryId
                 "testCategory",              // category
-                Instant.now()                // createdAt
+                Instant.now(),               // createdAt
+                null                         // notes
         );
     }
 

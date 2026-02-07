@@ -215,7 +215,7 @@ class UserTranscriptRepositoryTest {
 
         // When
         Optional<UserTranscriptEntity> found = userTranscriptRepository
-                .findByUserIdAndBaseTranscriptId(user1.getId(), baseTranscript1.getId());
+                .findByUserIdAndBaseTranscript_Id(user1.getId(), baseTranscript1.getId());
 
         // Then
         assertThat(found).isPresent();
@@ -255,9 +255,9 @@ class UserTranscriptRepositoryTest {
         userTranscriptRepository.save(userTranscript);
 
         // When & Then
-        assertThat(userTranscriptRepository.existsByUserIdAndBaseTranscriptId(user1.getId(), baseTranscript1.getId())).isTrue();
-        assertThat(userTranscriptRepository.existsByUserIdAndBaseTranscriptId(user1.getId(), baseTranscript2.getId())).isFalse();
-        assertThat(userTranscriptRepository.existsByUserIdAndBaseTranscriptId(user2.getId(), baseTranscript1.getId())).isFalse();
+        assertThat(userTranscriptRepository.existsByUserIdAndBaseTranscript_Id(user1.getId(), baseTranscript1.getId())).isTrue();
+        assertThat(userTranscriptRepository.existsByUserIdAndBaseTranscript_Id(user1.getId(), baseTranscript2.getId())).isFalse();
+        assertThat(userTranscriptRepository.existsByUserIdAndBaseTranscript_Id(user2.getId(), baseTranscript1.getId())).isFalse();
     }
 
     @Test

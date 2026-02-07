@@ -2,6 +2,7 @@ package com.app.categorise.api.controller;
 
 import com.app.categorise.api.dto.DeleteTranscriptsRequest;
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
+import com.app.categorise.api.dto.UpdateNotesRequest;
 import com.app.categorise.domain.service.TranscriptService;
 import com.app.categorise.security.UserPrincipal;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -72,6 +73,25 @@ public class TranscriptController {
         return transcriptService.findTranscript(userTranscriptId, userId)
             .map(ResponseEntity::ok)
             .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Update notes for a user transcript.
+     * @param userTranscriptId The user transcript ID to update
+     * @param request The request containing the notes content
+     * @param principal The authenticated user principal
+     * @return ResponseEntity with no content on successful update
+     */
+    @PatchMapping("/{userTranscriptId}/notes")
+    public ResponseEntity<Void> updateNotes(
+        @PathVariable UUID userTranscriptId,
+        @RequestBody @Valid UpdateNotesRequest request,
+        @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        UUID userId = principal.getId();
+        logger.info("Updating notes for user transcript: {}", userTranscriptId);
+        transcriptService.updateNotes(userId, userTranscriptId, request.notes());
+        return ResponseEntity.noContent().build();
     }
 
     /**

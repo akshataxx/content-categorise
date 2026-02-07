@@ -28,5 +28,7 @@ public record TranscriptDtoWithAliases(
     UUID categoryId,
     /** The special, predefined category name (e.g., "Recipe"). */
     String category,
-    Instant createdAt
+    Instant createdAt,
+    /** User's personal notes for this transcript. */
+    String notes
 ) {}

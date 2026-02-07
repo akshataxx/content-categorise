@@ -77,7 +77,8 @@ public class VideoMapper {
             alias,
             userTranscript.getCategoryId(),
             categoryName,
-            userTranscript.getCreatedAt()
+            userTranscript.getCreatedAt(),
+            userTranscript.getNotes()
         );
     }
 

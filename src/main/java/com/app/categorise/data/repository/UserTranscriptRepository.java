@@ -108,4 +108,12 @@ public interface UserTranscriptRepository extends JpaRepository<UserTranscriptEn
      * @return Total number of transcripts for the user
      */
     long countByUserId(UUID userId);
+
+    /**
+     * Find user transcript by ID and user ID for ownership validation
+     * @param id The user transcript ID
+     * @param userId The user ID
+     * @return The user transcript if found and owned by the user
+     */
+    Optional<UserTranscriptEntity> findByIdAndUserId(UUID id, UUID userId);
 }

@@ -14,6 +14,7 @@ public class UserTranscript {
     private UUID categoryId;
     private Instant createdAt;
     private Instant lastAccessedAt;
+    private String notes;
 
     public UserTranscript() {}
 
@@ -25,6 +26,12 @@ public class UserTranscript {
         this.categoryId = categoryId;
         this.createdAt = createdAt;
         this.lastAccessedAt = lastAccessedAt;
+    }
+
+    public UserTranscript(UUID id, UUID userId, UUID baseTranscriptId, UUID categoryId, 
+                         Instant createdAt, Instant lastAccessedAt, String notes) {
+        this(id, userId, baseTranscriptId, categoryId, createdAt, lastAccessedAt);
+        this.notes = notes;
     }
 
     // Getters and Setters
@@ -74,6 +81,14 @@ public class UserTranscript {
 
     public void setLastAccessedAt(Instant lastAccessedAt) {
         this.lastAccessedAt = lastAccessedAt;
+    }
+
+    public String getNotes() {
+        return notes;
+    }
+
+    public void setNotes(String notes) {
+        this.notes = notes;
     }
 
     @Override

@@ -21,6 +21,9 @@ public class UserTranscriptEntity {
     private Instant createdAt;
     private Instant lastAccessedAt;
 
+    @Column(name = "notes", columnDefinition = "TEXT")
+    private String notes;
+
     // Lazy-loaded relationship to base transcript
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "base_transcript_id")
@@ -111,6 +114,14 @@ public class UserTranscriptEntity {
 
     public void setCategory(CategoryEntity category) {
         this.category = category;
+    }
+
+    public String getNotes() {
+        return notes;
+    }
+
+    public void setNotes(String notes) {
+        this.notes = notes;
     }
 
     @Override

@@ -16,11 +16,7 @@ public interface UserTranscriptRepository extends JpaRepository<UserTranscriptEn
     /**
      * Find user transcript association by user ID and base transcript ID
      */
-    @Query("SELECT ut FROM UserTranscriptEntity ut " +
-           "WHERE ut.userId = :userId AND ut.baseTranscript.id = :baseTranscriptId")
-    Optional<UserTranscriptEntity> findByUserIdAndBaseTranscriptId(
-            @Param("userId") UUID userId,
-            @Param("baseTranscriptId") UUID baseTranscriptId);
+    Optional<UserTranscriptEntity> findByUserIdAndBaseTranscriptId(UUID userId, UUID baseTranscriptId);
     
     /**
      * Find all user transcripts for a user ordered by creation date
@@ -43,9 +39,7 @@ public interface UserTranscriptRepository extends JpaRepository<UserTranscriptEn
     /**
      * Check if user already has access to a specific base transcript
      */
-    @Query("SELECT COUNT(ut) > 0 FROM UserTranscriptEntity ut " +
-           "WHERE ut.userId = :userId AND ut.baseTranscript.id = :baseTranscriptId")
-    boolean existsByUserIdAndBaseTranscriptId(@Param("userId") UUID userId, @Param("baseTranscriptId") UUID baseTranscriptId);
+    boolean existsByUserIdAndBaseTranscriptId(UUID userId, UUID baseTranscriptId);
     
     /**
      * Find user transcript by user and video URL
@@ -61,9 +55,7 @@ public interface UserTranscriptRepository extends JpaRepository<UserTranscriptEn
      * Find a user transcript by ID and user ID
      * Ensures the transcript belongs to the requesting user (prevents IDOR)
      */
-    @Query("SELECT ut FROM UserTranscriptEntity ut " +
-           "WHERE ut.id = :id AND ut.userId = :userId")
-    Optional<UserTranscriptEntity> findByIdAndUserId(@Param("id") UUID id, @Param("userId") UUID userId);
+    Optional<UserTranscriptEntity> findByIdAndUserId(UUID id, UUID userId);
 
     /**
      * Count total number of transcripts for a specific user

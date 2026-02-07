@@ -93,7 +93,8 @@ class VideoServiceTest {
                 "recipe",
                 categoryId,
                 "testCategory",
-                Instant.now()
+                Instant.now(),
+                null // notes
         );
     }
 

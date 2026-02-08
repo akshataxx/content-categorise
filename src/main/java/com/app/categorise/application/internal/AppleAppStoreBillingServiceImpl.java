@@ -54,6 +54,12 @@ public class AppleAppStoreBillingServiceImpl implements AppleAppStoreBillingServ
     @PostConstruct
     public void init() {
         try {
+            if ("xcode-testing".equalsIgnoreCase(config.getEnvironment())) {
+                logger.info("Apple App Store Billing service running in XCODE-TESTING mode. " +
+                        "Private key not required — transactions will be verified locally.");
+                return;
+            }
+
             if (config.getPrivateKeyPath() != null && !config.getPrivateKeyPath().isEmpty()) {
                 loadPrivateKey();
                 logger.info("Apple App Store Billing service initialized successfully");
@@ -70,6 +76,12 @@ public class AppleAppStoreBillingServiceImpl implements AppleAppStoreBillingServ
     @Override
     public AppStoreVerificationResult verifyTransaction(String signedTransaction) {
         try {
+            // In xcode-testing mode, skip Apple API verification and trust the decoded JWS directly.
+            // Xcode's StoreKit testing signs JWS with a local certificate that Apple's API won't recognise.
+            if ("xcode-testing".equalsIgnoreCase(config.getEnvironment())) {
+                return verifyTransactionLocally(signedTransaction);
+            }
+
             if (privateKey == null) {
                 return AppStoreVerificationResult.builder()
                         .verified(false)
@@ -126,6 +138,40 @@ public class AppleAppStoreBillingServiceImpl implements AppleAppStoreBillingServ
             return AppStoreVerificationResult.builder()
                     .verified(false)
                     .errorMessage("Verification failed: " + e.getMessage())
+                    .build();
+        }
+    }
+
+    /**
+     * Verify a transaction locally by decoding the JWS payload without calling Apple's API.
+     * Used for Xcode StoreKit Testing where transactions are signed by Xcode's local certificate.
+     * NEVER use this in production or sandbox — only for local development.
+     */
+    private AppStoreVerificationResult verifyTransactionLocally(String signedTransaction) {
+        logger.warn("⚠ XCODE-TESTING MODE: Skipping Apple API verification, trusting decoded JWS directly");
+        try {
+            DecodedTransaction decoded = decodeTransaction(signedTransaction);
+
+            boolean isActive = decoded.getExpiresDate() != null
+                    && decoded.getExpiresDate().isAfter(Instant.now());
+
+            logger.info("Xcode-testing verification: productId={}, transactionId={}, originalTransactionId={}, expiresDate={}, active={}",
+                    decoded.getProductId(), decoded.getTransactionId(),
+                    decoded.getOriginalTransactionId(), decoded.getExpiresDate(), isActive);
+
+            return AppStoreVerificationResult.builder()
+                    .verified(true)
+                    .subscriptionActive(isActive)
+                    .expirationTime(decoded.getExpiresDate())
+                    .originalTransactionId(decoded.getOriginalTransactionId())
+                    .transactionId(decoded.getTransactionId())
+                    .productId(decoded.getProductId())
+                    .build();
+        } catch (Exception e) {
+            logger.error("Failed to decode transaction in xcode-testing mode", e);
+            return AppStoreVerificationResult.builder()
+                    .verified(false)
+                    .errorMessage("Local verification failed: " + e.getMessage())
                     .build();
         }
     }

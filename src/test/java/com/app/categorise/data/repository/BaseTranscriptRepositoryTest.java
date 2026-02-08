@@ -45,6 +45,7 @@ class BaseTranscriptRepositoryTest {
         BaseTranscriptEntity transcript = new BaseTranscriptEntity(
                 "https://example.com/video1",
                 "This is a test transcript content",
+                null, // structuredContent
                 "Test video description",
                 "Test Video Title",
                 120.5,
@@ -75,6 +76,7 @@ class BaseTranscriptRepositoryTest {
         BaseTranscriptEntity transcript = new BaseTranscriptEntity(
                 videoUrl,
                 "Another test transcript",
+                null, // structuredContent
                 "Another description",
                 "Another Title",
                 90.0,
@@ -111,6 +113,7 @@ class BaseTranscriptRepositoryTest {
         BaseTranscriptEntity transcript = new BaseTranscriptEntity(
                 videoUrl,
                 "Existence test transcript",
+                null, // structuredContent
                 "Existence description",
                 "Existence Title",
                 60.0,
@@ -134,6 +137,7 @@ class BaseTranscriptRepositoryTest {
         BaseTranscriptEntity transcript1 = new BaseTranscriptEntity(
                 videoUrl,
                 "First transcript",
+                null, // structuredContent
                 "First description",
                 "First Title",
                 100.0,
@@ -148,6 +152,7 @@ class BaseTranscriptRepositoryTest {
         BaseTranscriptEntity transcript2 = new BaseTranscriptEntity(
                 videoUrl, // Same URL
                 "Second transcript",
+                null, // structuredContent
                 "Second description",
                 "Second Title",
                 200.0,

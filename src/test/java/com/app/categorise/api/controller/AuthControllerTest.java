@@ -4,6 +4,7 @@ import com.app.categorise.api.dto.auth.JwtAuthResponse;
 import com.app.categorise.api.dto.auth.LoginRequest;
 import com.app.categorise.api.dto.auth.RefreshTokenRequest;
 import com.app.categorise.api.dto.auth.RegisterRequest;
+import com.app.categorise.domain.service.AppleAuthService;
 import com.app.categorise.domain.service.AuthService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
@@ -33,6 +34,9 @@ class AuthControllerTest {
 
     @MockBean
     private AuthService authService;
+
+    @MockBean
+    private AppleAuthService appleAuthService;
 
     @Nested
     @DisplayName("/api/auth/register")

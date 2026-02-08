@@ -11,7 +11,9 @@ import java.util.UUID;
  * Links users to base transcripts with user-specific categorization and metadata
  */
 @Entity
-@Table(name = "user_transcripts")
+@Table(name = "user_transcripts", uniqueConstraints = {
+    @UniqueConstraint(columnNames = {"userId", "base_transcript_id"})
+})
 public class UserTranscriptEntity {
     
     @Id

@@ -3,7 +3,8 @@ package com.app.categorise.api.dto.subscription;
 import jakarta.validation.constraints.NotBlank;
 
 /**
- * Request DTO for verifying a Google Play purchase
+ * Request DTO for verifying a Google Play purchase.
+ * TODO: Move Google Play DTOs to api/dto/subscription/googleplay/ sub-package for consistency with apple/.
  */
 public class GooglePlayPurchaseVerificationRequest {
 

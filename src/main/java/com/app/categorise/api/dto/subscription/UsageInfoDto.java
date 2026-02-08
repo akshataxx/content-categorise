@@ -11,12 +11,16 @@ public class UsageInfoDto {
     
     @JsonProperty("remainingFreeTranscriptions")
     private int remainingFreeTranscriptions;
+
+    @JsonProperty("totalFreeTranscriptions")
+    private int totalFreeTranscriptions;
     
     public UsageInfoDto() {}
     
-    public UsageInfoDto(boolean isPremium, int remainingFreeTranscriptions) {
+    public UsageInfoDto(boolean isPremium, int remainingFreeTranscriptions, int totalFreeTranscriptions) {
         this.isPremium = isPremium;
         this.remainingFreeTranscriptions = remainingFreeTranscriptions;
+        this.totalFreeTranscriptions = totalFreeTranscriptions;
     }
     
     @JsonProperty("isPremium")
@@ -27,5 +31,11 @@ public class UsageInfoDto {
     public int getRemainingFreeTranscriptions() { return remainingFreeTranscriptions; }
     public void setRemainingFreeTranscriptions(int remainingFreeTranscriptions) { 
         this.remainingFreeTranscriptions = remainingFreeTranscriptions; 
+    }
+
+    @JsonProperty("totalFreeTranscriptions")
+    public int getTotalFreeTranscriptions() { return totalFreeTranscriptions; }
+    public void setTotalFreeTranscriptions(int totalFreeTranscriptions) {
+        this.totalFreeTranscriptions = totalFreeTranscriptions;
     }
 }

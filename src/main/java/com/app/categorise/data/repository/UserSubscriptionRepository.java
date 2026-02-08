@@ -35,4 +35,13 @@ public interface UserSubscriptionRepository extends JpaRepository<UserSubscripti
      * Find subscription by Google Play purchase token
      */
     Optional<UserSubscriptionEntity> findByGooglePlayPurchaseToken(String purchaseToken);
+
+    /**
+     * Find subscription by Apple's original transaction ID.
+     * Used for webhook processing to identify which subscription to update.
+     *
+     * @param appleOriginalTransactionId The Apple original transaction ID
+     * @return The subscription if found
+     */
+    Optional<UserSubscriptionEntity> findByAppleOriginalTransactionId(String appleOriginalTransactionId);
 }

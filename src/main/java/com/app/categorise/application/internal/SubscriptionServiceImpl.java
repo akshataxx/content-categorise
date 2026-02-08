@@ -4,10 +4,13 @@ import com.app.categorise.application.mapper.SubscriptionMapper;
 import com.app.categorise.data.entity.UserSubscriptionEntity;
 import com.app.categorise.data.repository.UserSubscriptionRepository;
 import com.app.categorise.data.repository.UserTranscriptRepository;
+import com.app.categorise.domain.model.SubscriptionSource;
 import com.app.categorise.domain.model.UserSubscription;
+import com.app.categorise.domain.service.RateLimitService;
 import com.app.categorise.domain.service.SubscriptionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,13 +32,16 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     private final UserSubscriptionRepository subscriptionRepository;
     private final UserTranscriptRepository transcriptRepository;
     private final SubscriptionMapper mapper;
+    private final RateLimitService rateLimitService;
     
     public SubscriptionServiceImpl(UserSubscriptionRepository subscriptionRepository,
                                   UserTranscriptRepository transcriptRepository,
-                                  SubscriptionMapper mapper) {
+                                  SubscriptionMapper mapper,
+                                  @Lazy RateLimitService rateLimitService) {
         this.subscriptionRepository = subscriptionRepository;
         this.transcriptRepository = transcriptRepository;
         this.mapper = mapper;
+        this.rateLimitService = rateLimitService;
     }
     
     @Override
@@ -119,6 +125,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         entity.setGooglePlayPurchaseToken(purchaseToken);
         entity.setGooglePlayProductId(productId);
         entity.setGooglePlayOrderId(orderId);
+        entity.setSubscriptionSource(SubscriptionSource.GOOGLE_PLAY);
         entity.setSubscriptionStartDate(Instant.now());
 
         // Set end date based on subscription type
@@ -132,11 +139,59 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         entity.setAutoRenew(true);
 
         UserSubscriptionEntity saved = subscriptionRepository.save(entity);
+        rateLimitService.applyPremiumLimits(userId);
         logger.info("Successfully upgraded user {} to premium via Google Play", userId);
 
         return mapper.toDomainModel(saved);
     }
     
+    @Override
+    public void upgradeToPremiumWithAppStore(UUID userId, String originalTransactionId,
+                                             String transactionId, String productId,
+                                             Instant expirationDate) {
+        logger.info("Upgrading user {} to premium via App Store", userId);
+
+        // Find existing subscription or create new one
+        UserSubscriptionEntity entity = subscriptionRepository.findByUserId(userId)
+                .orElseGet(() -> {
+                    UserSubscriptionEntity newSub = new UserSubscriptionEntity(
+                            userId,
+                            UserSubscriptionEntity.SubscriptionType.FREE,
+                            UserSubscriptionEntity.SubscriptionStatus.ACTIVE
+                    );
+                    return newSub;
+                });
+
+        // Log platform switch if applicable
+        if (entity.getSubscriptionSource() != null
+                && entity.getSubscriptionSource() != SubscriptionSource.APP_STORE) {
+            logger.info("User {} switching subscription platform from {} to APP_STORE",
+                    userId, entity.getSubscriptionSource());
+        }
+
+        // Determine subscription type from product ID
+        UserSubscriptionEntity.SubscriptionType type = productId.contains("yearly")
+                ? UserSubscriptionEntity.SubscriptionType.PREMIUM_YEARLY
+                : UserSubscriptionEntity.SubscriptionType.PREMIUM_MONTHLY;
+
+        // Update subscription details
+        entity.setSubscriptionType(type);
+        entity.setStatus(UserSubscriptionEntity.SubscriptionStatus.ACTIVE);
+        entity.setAppleOriginalTransactionId(originalTransactionId);
+        entity.setAppleTransactionId(transactionId);
+        entity.setAppleProductId(productId);
+        entity.setSubscriptionSource(SubscriptionSource.APP_STORE);
+        entity.setSubscriptionStartDate(Instant.now());
+        entity.setSubscriptionEndDate(expirationDate);
+        entity.setAutoRenew(true);
+
+        subscriptionRepository.save(entity);
+        rateLimitService.applyPremiumLimits(userId);
+
+        logger.info("User {} upgraded to {} via App Store, expires {}",
+                userId, type, expirationDate);
+    }
+
     @Override
     public void cancelSubscription(UUID userId) {
         logger.info("Cancelling subscription for user: {}", userId);
@@ -152,6 +207,7 @@ public class SubscriptionServiceImpl implements SubscriptionService {
             entity.setStatus(UserSubscriptionEntity.SubscriptionStatus.CANCELLED);
             entity.setAutoRenew(false);
             subscriptionRepository.save(entity);
+            rateLimitService.applyFreeLimits(userId);
 
             logger.info("Subscription marked as cancelled for user: {}. " +
                     "User should cancel via Google Play Store to stop billing.", userId);
@@ -170,6 +226,11 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         long usedTranscriptions = transcriptRepository.countByUserId(userId);
         int remaining = FREE_TIER_LIMIT - (int) usedTranscriptions;
         return Math.max(0, remaining);
+    }
+
+    @Override
+    public int getFreeTierLimit() {
+        return FREE_TIER_LIMIT;
     }
     
     private UserSubscriptionEntity.SubscriptionType mapToEntityType(UserSubscription.SubscriptionType domainType) {

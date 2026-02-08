@@ -51,4 +51,16 @@ public interface RateLimitService {
      * @return true if user has rate limits configured, false otherwise
      */
     boolean hasRateLimits(UUID userId);
+
+    /**
+     * Apply premium rate limits for a user (e.g. on subscription upgrade)
+     * @param userId The user ID
+     */
+    void applyPremiumLimits(UUID userId);
+
+    /**
+     * Apply free-tier rate limits for a user (e.g. on subscription downgrade)
+     * @param userId The user ID
+     */
+    void applyFreeLimits(UUID userId);
 }

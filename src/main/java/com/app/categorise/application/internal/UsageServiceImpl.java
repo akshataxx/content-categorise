@@ -23,7 +23,8 @@ public class UsageServiceImpl implements UsageService {
     public UsageInfoDto getUserUsageInfo(UUID userId) {
         boolean isPremium = subscriptionService.hasActivePremiumSubscription(userId);
         int remainingFree = subscriptionService.getRemainingFreeTranscriptions(userId);
+        int totalFree = subscriptionService.getFreeTierLimit();
 
-        return new UsageInfoDto(isPremium, remainingFree);
+        return new UsageInfoDto(isPremium, remainingFree, totalFree);
     }
 }

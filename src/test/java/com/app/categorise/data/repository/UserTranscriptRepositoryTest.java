@@ -82,6 +82,7 @@ class UserTranscriptRepositoryTest {
         baseTranscript1 = new BaseTranscriptEntity(
                 "https://example.com/video1",
                 "First transcript content",
+                null, // structuredContent
                 "First description",
                 "First Video",
                 120.0,
@@ -96,6 +97,7 @@ class UserTranscriptRepositoryTest {
         baseTranscript2 = new BaseTranscriptEntity(
                 "https://example.com/video2",
                 "Second transcript content",
+                null, // structuredContent
                 "Second description",
                 "Second Video",
                 180.0,

@@ -4,6 +4,7 @@ import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.application.mapper.VideoMapper;
 import com.app.categorise.data.client.whisper.WhisperClient;
 import com.app.categorise.data.dto.TranscriptCategorisationResult;
+import com.app.categorise.data.client.openai.OpenAIClient;
 import com.app.categorise.data.entity.BaseTranscriptEntity;
 import com.app.categorise.data.entity.CategoryEntity;
 import com.app.categorise.data.entity.UserTranscriptEntity;
@@ -39,6 +40,7 @@ class VideoServiceTest {
     @Mock private BaseTranscriptRepository baseTranscriptRepository;
     @Mock private UserTranscriptRepository userTranscriptRepository;
     @Mock private ProcessExecutor processExecutor;
+    @Mock private OpenAIClient openAIClient;
 
     private VideoService videoService;
 
@@ -62,6 +64,7 @@ class VideoServiceTest {
                 categoryAliasService,
                 categorisationService,
                 categoryService,
+                openAIClient,
                 processExecutor,
                 userTranscriptRepository,
                 videoMapper,
@@ -82,6 +85,7 @@ class VideoServiceTest {
                 userTranscriptId,
                 videoUrl,
                 transcriptText,
+                null, // structuredContent
                 "Test Description",
                 "Test Video",
                 30.0,

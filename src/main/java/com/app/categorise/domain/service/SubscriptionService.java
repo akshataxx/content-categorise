@@ -2,6 +2,7 @@ package com.app.categorise.domain.service;
 
 import com.app.categorise.domain.model.UserSubscription;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -33,6 +34,19 @@ public interface SubscriptionService {
                                                     UserSubscription.SubscriptionType type);
 
     /**
+     * Upgrade user to premium subscription with App Store details
+     *
+     * @param userId The user's ID
+     * @param originalTransactionId Apple's original transaction ID (unique per subscription)
+     * @param transactionId Current transaction ID
+     * @param productId The product ID purchased
+     * @param expirationDate When the subscription expires
+     */
+    void upgradeToPremiumWithAppStore(UUID userId, String originalTransactionId,
+                                      String transactionId, String productId,
+                                      Instant expirationDate);
+
+    /**
      * Cancel user's subscription
      */
     void cancelSubscription(UUID userId);
@@ -41,4 +55,9 @@ public interface SubscriptionService {
      * Get remaining free transcriptions for user
      */
     int getRemainingFreeTranscriptions(UUID userId);
+
+    /**
+     * Get the total free tier transcription limit
+     */
+    int getFreeTierLimit();
 }

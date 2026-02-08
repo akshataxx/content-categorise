@@ -77,7 +77,7 @@ class VideoControllerRateLimitIntegrationTest {
             when(rateLimitService.checkRateLimit(userId)).thenReturn(allowedResult);
             
             TranscriptDtoWithAliases mockResponse = new TranscriptDtoWithAliases(
-                    UUID.randomUUID(), videoUrl, "Test transcript content", "Test description", "Test title",
+                    UUID.randomUUID(), videoUrl, "Test transcript content", null, "Test description", "Test title",
                     120.0, Instant.now(), "test-account-id", "Test Account", "test-identifier-id",
                     "Test Identifier", "Test Alias", UUID.randomUUID(), "Test Category", Instant.now(),
                     null // notes

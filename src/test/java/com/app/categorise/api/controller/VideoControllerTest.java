@@ -53,6 +53,7 @@ class VideoControllerTest {
                 UUID.randomUUID(),           // id
                 testVideoUrl,                // videoUrl
                 "This is a test transcript", // transcript
+                null,                        // structuredContent
                 "Test Description",          // description
                 "Test Video",                // title
                 30.0,                        // duration

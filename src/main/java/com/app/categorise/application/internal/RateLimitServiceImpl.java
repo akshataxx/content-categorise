@@ -36,10 +36,15 @@ public class RateLimitServiceImpl implements RateLimitService {
     private final RateLimitMapper mapper;
     private final SubscriptionService subscriptionService;
 
-    // Default rate limits
+    // Free-tier rate limits
     private static final int DEFAULT_TRANSCRIPTS_PER_MINUTE = 5;
     private static final int DEFAULT_TRANSCRIPTS_PER_DAY = 100;
     private static final int DEFAULT_TOTAL_TRANSCRIPTS = 3;
+
+    // Premium rate limits
+    private static final int PREMIUM_TRANSCRIPTS_PER_MINUTE = 5;
+    private static final int PREMIUM_TRANSCRIPTS_PER_DAY = 100;
+    private static final int PREMIUM_TOTAL_TRANSCRIPTS = 10000;
 
     public RateLimitServiceImpl(UserRateLimitRepository rateLimitRepository,
        UserRateLimitTrackingRepository trackingRepository,
@@ -245,6 +250,32 @@ public class RateLimitServiceImpl implements RateLimitService {
 
     private Instant truncateToDay(Instant instant) {
         return instant.truncatedTo(ChronoUnit.DAYS);
+    }
+
+    @Override
+    public void applyPremiumLimits(UUID userId) {
+        logger.info("Applying premium rate limits for user: {}", userId);
+        RateLimitConfig premiumConfig = new RateLimitConfig(
+            null, userId,
+            PREMIUM_TRANSCRIPTS_PER_MINUTE,
+            PREMIUM_TRANSCRIPTS_PER_DAY,
+            PREMIUM_TOTAL_TRANSCRIPTS,
+            null, null
+        );
+        updateUserRateLimits(userId, premiumConfig);
+    }
+
+    @Override
+    public void applyFreeLimits(UUID userId) {
+        logger.info("Applying free-tier rate limits for user: {}", userId);
+        RateLimitConfig freeConfig = new RateLimitConfig(
+            null, userId,
+            DEFAULT_TRANSCRIPTS_PER_MINUTE,
+            DEFAULT_TRANSCRIPTS_PER_DAY,
+            DEFAULT_TOTAL_TRANSCRIPTS,
+            null, null
+        );
+        updateUserRateLimits(userId, freeConfig);
     }
 
     private RateLimitConfig createDefaultConfig(UUID userId) {

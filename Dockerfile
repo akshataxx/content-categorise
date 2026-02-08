@@ -14,8 +14,10 @@ RUN mvn -q -Dmaven.test.skip=true package
 # ---- Runtime stage ----
 FROM --platform=linux/amd64 eclipse-temurin:21-jre-alpine
 
-# Install runtime dependencies (curl for healthcheck, ffmpeg for app functionality)
-RUN apk add --no-cache curl ffmpeg yt-dlp
+# Install runtime dependencies (curl for healthcheck, ffmpeg for audio extraction)
+# Install yt-dlp via pip with curl_cffi for TikTok browser impersonation support
+RUN apk add --no-cache curl ffmpeg python3 py3-pip \
+  && pip3 install --break-system-packages "yt-dlp[curl-cffi]"
 
 # Create a non-root user
 RUN addgroup -S app && adduser -S app -G app \

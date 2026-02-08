@@ -6,9 +6,10 @@
 
 set -euo pipefail
 
-CONTAINER="content-postgres"
 DB="contentdb"
 DB_USER="postgres"
+DB_HOST="${DB_HOST:-localhost}"
+DB_PORT="${DB_PORT:-5432}"
 
 # Rate limit defaults
 FREE_PER_MIN=5
@@ -20,14 +21,8 @@ PREMIUM_PER_DAY=100
 PREMIUM_TOTAL=10000
 
 run_sql() {
-  docker exec -i "$CONTAINER" psql -U "$DB_USER" -d "$DB" -tAc "$1"
+  psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB" -tAc "$1"
 }
-
-# ── Check container is running ──────────────────────────────────────────────
-if ! docker ps --format '{{.Names}}' | grep -qx "$CONTAINER"; then
-  echo "❌  Container '$CONTAINER' is not running. Start it with: docker compose up -d postgres"
-  exit 1
-fi
 
 # ── List users ──────────────────────────────────────────────────────────────
 echo ""
@@ -36,7 +31,7 @@ echo "────────────────────────�
 printf "%-40s %-30s %-20s\n" "ID" "EMAIL" "SUBSCRIPTION"
 
 run_sql "
-  SELECT u.id || '|' || COALESCE(u.email, u.google_id) || '|' || COALESCE(s.subscription_type, 'NO SUB')
+  SELECT u.id || '|' || COALESCE(u.email, u.sub, u.apple_user_id, 'unknown') || '|' || COALESCE(s.subscription_type, 'NO SUB')
   FROM users u
   LEFT JOIN user_subscriptions s ON s.user_id = u.id
   ORDER BY u.email;
@@ -50,7 +45,7 @@ echo ""
 # ── Pick a user ─────────────────────────────────────────────────────────────
 read -rp "Enter user email (or google_id): " USER_INPUT
 
-USER_ID=$(run_sql "SELECT id FROM users WHERE email = '$USER_INPUT' OR google_id = '$USER_INPUT' LIMIT 1;")
+USER_ID=$(run_sql "SELECT id FROM users WHERE email = '$USER_INPUT' OR sub = '$USER_INPUT' OR apple_user_id = '$USER_INPUT' LIMIT 1;")
 
 if [[ -z "$USER_ID" ]]; then
   echo "❌  No user found matching '$USER_INPUT'"

@@ -1,5 +1,6 @@
 package com.app.categorise.api.dto.subscription;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -53,6 +54,7 @@ public class SubscriptionDto {
     public boolean isAutoRenew() { return autoRenew; }
     public void setAutoRenew(boolean autoRenew) { this.autoRenew = autoRenew; }
     
+    @JsonProperty("isPremium")
     public boolean isPremium() { return isPremium; }
     public void setPremium(boolean premium) { isPremium = premium; }
 }

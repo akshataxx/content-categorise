@@ -1,4 +1,4 @@
-package com.app.categorise.api.dto.appstore;
+package com.app.categorise.api.dto.subscription.apple;
 
 /**
  * Decoded ASN v2 notification structure.

@@ -1,8 +1,8 @@
 package com.app.categorise.application.internal;
 
-import com.app.categorise.api.dto.appstore.AppStoreSubscriptionStatus;
-import com.app.categorise.api.dto.appstore.AppStoreVerificationResult;
-import com.app.categorise.api.dto.appstore.DecodedTransaction;
+import com.app.categorise.api.dto.subscription.apple.AppStoreSubscriptionStatus;
+import com.app.categorise.api.dto.subscription.apple.AppStoreVerificationResult;
+import com.app.categorise.api.dto.subscription.apple.DecodedTransaction;
 import com.app.categorise.config.AppleAppStoreConfiguration;
 import com.app.categorise.domain.service.AppleAppStoreBillingService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -31,7 +31,6 @@ import java.util.Date;
 /**
  * Implementation of AppleAppStoreBillingService.
  * Verifies App Store transactions using Apple's App Store Server API.
- * Mirrors the GooglePlayBillingService pattern for iOS platform support.
  */
 @Service
 public class AppleAppStoreBillingServiceImpl implements AppleAppStoreBillingService {

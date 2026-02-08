@@ -1,12 +1,11 @@
 package com.app.categorise.domain.service;
 
-import com.app.categorise.api.dto.appstore.AppStoreVerificationResult;
-import com.app.categorise.api.dto.appstore.DecodedTransaction;
-import com.app.categorise.api.dto.appstore.AppStoreSubscriptionStatus;
+import com.app.categorise.api.dto.subscription.apple.AppStoreVerificationResult;
+import com.app.categorise.api.dto.subscription.apple.DecodedTransaction;
+import com.app.categorise.api.dto.subscription.apple.AppStoreSubscriptionStatus;
 
 /**
  * Service for verifying and managing Apple App Store subscriptions.
- * Mirrors GooglePlayBillingService for iOS platform support.
  */
 public interface AppleAppStoreBillingService {
 

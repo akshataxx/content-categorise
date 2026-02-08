@@ -1,8 +1,8 @@
 package com.app.categorise.api.controller;
 
-import com.app.categorise.api.dto.appstore.AppStoreVerificationRequest;
-import com.app.categorise.api.dto.appstore.AppStoreVerificationResponse;
-import com.app.categorise.api.dto.appstore.AppStoreVerificationResult;
+import com.app.categorise.api.dto.subscription.apple.AppStoreVerificationRequest;
+import com.app.categorise.api.dto.subscription.apple.AppStoreVerificationResponse;
+import com.app.categorise.api.dto.subscription.apple.AppStoreVerificationResult;
 import com.app.categorise.api.dto.subscription.GooglePlayPurchaseVerificationRequest;
 import com.app.categorise.api.dto.subscription.GooglePlayVerificationResponse;
 import com.app.categorise.api.dto.subscription.SubscriptionDto;

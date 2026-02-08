@@ -1,11 +1,13 @@
 package com.app.categorise.api.controller;
 
-import com.app.categorise.api.dto.appstore.AppStoreNotificationPayload;
-import com.app.categorise.api.dto.appstore.AppStoreNotificationType;
-import com.app.categorise.api.dto.appstore.DecodedNotification;
-import com.app.categorise.api.dto.appstore.DecodedTransaction;
+import com.app.categorise.api.dto.subscription.apple.AppStoreNotificationPayload;
+import com.app.categorise.api.dto.subscription.apple.AppStoreNotificationType;
+import com.app.categorise.api.dto.subscription.apple.DecodedNotification;
+import com.app.categorise.api.dto.subscription.apple.DecodedTransaction;
 import com.app.categorise.config.AppleAppStoreConfiguration;
+import com.app.categorise.data.entity.ProcessedNotificationEntity;
 import com.app.categorise.data.entity.UserSubscriptionEntity;
+import com.app.categorise.data.repository.ProcessedNotificationRepository;
 import com.app.categorise.data.repository.UserSubscriptionRepository;
 import com.app.categorise.domain.service.AppleAppStoreBillingService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -19,16 +21,12 @@ import org.springframework.web.bind.annotation.*;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
-import java.util.Collections;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Webhook controller for Apple App Store Server Notifications v2 (ASN v2).
  * Handles subscription lifecycle events from Apple.
- * Mirrors GooglePlayWebhookController for the iOS platform.
  */
 @RestController
 @RequestMapping("/api/webhook")
@@ -39,19 +37,18 @@ public class AppleAppStoreWebhookController {
 
     private final AppleAppStoreBillingService billingService;
     private final UserSubscriptionRepository subscriptionRepository;
+    private final ProcessedNotificationRepository processedNotificationRepository;
     private final AppleAppStoreConfiguration config;
     private final ObjectMapper objectMapper;
 
-    // In-memory idempotency set. For production, use Redis or database.
-    private final Set<String> processedNotifications =
-            Collections.newSetFromMap(new ConcurrentHashMap<>());
-
     public AppleAppStoreWebhookController(AppleAppStoreBillingService billingService,
                                           UserSubscriptionRepository subscriptionRepository,
+                                          ProcessedNotificationRepository processedNotificationRepository,
                                           AppleAppStoreConfiguration config,
                                           ObjectMapper objectMapper) {
         this.billingService = billingService;
         this.subscriptionRepository = subscriptionRepository;
+        this.processedNotificationRepository = processedNotificationRepository;
         this.config = config;
         this.objectMapper = objectMapper;
     }
@@ -84,7 +81,7 @@ public class AppleAppStoreWebhookController {
 
         // Idempotency check using notification UUID
         String notificationId = notification.getNotificationUUID();
-        if (notificationId != null && processedNotifications.contains(notificationId)) {
+        if (notificationId != null && processedNotificationRepository.existsByNotificationId(notificationId)) {
             logger.info("Skipping already processed notification: {}", notificationId);
             return;
         }
@@ -118,7 +115,11 @@ public class AppleAppStoreWebhookController {
 
         // Mark as processed
         if (notificationId != null) {
-            processedNotifications.add(notificationId);
+            processedNotificationRepository.save(new ProcessedNotificationEntity(
+                    notificationId,
+                    notification.getNotificationType(),
+                    "APP_STORE"
+            ));
         }
 
         logger.info("Notification processed successfully: uuid={}", notificationId);

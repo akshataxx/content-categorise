@@ -1,4 +1,4 @@
-package com.app.categorise.api.dto.appstore;
+package com.app.categorise.api.dto.subscription.apple;
 
 import java.time.Instant;
 

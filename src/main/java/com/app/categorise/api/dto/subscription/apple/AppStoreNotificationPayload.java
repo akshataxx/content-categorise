@@ -1,4 +1,4 @@
-package com.app.categorise.api.dto.appstore;
+package com.app.categorise.api.dto.subscription.apple;
 
 /**
  * Outer wrapper for App Store Server Notifications v2.

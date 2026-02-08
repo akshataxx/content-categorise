@@ -1,4 +1,4 @@
-package com.app.categorise.api.dto.appstore;
+package com.app.categorise.api.dto.subscription.apple;
 
 /**
  * App Store Server Notification types.

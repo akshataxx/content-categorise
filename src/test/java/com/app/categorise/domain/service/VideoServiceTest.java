@@ -106,7 +106,7 @@ class VideoServiceTest {
         @DisplayName("Reuses existing base transcript and creates new user transcript")
         void reuseBaseTranscript_createsUserTranscript_async() throws Exception {
             when(baseTranscriptRepository.findByVideoUrl(videoUrl)).thenReturn(Optional.of(baseTranscript));
-            when(userTranscriptRepository.findByUserIdAndBaseTranscriptIdWithBaseTranscript(userId, baseTranscriptId))
+            when(userTranscriptRepository.findByUserIdAndBaseTranscript_Id(userId, baseTranscriptId))
                     .thenReturn(Optional.empty());
 
             TranscriptCategorisationResult catRes = new TranscriptCategorisationResult("testCategory", "genericTopic", "recipe");
@@ -126,7 +126,7 @@ class VideoServiceTest {
             assertNotNull(result);
             assertEquals(expectedResponse, result);
             verify(baseTranscriptRepository).findByVideoUrl(videoUrl);
-            verify(userTranscriptRepository).findByUserIdAndBaseTranscriptIdWithBaseTranscript(userId, baseTranscriptId);
+            verify(userTranscriptRepository).findByUserIdAndBaseTranscript_Id(userId, baseTranscriptId);
             verify(categorisationService).classifyAndSuggestAlias(transcriptText, "Test Video", "Test Description");
             verify(videoMapper).createUserTranscriptEntity(userId, baseTranscript, category);
             verify(userTranscriptRepository).save(userTranscript);
@@ -136,7 +136,7 @@ class VideoServiceTest {
         @DisplayName("Returns existing user transcript when user already has access")
         void existingUserTranscript_updatesLastAccessed_async() throws Exception {
             when(baseTranscriptRepository.findByVideoUrl(videoUrl)).thenReturn(Optional.of(baseTranscript));
-            when(userTranscriptRepository.findByUserIdAndBaseTranscriptIdWithBaseTranscript(userId, baseTranscriptId))
+            when(userTranscriptRepository.findByUserIdAndBaseTranscript_Id(userId, baseTranscriptId))
                     .thenReturn(Optional.of(userTranscript));
 
             when(userTranscriptRepository.save(userTranscript)).thenReturn(userTranscript);
@@ -148,7 +148,7 @@ class VideoServiceTest {
             assertNotNull(result);
             assertEquals(expectedResponse, result);
             verify(baseTranscriptRepository).findByVideoUrl(videoUrl);
-            verify(userTranscriptRepository).findByUserIdAndBaseTranscriptIdWithBaseTranscript(userId, baseTranscriptId);
+            verify(userTranscriptRepository).findByUserIdAndBaseTranscript_Id(userId, baseTranscriptId);
             verify(userTranscript).setLastAccessedAt(any(Instant.class));
             verify(userTranscriptRepository).save(userTranscript);
             verify(videoMapper).buildResponse(baseTranscript, userTranscript);

@@ -1,6 +1,7 @@
 package com.app.categorise.domain.service;
 
 import com.app.categorise.application.mapper.VideoMapper;
+import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.data.entity.BaseTranscriptEntity;
 import com.app.categorise.data.entity.CategoryEntity;
 import com.app.categorise.data.entity.UserTranscriptEntity;
@@ -21,6 +22,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -34,13 +36,7 @@ class TranscriptServiceTest {
     private UserTranscriptRepository userTranscriptRepository;
 
     @Mock
-    private BaseTranscriptRepository baseTranscriptRepository;
-
-    @Mock
     private VideoMapper videoMapper;
-
-    @Mock
-    private CategoryAliasService categoryAliasService;
 
     @InjectMocks
     private TranscriptService transcriptService;
@@ -58,6 +54,75 @@ class TranscriptServiceTest {
         userId = UUID.randomUUID();
         baseTranscriptId = UUID.randomUUID();
         categoryId = UUID.randomUUID();
+    }
+
+    @Nested
+    @DisplayName("Find Transcript")
+    class FindTranscriptTests {
+
+        @Test
+        @DisplayName("Should return transcript when found by id and userId")
+        void findTranscript_WithValidIdAndUserId_ReturnsTranscript() {
+            // Arrange
+            UserTranscriptEntity entity = createMockUserTranscriptEntity(userTranscriptId1);
+            TranscriptDtoWithAliases expectedDto = mock(TranscriptDtoWithAliases.class);
+
+            when(userTranscriptRepository.findByIdAndUserId(userTranscriptId1, userId))
+                    .thenReturn(Optional.of(entity));
+            when(videoMapper.buildResponse(entity.getBaseTranscript(), entity))
+                    .thenReturn(expectedDto);
+
+            // Act
+            Optional<TranscriptDtoWithAliases> result = transcriptService.findTranscript(userTranscriptId1, userId);
+
+            // Assert
+            assertTrue(result.isPresent());
+            assertEquals(expectedDto, result.get());
+            verify(userTranscriptRepository).findByIdAndUserId(userTranscriptId1, userId);
+        }
+
+        @Test
+        @DisplayName("Should return empty when transcript belongs to different user (IDOR prevention)")
+        void findTranscript_WithDifferentUserId_ReturnsEmpty() {
+            // Arrange
+            UUID otherUserId = UUID.randomUUID();
+            when(userTranscriptRepository.findByIdAndUserId(userTranscriptId1, otherUserId))
+                    .thenReturn(Optional.empty());
+
+            // Act
+            Optional<TranscriptDtoWithAliases> result = transcriptService.findTranscript(userTranscriptId1, otherUserId);
+
+            // Assert
+            assertTrue(result.isEmpty());
+            verify(userTranscriptRepository).findByIdAndUserId(userTranscriptId1, otherUserId);
+            verify(videoMapper, never()).buildResponse(any(), any(UserTranscriptEntity.class));
+        }
+
+        @Test
+        @DisplayName("Should return empty when transcript id does not exist")
+        void findTranscript_WithNonExistentId_ReturnsEmpty() {
+            // Arrange
+            UUID nonExistentId = UUID.randomUUID();
+            when(userTranscriptRepository.findByIdAndUserId(nonExistentId, userId))
+                    .thenReturn(Optional.empty());
+
+            // Act
+            Optional<TranscriptDtoWithAliases> result = transcriptService.findTranscript(nonExistentId, userId);
+
+            // Assert
+            assertTrue(result.isEmpty());
+        }
+
+        @Test
+        @DisplayName("Should return empty when userTranscriptId is null")
+        void findTranscript_WithNullId_ReturnsEmpty() {
+            // Act
+            Optional<TranscriptDtoWithAliases> result = transcriptService.findTranscript(null, userId);
+
+            // Assert
+            assertTrue(result.isEmpty());
+            verify(userTranscriptRepository, never()).findByIdAndUserId(any(), any());
+        }
     }
 
     @Nested

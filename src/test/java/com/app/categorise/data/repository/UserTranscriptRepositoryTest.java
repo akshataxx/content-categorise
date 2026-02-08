@@ -141,7 +141,7 @@ class UserTranscriptRepositoryTest {
     }
 
     @Test
-    void shouldFindByUserIdWithBaseTranscript() {
+    void shouldFindByUserId() {
         // Given
         UserTranscriptEntity userTranscript1 = new UserTranscriptEntity(user1.getId(), baseTranscript1, category1);
         UserTranscriptEntity userTranscript2 = new UserTranscriptEntity(user1.getId(), baseTranscript2, category2);
@@ -149,17 +149,17 @@ class UserTranscriptRepositoryTest {
 
         userTranscriptRepository.saveAll(List.of(userTranscript1, userTranscript2, userTranscript3));
         entityManager.flush();
-        entityManager.clear(); // Clear persistence context to test lazy loading
+        entityManager.clear();
 
         // When
-        List<UserTranscriptEntity> userTranscripts = userTranscriptRepository.findByUserIdWithBaseTranscript(user1.getId());
+        List<UserTranscriptEntity> userTranscripts = userTranscriptRepository.findByUserId(user1.getId());
 
         // Then
         assertThat(userTranscripts).hasSize(2);
         
-        // Verify JOIN FETCH worked - accessing baseTranscript shouldn't trigger additional queries
+        // Verify eager loading - baseTranscript and category should be loaded
         UserTranscriptEntity first = userTranscripts.get(0);
-        assertThat(first.getBaseTranscript()).isNotNull(); // Should be loaded due to JOIN FETCH
+        assertThat(first.getBaseTranscript()).isNotNull();
         assertThat(first.getBaseTranscript().getVideoUrl()).isIn(
                 "https://example.com/video1", 
                 "https://example.com/video2"
@@ -171,7 +171,7 @@ class UserTranscriptRepositoryTest {
     }
 
     @Test
-    void shouldFindByUserIdWithBaseTranscriptAndCategory() {
+    void shouldFindByUserId_WithNullCategory() {
         // Given
         UserTranscriptEntity userTranscript1 = new UserTranscriptEntity(user1.getId(), baseTranscript1, category1);
         UserTranscriptEntity userTranscript2 = new UserTranscriptEntity(user1.getId(), baseTranscript2, null); // No category
@@ -181,34 +181,32 @@ class UserTranscriptRepositoryTest {
         entityManager.clear();
 
         // When
-        List<UserTranscriptEntity> userTranscripts = userTranscriptRepository.findByUserIdWithBaseTranscriptAndCategory(user1.getId());
+        List<UserTranscriptEntity> userTranscripts = userTranscriptRepository.findByUserId(user1.getId());
 
         // Then
         assertThat(userTranscripts).hasSize(2);
         
-        // Find the one with category
         UserTranscriptEntity withCategory = userTranscripts.stream()
                 .filter(ut -> ut.getCategoryId() != null)
                 .findFirst()
                 .orElseThrow();
         
-        // Find the one without category
         UserTranscriptEntity withoutCategory = userTranscripts.stream()
                 .filter(ut -> ut.getCategoryId() == null)
                 .findFirst()
                 .orElseThrow();
 
-        // Verify JOIN FETCH worked for both base transcript and category
+        // Verify eager loading works for both cases
         assertThat(withCategory.getBaseTranscript()).isNotNull();
         assertThat(withCategory.getCategory()).isNotNull();
         assertThat(withCategory.getCategory().getName()).isEqualTo("Technology");
 
         assertThat(withoutCategory.getBaseTranscript()).isNotNull();
-        assertThat(withoutCategory.getCategory()).isNull(); // LEFT JOIN should handle null category
+        assertThat(withoutCategory.getCategory()).isNull();
     }
 
     @Test
-    void shouldFindByUserIdAndBaseTranscriptIdWithBaseTranscript() {
+    void shouldFindByUserIdAndBaseTranscriptId() {
         // Given
         UserTranscriptEntity userTranscript = new UserTranscriptEntity(user1.getId(), baseTranscript1, category1);
         userTranscriptRepository.save(userTranscript);
@@ -217,22 +215,22 @@ class UserTranscriptRepositoryTest {
 
         // When
         Optional<UserTranscriptEntity> found = userTranscriptRepository
-                .findByUserIdAndBaseTranscriptIdWithBaseTranscript(user1.getId(), baseTranscript1.getId());
+                .findByUserIdAndBaseTranscript_Id(user1.getId(), baseTranscript1.getId());
 
         // Then
         assertThat(found).isPresent();
         assertThat(found.get().getUserId()).isEqualTo(user1.getId());
         assertThat(found.get().getBaseTranscriptId()).isEqualTo(baseTranscript1.getId());
-        assertThat(found.get().getBaseTranscript()).isNotNull(); // Should be loaded due to JOIN FETCH
+        assertThat(found.get().getBaseTranscript()).isNotNull();
         assertThat(found.get().getBaseTranscript().getVideoUrl()).isEqualTo("https://example.com/video1");
     }
 
     @Test
-    void shouldFindByUserIdAndCategoryIdWithBaseTranscript() {
+    void shouldFindByUserIdAndCategoryId() {
         // Given
         UserTranscriptEntity userTranscript1 = new UserTranscriptEntity(user1.getId(), baseTranscript1, category1);
         UserTranscriptEntity userTranscript2 = new UserTranscriptEntity(user1.getId(), baseTranscript2, category1);
-        UserTranscriptEntity userTranscript3 = new UserTranscriptEntity(user2.getId(), baseTranscript1, category2); // Use user2 to avoid duplicate
+        UserTranscriptEntity userTranscript3 = new UserTranscriptEntity(user2.getId(), baseTranscript1, category2);
 
         userTranscriptRepository.saveAll(List.of(userTranscript1, userTranscript2, userTranscript3));
         entityManager.flush();
@@ -240,13 +238,13 @@ class UserTranscriptRepositoryTest {
 
         // When
         List<UserTranscriptEntity> category1Transcripts = userTranscriptRepository
-                .findByUserIdAndCategoryIdWithBaseTranscript(user1.getId(), category1.getId());
+                .findByUserIdAndCategoryId(user1.getId(), category1.getId());
 
         // Then
         assertThat(category1Transcripts).hasSize(2);
         category1Transcripts.forEach(ut -> {
             assertThat(ut.getCategoryId()).isEqualTo(category1.getId());
-            assertThat(ut.getBaseTranscript()).isNotNull(); // Should be loaded due to JOIN FETCH
+            assertThat(ut.getBaseTranscript()).isNotNull();
         });
     }
 
@@ -257,9 +255,9 @@ class UserTranscriptRepositoryTest {
         userTranscriptRepository.save(userTranscript);
 
         // When & Then
-        assertThat(userTranscriptRepository.existsByUserIdAndBaseTranscriptId(user1.getId(), baseTranscript1.getId())).isTrue();
-        assertThat(userTranscriptRepository.existsByUserIdAndBaseTranscriptId(user1.getId(), baseTranscript2.getId())).isFalse();
-        assertThat(userTranscriptRepository.existsByUserIdAndBaseTranscriptId(user2.getId(), baseTranscript1.getId())).isFalse();
+        assertThat(userTranscriptRepository.existsByUserIdAndBaseTranscript_Id(user1.getId(), baseTranscript1.getId())).isTrue();
+        assertThat(userTranscriptRepository.existsByUserIdAndBaseTranscript_Id(user1.getId(), baseTranscript2.getId())).isFalse();
+        assertThat(userTranscriptRepository.existsByUserIdAndBaseTranscript_Id(user2.getId(), baseTranscript1.getId())).isFalse();
     }
 
     @Test
@@ -279,26 +277,41 @@ class UserTranscriptRepositoryTest {
     }
 
     @Test
-    void shouldFindByUserIdAndVideoUrlWithFullData() {
+    void shouldFindByIdAndUserId() {
         // Given
         UserTranscriptEntity userTranscript = new UserTranscriptEntity(user1.getId(), baseTranscript1, category1);
-        userTranscriptRepository.save(userTranscript);
+        UserTranscriptEntity saved = userTranscriptRepository.save(userTranscript);
         entityManager.flush();
         entityManager.clear();
 
         // When
         Optional<UserTranscriptEntity> found = userTranscriptRepository
-                .findByUserIdAndVideoUrlWithFullData(user1.getId(), "https://example.com/video1");
+                .findByIdAndUserId(saved.getId(), user1.getId());
 
         // Then
         assertThat(found).isPresent();
         UserTranscriptEntity result = found.get();
-        
-        // Verify all data is loaded due to JOIN FETCH
+        assertThat(result.getUserId()).isEqualTo(user1.getId());
         assertThat(result.getBaseTranscript()).isNotNull();
         assertThat(result.getBaseTranscript().getVideoUrl()).isEqualTo("https://example.com/video1");
         assertThat(result.getCategory()).isNotNull();
         assertThat(result.getCategory().getName()).isEqualTo("Technology");
+    }
+
+    @Test
+    void shouldNotFindByIdAndUserId_WhenDifferentUser() {
+        // Given - transcript belongs to user1
+        UserTranscriptEntity userTranscript = new UserTranscriptEntity(user1.getId(), baseTranscript1, category1);
+        UserTranscriptEntity saved = userTranscriptRepository.save(userTranscript);
+        entityManager.flush();
+        entityManager.clear();
+
+        // When - user2 tries to access it
+        Optional<UserTranscriptEntity> found = userTranscriptRepository
+                .findByIdAndUserId(saved.getId(), user2.getId());
+
+        // Then - should not be found (IDOR prevention)
+        assertThat(found).isEmpty();
     }
 
     @Test

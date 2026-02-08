@@ -8,6 +8,7 @@ import com.app.categorise.data.repository.UserRateLimitTrackingRepository;
 import com.app.categorise.data.repository.UserTranscriptRepository;
 import com.app.categorise.domain.model.RateLimitConfig;
 import com.app.categorise.domain.model.RateLimitResult;
+import com.app.categorise.domain.service.SubscriptionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -40,6 +41,9 @@ class RateLimitServiceImplTest {
 
     @Mock
     private RateLimitMapper mapper;
+
+    @Mock
+    private SubscriptionService subscriptionService;
 
     @InjectMocks
     private RateLimitServiceImpl rateLimitService;
@@ -280,7 +284,7 @@ class RateLimitServiceImplTest {
             assertThat(result.getUserId()).isEqualTo(userId);
             assertThat(result.getTranscriptsPerMinuteLimit()).isEqualTo(5);
             assertThat(result.getTranscriptsPerDayLimit()).isEqualTo(100);
-            assertThat(result.getTotalTranscriptsLimit()).isEqualTo(10000);
+            assertThat(result.getTotalTranscriptsLimit()).isEqualTo(3);
             assertThat(result.getId()).isNull(); // Default config has no ID
         }
     }

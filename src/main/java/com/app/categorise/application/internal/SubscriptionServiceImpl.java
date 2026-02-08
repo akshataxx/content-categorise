@@ -227,6 +227,11 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         int remaining = FREE_TIER_LIMIT - (int) usedTranscriptions;
         return Math.max(0, remaining);
     }
+
+    @Override
+    public int getFreeTierLimit() {
+        return FREE_TIER_LIMIT;
+    }
     
     private UserSubscriptionEntity.SubscriptionType mapToEntityType(UserSubscription.SubscriptionType domainType) {
         return switch (domainType) {

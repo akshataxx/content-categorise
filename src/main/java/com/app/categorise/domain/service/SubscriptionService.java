@@ -55,4 +55,9 @@ public interface SubscriptionService {
      * Get remaining free transcriptions for user
      */
     int getRemainingFreeTranscriptions(UUID userId);
+
+    /**
+     * Get the total free tier transcription limit
+     */
+    int getFreeTierLimit();
 }

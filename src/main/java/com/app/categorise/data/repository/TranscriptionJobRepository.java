@@ -11,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -59,15 +60,19 @@ public interface TranscriptionJobRepository extends JpaRepository<TranscriptionJ
     // --- User job listing (WP04: API) ---
 
     /**
-     * Paginated list of all jobs for a user, ordered by pageable.
+     * Paginated list of jobs for a user with optional status and date range filters.
+     * Pass null for any filter to skip it.
      */
-    Page<TranscriptionJobEntity> findByUserId(UUID userId, Pageable pageable);
-
-    /**
-     * Paginated list of jobs for a user filtered by status.
-     */
-    @Query("SELECT j FROM TranscriptionJobEntity j WHERE j.userId = :userId AND j.status = :status")
-    Page<TranscriptionJobEntity> findByUserIdAndStatus(@Param("userId") UUID userId, @Param("status") JobStatus status, Pageable pageable);
+    @Query("SELECT j FROM TranscriptionJobEntity j WHERE j.userId = :userId" +
+           " AND (:status IS NULL OR j.status = :status)" +
+           " AND (CAST(:from AS timestamp) IS NULL OR j.createdAt >= :from)" +
+           " AND (CAST(:to AS timestamp) IS NULL OR j.createdAt <= :to)")
+    Page<TranscriptionJobEntity> findByUserIdFiltered(
+            @Param("userId") UUID userId,
+            @Param("status") JobStatus status,
+            @Param("from") Instant from,
+            @Param("to") Instant to,
+            Pageable pageable);
 
     // --- Cleanup (WP03: cleanup service) ---
 
@@ -78,7 +83,7 @@ public interface TranscriptionJobRepository extends JpaRepository<TranscriptionJ
      */
     @Modifying
     @Transactional
-    @Query(value = "DELETE FROM transcription_jobs WHERE status = 'COMPLETED' AND completed_at < NOW() - INTERVAL '7 days'", nativeQuery = true)
+    @Query(value = "DELETE FROM transcription_jobs WHERE status = 'COMPLETED' AND updated_at < NOW() - INTERVAL '7 days'", nativeQuery = true)
     int deleteOldCompletedJobs();
 
     /**

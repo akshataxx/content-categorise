@@ -7,6 +7,8 @@ import com.app.categorise.data.repository.TranscriptionJobRepository;
 import com.app.categorise.domain.model.JobStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,8 +39,10 @@ public class TranscriptionJobService {
         Optional<TranscriptionJobEntity> existing = jobRepository
                 .findByUserIdAndVideoUrlAndStatusIn(userId, videoUrl, List.of(JobStatus.PENDING, JobStatus.PROCESSING));
         if (existing.isPresent()) {
-            log.info("Returning existing active job {} for userId={}, videoUrl={}", existing.get().getId(), userId, videoUrl);
-            return existing.get();
+            TranscriptionJobEntity existingJob = existing.get();
+            log.info("Returning existing job {} (status={}) for user={} videoUrl={}",
+                    existingJob.getId(), existingJob.getStatus(), userId, videoUrl);
+            return existingJob;
         }
 
         // 2. Check if transcript already exists (another user already transcribed this URL)
@@ -55,12 +59,13 @@ public class TranscriptionJobService {
         }
 
         // 3. Create new PENDING job
-        log.info("Creating new PENDING job for userId={}, videoUrl={}", userId, videoUrl);
         TranscriptionJobEntity job = new TranscriptionJobEntity();
         job.setUserId(userId);
         job.setVideoUrl(videoUrl);
         job.setStatus(JobStatus.PENDING);
-        return jobRepository.save(job);
+        job = jobRepository.save(job);
+        log.info("Job {} created for user={} videoUrl={}", job.getId(), userId, videoUrl);
+        return job;
     }
 
     // --- State transitions ---
@@ -102,14 +107,14 @@ public class TranscriptionJobService {
             job.setNextRetryAt(Instant.now().plusSeconds(backoffSeconds));
             job.setStatus(JobStatus.PENDING);
             job.setErrorMessage(ex.getMessage());
-            log.info("Transient failure for job {}, retry {}/{}, next retry at +{}s",
-                    job.getId(), job.getRetryCount(), job.getMaxRetries(), backoffSeconds);
+            log.warn("Job {} failed (attempt {}/{}), retrying in {}s: {}",
+                    job.getId(), job.getRetryCount(), job.getMaxRetries(), backoffSeconds, ex.getMessage());
         } else {
             // Permanent failure
             job.setStatus(JobStatus.FAILED);
             job.setErrorMessage(ex.getMessage());
             job.setCompletedAt(Instant.now());
-            log.warn("Permanent failure for job {}: {}", job.getId(), ex.getMessage());
+            log.error("Job {} permanently failed: {}", job.getId(), ex.getMessage());
         }
         jobRepository.save(job);
     }
@@ -128,5 +133,23 @@ public class TranscriptionJobService {
         if (msg.contains("timeout")) return true;
         // Default: treat as transient (safer to retry than to lose)
         return true;
+    }
+
+    // --- Crash recovery (on startup) ---
+
+    /**
+     * On application startup, reset any PROCESSING jobs back to PENDING.
+     * These are jobs that were in-flight when the previous instance crashed or restarted.
+     * Safe because the transcription pipeline is idempotent (dedup in VideoService).
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    @Transactional
+    public void recoverStuckJobs() {
+        int recovered = jobRepository.resetProcessingToPending();
+        if (recovered > 0) {
+            log.info("Recovered {} stuck jobs after restart", recovered);
+        } else {
+            log.info("No stuck jobs to recover on startup");
+        }
     }
 }

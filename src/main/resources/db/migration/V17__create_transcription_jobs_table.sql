@@ -9,10 +9,8 @@ CREATE TABLE transcription_jobs (
                         CHECK (status IN ('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED')),
     error_message       TEXT,
     retry_count         INTEGER NOT NULL DEFAULT 0,
-    max_retries         INTEGER NOT NULL DEFAULT 3,
     next_retry_at       TIMESTAMP WITH TIME ZONE,
     base_transcript_id  UUID REFERENCES base_transcripts(id),
-    created_at          TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     updated_at          TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 

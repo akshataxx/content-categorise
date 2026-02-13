@@ -18,7 +18,6 @@ public record JobStatusDto(
     String status,
     String errorMessage,
     int retryCount,
-    Instant createdAt,
     Instant updatedAt,
     UUID baseTranscriptId
 ) {}

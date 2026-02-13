@@ -40,7 +40,7 @@ public class JobController {
 
     /**
      * List the authenticated user's transcription jobs with optional filters.
-     * Results are ordered by createdAt descending (newest first).
+     * Results are ordered by updatedAt descending (newest first).
      *
      * @param principal authenticated user
      * @param status    optional status filter (PENDING, PROCESSING, COMPLETED, FAILED)
@@ -61,7 +61,7 @@ public class JobController {
             @RequestParam(defaultValue = "20") int size) {
 
         UUID userId = principal.getId();
-        PageRequest pageRequest = PageRequest.of(page, Math.min(size, 100), Sort.by(Sort.Direction.DESC, "createdAt"));
+        PageRequest pageRequest = PageRequest.of(page, Math.min(size, 100), Sort.by(Sort.Direction.DESC, "updatedAt"));
 
         JobStatus jobStatus = null;
         if (status != null) {

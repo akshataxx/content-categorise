@@ -22,6 +22,9 @@ public class TranscriptionJobService {
 
     private static final Logger log = LoggerFactory.getLogger(TranscriptionJobService.class);
 
+    /** Max retries before marking a job as FAILED. Configured in code (not per-row in DB). */
+    private static final int MAX_RETRIES = 3;
+
     private final TranscriptionJobRepository jobRepository;
     private final BaseTranscriptRepository baseTranscriptRepository;
 
@@ -98,7 +101,7 @@ public class TranscriptionJobService {
 
     @Transactional
     public void handleFailure(TranscriptionJobEntity job, Exception ex) {
-        if (isTransientFailure(ex) && job.getRetryCount() < job.getMaxRetries()) {
+        if (isTransientFailure(ex) && job.getRetryCount() < MAX_RETRIES) {
             // Re-queue with exponential backoff: 5s, 25s, 125s
             job.setRetryCount(job.getRetryCount() + 1);
             long backoffSeconds = (long) Math.pow(5, job.getRetryCount());
@@ -106,7 +109,7 @@ public class TranscriptionJobService {
             job.setStatus(JobStatus.PENDING);
             job.setErrorMessage(ex.getMessage());
             log.warn("Job {} failed (attempt {}/{}), retrying in {}s: {}",
-                    job.getId(), job.getRetryCount(), job.getMaxRetries(), backoffSeconds, ex.getMessage());
+                    job.getId(), job.getRetryCount(), MAX_RETRIES, backoffSeconds, ex.getMessage());
         } else {
             // Permanent failure
             job.setStatus(JobStatus.FAILED);

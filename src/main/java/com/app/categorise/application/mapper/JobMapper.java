@@ -18,7 +18,6 @@ public class JobMapper {
             entity.getStatus().name(),
             entity.getErrorMessage(),
             entity.getRetryCount(),
-            entity.getCreatedAt(),
             entity.getUpdatedAt(),
             entity.getBaseTranscriptId()
         );

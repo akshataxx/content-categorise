@@ -65,8 +65,8 @@ public interface TranscriptionJobRepository extends JpaRepository<TranscriptionJ
      */
     @Query("SELECT j FROM TranscriptionJobEntity j WHERE j.userId = :userId" +
            " AND (:status IS NULL OR j.status = :status)" +
-           " AND (CAST(:from AS timestamp) IS NULL OR j.createdAt >= :from)" +
-           " AND (CAST(:to AS timestamp) IS NULL OR j.createdAt <= :to)")
+           " AND (CAST(:from AS timestamp) IS NULL OR j.updatedAt >= :from)" +
+           " AND (CAST(:to AS timestamp) IS NULL OR j.updatedAt <= :to)")
     Page<TranscriptionJobEntity> findByUserIdFiltered(
             @Param("userId") UUID userId,
             @Param("status") JobStatus status,

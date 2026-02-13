@@ -35,7 +35,7 @@ public class TranscriptionJobRepositoryImpl implements CustomTranscriptionJobRep
                 SELECT * FROM transcription_jobs
                 WHERE status = 'PENDING'
                   AND (next_retry_at IS NULL OR next_retry_at <= NOW())
-                ORDER BY created_at ASC
+                ORDER BY updated_at ASC
                 LIMIT 1
                 FOR UPDATE SKIP LOCKED
                 """,

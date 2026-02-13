@@ -33,17 +33,11 @@ public class TranscriptionJobEntity {
     @Column(name = "retry_count", nullable = false)
     private int retryCount = 0;
 
-    @Column(name = "max_retries", nullable = false)
-    private int maxRetries = 3;
-
     @Column(name = "next_retry_at")
     private Instant nextRetryAt;
 
     @Column(name = "base_transcript_id")
     private UUID baseTranscriptId;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
@@ -52,12 +46,8 @@ public class TranscriptionJobEntity {
 
     @PrePersist
     protected void onCreate() {
-        Instant now = Instant.now();
-        if (createdAt == null) {
-            createdAt = now;
-        }
         if (updatedAt == null) {
-            updatedAt = now;
+            updatedAt = Instant.now();
         }
     }
 
@@ -116,14 +106,6 @@ public class TranscriptionJobEntity {
         this.retryCount = retryCount;
     }
 
-    public int getMaxRetries() {
-        return maxRetries;
-    }
-
-    public void setMaxRetries(int maxRetries) {
-        this.maxRetries = maxRetries;
-    }
-
     public Instant getNextRetryAt() {
         return nextRetryAt;
     }
@@ -138,14 +120,6 @@ public class TranscriptionJobEntity {
 
     public void setBaseTranscriptId(UUID baseTranscriptId) {
         this.baseTranscriptId = baseTranscriptId;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
     }
 
     public Instant getUpdatedAt() {
@@ -164,7 +138,7 @@ public class TranscriptionJobEntity {
                 ", videoUrl='" + videoUrl + '\'' +
                 ", status=" + status +
                 ", retryCount=" + retryCount +
-                ", createdAt=" + createdAt +
+                ", updatedAt=" + updatedAt +
                 '}';
     }
 }

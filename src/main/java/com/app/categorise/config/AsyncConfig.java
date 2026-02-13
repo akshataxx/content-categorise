@@ -18,7 +18,7 @@ public class AsyncConfig {
         exec.setCorePoolSize(2);
         exec.setMaxPoolSize(4);
         exec.setQueueCapacity(20);
-        exec.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
+        exec.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         exec.setWaitForTasksToCompleteOnShutdown(true);
         exec.setAwaitTerminationSeconds(60);
         exec.initialize();

@@ -1,0 +1,132 @@
+package com.app.categorise.domain.service;
+
+import com.app.categorise.data.entity.BaseTranscriptEntity;
+import com.app.categorise.data.entity.TranscriptionJobEntity;
+import com.app.categorise.data.repository.BaseTranscriptRepository;
+import com.app.categorise.data.repository.TranscriptionJobRepository;
+import com.app.categorise.domain.model.JobStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+@Service
+public class TranscriptionJobService {
+
+    private static final Logger log = LoggerFactory.getLogger(TranscriptionJobService.class);
+
+    private final TranscriptionJobRepository jobRepository;
+    private final BaseTranscriptRepository baseTranscriptRepository;
+
+    public TranscriptionJobService(TranscriptionJobRepository jobRepository,
+                                   BaseTranscriptRepository baseTranscriptRepository) {
+        this.jobRepository = jobRepository;
+        this.baseTranscriptRepository = baseTranscriptRepository;
+    }
+
+    // --- Job creation + deduplication ---
+
+    @Transactional
+    public TranscriptionJobEntity createOrGetExisting(UUID userId, String videoUrl) {
+        // 1. Check for existing active job (PENDING or PROCESSING)
+        Optional<TranscriptionJobEntity> existing = jobRepository
+                .findByUserIdAndVideoUrlAndStatusIn(userId, videoUrl, List.of(JobStatus.PENDING, JobStatus.PROCESSING));
+        if (existing.isPresent()) {
+            log.info("Returning existing active job {} for userId={}, videoUrl={}", existing.get().getId(), userId, videoUrl);
+            return existing.get();
+        }
+
+        // 2. Check if transcript already exists (another user already transcribed this URL)
+        Optional<BaseTranscriptEntity> existingTranscript = baseTranscriptRepository.findByVideoUrl(videoUrl);
+        if (existingTranscript.isPresent()) {
+            log.info("Transcript already exists for videoUrl={}, creating COMPLETED job", videoUrl);
+            TranscriptionJobEntity job = new TranscriptionJobEntity();
+            job.setUserId(userId);
+            job.setVideoUrl(videoUrl);
+            job.setStatus(JobStatus.COMPLETED);
+            job.setBaseTranscriptId(existingTranscript.get().getId());
+            job.setCompletedAt(Instant.now());
+            return jobRepository.save(job);
+        }
+
+        // 3. Create new PENDING job
+        log.info("Creating new PENDING job for userId={}, videoUrl={}", userId, videoUrl);
+        TranscriptionJobEntity job = new TranscriptionJobEntity();
+        job.setUserId(userId);
+        job.setVideoUrl(videoUrl);
+        job.setStatus(JobStatus.PENDING);
+        return jobRepository.save(job);
+    }
+
+    // --- State transitions ---
+
+    @Transactional
+    public void transitionToProcessing(TranscriptionJobEntity job) {
+        job.setStatus(JobStatus.PROCESSING);
+        jobRepository.save(job);
+    }
+
+    @Transactional
+    public void markCompleted(TranscriptionJobEntity job, UUID baseTranscriptId) {
+        job.setStatus(JobStatus.COMPLETED);
+        job.setBaseTranscriptId(baseTranscriptId);
+        job.setCompletedAt(Instant.now());
+        jobRepository.save(job);
+    }
+
+    /**
+     * Convenience method: marks job completed by looking up the base transcript from the video URL.
+     * Used by the sync endpoint after the pipeline finishes.
+     */
+    @Transactional
+    public void markCompletedForUrl(TranscriptionJobEntity job, String videoUrl) {
+        UUID baseTranscriptId = baseTranscriptRepository.findByVideoUrl(videoUrl)
+                .map(BaseTranscriptEntity::getId)
+                .orElse(null);
+        markCompleted(job, baseTranscriptId);
+    }
+
+    // --- Failure handling ---
+
+    @Transactional
+    public void handleFailure(TranscriptionJobEntity job, Exception ex) {
+        if (isTransientFailure(ex) && job.getRetryCount() < job.getMaxRetries()) {
+            // Re-queue with exponential backoff: 5s, 25s, 125s
+            job.setRetryCount(job.getRetryCount() + 1);
+            long backoffSeconds = (long) Math.pow(5, job.getRetryCount());
+            job.setNextRetryAt(Instant.now().plusSeconds(backoffSeconds));
+            job.setStatus(JobStatus.PENDING);
+            job.setErrorMessage(ex.getMessage());
+            log.info("Transient failure for job {}, retry {}/{}, next retry at +{}s",
+                    job.getId(), job.getRetryCount(), job.getMaxRetries(), backoffSeconds);
+        } else {
+            // Permanent failure
+            job.setStatus(JobStatus.FAILED);
+            job.setErrorMessage(ex.getMessage());
+            job.setCompletedAt(Instant.now());
+            log.warn("Permanent failure for job {}: {}", job.getId(), ex.getMessage());
+        }
+        jobRepository.save(job);
+    }
+
+    private boolean isTransientFailure(Exception ex) {
+        String msg = ex.getMessage() != null ? ex.getMessage().toLowerCase() : "";
+        // Permanent failures - do not retry
+        if (msg.contains("unsupported url") || msg.contains("is not a valid url")) return false;
+        if (msg.contains("private video") || msg.contains("login required")) return false;
+        if (msg.contains("no space left on device")) return false;
+        // Transient failures - retry
+        if (ex instanceof java.net.SocketTimeoutException) return true;
+        if (ex instanceof java.net.ConnectException) return true;
+        if (msg.contains("429") || msg.contains("rate limit")) return true;
+        if (msg.contains("500") || msg.contains("502") || msg.contains("503")) return true;
+        if (msg.contains("timeout")) return true;
+        // Default: treat as transient (safer to retry than to lose)
+        return true;
+    }
+}

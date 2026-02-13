@@ -1,9 +1,11 @@
 package com.app.categorise.api.controller;
 
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
+import com.app.categorise.data.entity.TranscriptionJobEntity;
+import com.app.categorise.domain.model.JobStatus;
 import com.app.categorise.domain.model.RateLimitResult;
 import com.app.categorise.domain.service.RateLimitService;
-import com.app.categorise.domain.service.UntranscribedLinkService;
+import com.app.categorise.domain.service.TranscriptionJobService;
 import com.app.categorise.domain.service.VideoService;
 import com.app.categorise.security.UserPrincipal;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -43,7 +45,7 @@ class VideoControllerRateLimitIntegrationTest {
     private VideoService videoService;
 
     @MockBean
-    private UntranscribedLinkService untranscribedLinkService;
+    private TranscriptionJobService transcriptionJobService;
 
     @MockBean
     private RateLimitService rateLimitService;
@@ -75,6 +77,13 @@ class VideoControllerRateLimitIntegrationTest {
                     RateLimitResult.RateLimitType.PER_MINUTE
             );
             when(rateLimitService.checkRateLimit(userId)).thenReturn(allowedResult);
+
+            // Mock job service to return a new PENDING job
+            TranscriptionJobEntity mockJob = new TranscriptionJobEntity();
+            mockJob.setUserId(userId);
+            mockJob.setVideoUrl(videoUrl);
+            mockJob.setStatus(JobStatus.PENDING);
+            when(transcriptionJobService.createOrGetExisting(userId, videoUrl)).thenReturn(mockJob);
             
             TranscriptDtoWithAliases mockResponse = new TranscriptDtoWithAliases(
                     UUID.randomUUID(), videoUrl, "Test transcript content", null, "Test description", "Test title",

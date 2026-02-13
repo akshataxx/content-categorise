@@ -1,10 +1,12 @@
 package com.app.categorise.api.controller;
 
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
+import com.app.categorise.data.entity.TranscriptionJobEntity;
+import com.app.categorise.domain.model.JobStatus;
 import com.app.categorise.domain.model.RateLimitResult;
 import com.app.categorise.domain.service.RateLimitService;
+import com.app.categorise.domain.service.TranscriptionJobService;
 import com.app.categorise.domain.service.VideoService;
-import com.app.categorise.domain.service.UntranscribedLinkService;
 import com.app.categorise.security.UserPrincipal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,7 +34,7 @@ class VideoControllerTest {
     private VideoService videoService;
 
     @Mock
-    private UntranscribedLinkService untranscribedLinkService;
+    private TranscriptionJobService transcriptionJobService;
 
     @Mock
     private RateLimitService rateLimitService;
@@ -78,6 +80,13 @@ class VideoControllerTest {
         // Mock rate limiting to allow the request
         RateLimitResult allowedResult = RateLimitResult.allowed(4, Instant.now().plus(1, ChronoUnit.MINUTES), RateLimitResult.RateLimitType.PER_MINUTE);
         when(rateLimitService.checkRateLimit(testUserId)).thenReturn(allowedResult);
+
+        // Mock job service to return a new PENDING job
+        TranscriptionJobEntity mockJob = new TranscriptionJobEntity();
+        mockJob.setUserId(testUserId);
+        mockJob.setVideoUrl(testVideoUrl);
+        mockJob.setStatus(JobStatus.PENDING);
+        when(transcriptionJobService.createOrGetExisting(testUserId, testVideoUrl)).thenReturn(mockJob);
         
         when(videoService.processVideoAndCreateTranscript(eq(testVideoUrl), eq(testUserId)))
                 .thenReturn(CompletableFuture.completedFuture(testTranscriptDtoWithAlias));
@@ -94,14 +103,15 @@ class VideoControllerTest {
         assertEquals(testTranscriptDtoWithAlias.id(), response.getBody().id());
         assertEquals(testVideoUrl, response.getBody().videoUrl());
         
+        // Verify job lifecycle
+        verify(transcriptionJobService).createOrGetExisting(testUserId, testVideoUrl);
+        verify(transcriptionJobService).transitionToProcessing(mockJob);
+        verify(transcriptionJobService).markCompletedForUrl(mockJob, testVideoUrl);
+        
         // Verify the rate limit check and recording
         verify(rateLimitService).checkRateLimit(testUserId);
         verify(rateLimitService).recordTranscription(testUserId);
-
-        // Verify the new simplified method is called
         verify(videoService).processVideoAndCreateTranscript(eq(testVideoUrl), eq(testUserId));
-        verify(untranscribedLinkService).deleteLink(testUserId, testVideoUrl);
-        verify(rateLimitService).recordTranscription(testUserId);
     }
 
     @Test
@@ -148,6 +158,13 @@ class VideoControllerTest {
         // Mock rate limiting to allow the request
         RateLimitResult allowedResult = RateLimitResult.allowed(4, Instant.now().plus(1, java.time.temporal.ChronoUnit.MINUTES), RateLimitResult.RateLimitType.PER_MINUTE);
         when(rateLimitService.checkRateLimit(testUserId)).thenReturn(allowedResult);
+
+        // Mock job service to return a new PENDING job
+        TranscriptionJobEntity mockJob = new TranscriptionJobEntity();
+        mockJob.setUserId(testUserId);
+        mockJob.setVideoUrl(testVideoUrl);
+        mockJob.setStatus(JobStatus.PENDING);
+        when(transcriptionJobService.createOrGetExisting(testUserId, testVideoUrl)).thenReturn(mockJob);
         
         when(videoService.processVideoAndCreateTranscript(testVideoUrl, testUserId))
             .thenReturn(CompletableFuture.failedFuture(new RuntimeException("Test exception")));
@@ -162,6 +179,7 @@ class VideoControllerTest {
         verify(videoService).processVideoAndCreateTranscript(testVideoUrl, testUserId);
         // Should not record transcription when service throws exception
         verify(rateLimitService, never()).recordTranscription(testUserId);
-        verifyNoMoreInteractions(videoService);
+        // Should handle the failure on the job
+        verify(transcriptionJobService).handleFailure(eq(mockJob), any(Exception.class));
     }
 }

@@ -18,11 +18,5 @@ CREATE TABLE transcription_jobs (
     CONSTRAINT chk_jobs_retry CHECK (retry_count >= 0 AND retry_count <= max_retries)
 );
 
--- Poller query: find next eligible PENDING job
-CREATE INDEX idx_jobs_status_next_retry ON transcription_jobs (status, next_retry_at, created_at);
-
 -- User's job list
 CREATE INDEX idx_jobs_user_id ON transcription_jobs (user_id);
-
--- Deduplication: check for existing active job for same user + URL
-CREATE INDEX idx_jobs_user_video_status ON transcription_jobs (user_id, video_url, status);

@@ -13,10 +13,10 @@ import java.io.IOException;
 /**
  * Configuration for Firebase Admin SDK initialization.
  * Used for FCM push notifications when transcription jobs complete.
- * App starts without Firebase if firebase.service-account-path is not set.
+ * Enable with firebase.enabled=true and firebase.service-account-path set.
  */
 @Configuration
-@ConditionalOnProperty(name = "firebase.service-account-path")
+@ConditionalOnProperty(name = "firebase.enabled", havingValue = "true")
 public class FirebaseConfig {
 
     @Bean

@@ -27,11 +27,14 @@ public class TranscriptionJobService {
 
     private final TranscriptionJobRepository jobRepository;
     private final BaseTranscriptRepository baseTranscriptRepository;
+    private final NotificationService notificationService;
 
     public TranscriptionJobService(TranscriptionJobRepository jobRepository,
-                                   BaseTranscriptRepository baseTranscriptRepository) {
+                                   BaseTranscriptRepository baseTranscriptRepository,
+                                   NotificationService notificationService) {
         this.jobRepository = jobRepository;
         this.baseTranscriptRepository = baseTranscriptRepository;
+        this.notificationService = notificationService;
     }
 
     // --- Job creation + deduplication ---
@@ -83,6 +86,17 @@ public class TranscriptionJobService {
         job.setStatus(JobStatus.COMPLETED);
         job.setBaseTranscriptId(baseTranscriptId);
         jobRepository.save(job);
+        if (baseTranscriptId != null) {
+            try {
+                String title = baseTranscriptRepository.findById(baseTranscriptId)
+                        .map(BaseTranscriptEntity::getTitle)
+                        .filter(t -> t != null && !t.isBlank())
+                        .orElse("your video");
+                notificationService.notifyJobCompleted(job.getUserId(), job.getId(), baseTranscriptId, title);
+            } catch (Exception e) {
+                log.warn("Failed to send notification for job {}: {}", job.getId(), e.getMessage());
+            }
+        }
     }
 
     /**
@@ -115,6 +129,11 @@ public class TranscriptionJobService {
             job.setStatus(JobStatus.FAILED);
             job.setErrorMessage(ex.getMessage());
             log.error("Job {} permanently failed: {}", job.getId(), ex.getMessage());
+            try {
+                notificationService.notifyJobFailed(job.getUserId(), job.getId(), ex.getMessage());
+            } catch (Exception ne) {
+                log.warn("Failed to send failure notification for job {}: {}", job.getId(), ne.getMessage());
+            }
         }
         jobRepository.save(job);
     }

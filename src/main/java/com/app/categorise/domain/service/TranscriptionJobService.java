@@ -54,7 +54,6 @@ public class TranscriptionJobService {
             job.setVideoUrl(videoUrl);
             job.setStatus(JobStatus.COMPLETED);
             job.setBaseTranscriptId(existingTranscript.get().getId());
-            job.setCompletedAt(Instant.now());
             return jobRepository.save(job);
         }
 
@@ -80,7 +79,6 @@ public class TranscriptionJobService {
     public void markCompleted(TranscriptionJobEntity job, UUID baseTranscriptId) {
         job.setStatus(JobStatus.COMPLETED);
         job.setBaseTranscriptId(baseTranscriptId);
-        job.setCompletedAt(Instant.now());
         jobRepository.save(job);
     }
 
@@ -113,7 +111,6 @@ public class TranscriptionJobService {
             // Permanent failure
             job.setStatus(JobStatus.FAILED);
             job.setErrorMessage(ex.getMessage());
-            job.setCompletedAt(Instant.now());
             log.error("Job {} permanently failed: {}", job.getId(), ex.getMessage());
         }
         jobRepository.save(job);

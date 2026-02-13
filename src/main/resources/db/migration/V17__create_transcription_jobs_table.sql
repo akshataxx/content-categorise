@@ -13,8 +13,7 @@ CREATE TABLE transcription_jobs (
     next_retry_at       TIMESTAMP WITH TIME ZONE,
     base_transcript_id  UUID REFERENCES base_transcripts(id),
     created_at          TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    updated_at          TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    completed_at        TIMESTAMP WITH TIME ZONE
+    updated_at          TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
 -- User's job list

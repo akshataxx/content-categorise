@@ -48,9 +48,6 @@ public class TranscriptionJobEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    @Column(name = "completed_at")
-    private Instant completedAt;
-
     public TranscriptionJobEntity() {}
 
     @PrePersist
@@ -157,14 +154,6 @@ public class TranscriptionJobEntity {
 
     public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
-    }
-
-    public Instant getCompletedAt() {
-        return completedAt;
-    }
-
-    public void setCompletedAt(Instant completedAt) {
-        this.completedAt = completedAt;
     }
 
     @Override

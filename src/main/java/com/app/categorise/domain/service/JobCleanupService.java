@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
  * JobCleanupService - Daily scheduled cleanup of old transcription jobs.
  *
  * Prevents the transcription_jobs table from growing indefinitely by removing:
- * - COMPLETED jobs older than 7 days (based on completed_at)
+ * - COMPLETED jobs older than 7 days (based on updated_at)
  * - FAILED jobs older than 30 days (based on updated_at)
  *
  * PENDING and PROCESSING jobs are never deleted.

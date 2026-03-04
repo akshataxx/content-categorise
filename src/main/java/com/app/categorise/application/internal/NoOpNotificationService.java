@@ -1,17 +1,15 @@
 package com.app.categorise.application.internal;
 
 import com.app.categorise.domain.service.NotificationService;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.stereotype.Service;
 
 import java.util.UUID;
 
 /**
  * No-op NotificationService for when Firebase is not configured (dev/test).
  * Allows the app to start and run without FCM.
+ *
+ * Registered as a bean via {@link com.app.categorise.config.NotificationConfig}.
  */
-@Service
-@ConditionalOnMissingBean(NotificationService.class)
 public class NoOpNotificationService implements NotificationService {
 
     @Override

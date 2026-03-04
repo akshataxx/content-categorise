@@ -7,9 +7,6 @@ import com.google.firebase.FirebaseApp;
 import com.google.firebase.messaging.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.stereotype.Service;
-
 import java.util.*;
 import java.util.List;
 
@@ -18,9 +15,9 @@ import java.util.List;
  * Sends silent notifications when transcription jobs complete.
  * Sends visible notifications when jobs fail.
  * Marks devices inactive when FCM reports invalid tokens.
+ *
+ * Registered as a bean via {@link com.app.categorise.config.NotificationConfig}.
  */
-@Service
-@ConditionalOnBean(FirebaseApp.class)
 public class NotificationServiceImpl implements NotificationService {
 
     private static final Logger log = LoggerFactory.getLogger(NotificationServiceImpl.class);

@@ -82,9 +82,10 @@ public class TranscriptionJobService {
     }
 
     @Transactional
-    public void markCompleted(TranscriptionJobEntity job, UUID baseTranscriptId) {
+    public void markCompleted(TranscriptionJobEntity job, UUID baseTranscriptId, UUID userTranscriptId) {
         job.setStatus(JobStatus.COMPLETED);
         job.setBaseTranscriptId(baseTranscriptId);
+        job.setUserTranscriptId(userTranscriptId);
         jobRepository.save(job);
         if (baseTranscriptId != null) {
             try {
@@ -104,11 +105,11 @@ public class TranscriptionJobService {
      * Used by the sync endpoint after the pipeline finishes.
      */
     @Transactional
-    public void markCompletedForUrl(TranscriptionJobEntity job, String videoUrl) {
+    public void markCompletedForUrl(TranscriptionJobEntity job, String videoUrl, UUID userTranscriptId) {
         UUID baseTranscriptId = baseTranscriptRepository.findByVideoUrl(videoUrl)
                 .map(BaseTranscriptEntity::getId)
                 .orElse(null);
-        markCompleted(job, baseTranscriptId);
+        markCompleted(job, baseTranscriptId, userTranscriptId);
     }
 
     // --- Failure handling ---

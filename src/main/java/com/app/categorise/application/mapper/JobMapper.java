@@ -19,7 +19,8 @@ public class JobMapper {
             entity.getErrorMessage(),
             entity.getRetryCount(),
             entity.getUpdatedAt(),
-            entity.getBaseTranscriptId()
+            entity.getBaseTranscriptId(),
+            entity.getUserTranscriptId()
         );
     }
 }

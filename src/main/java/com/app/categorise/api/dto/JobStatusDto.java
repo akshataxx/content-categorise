@@ -19,5 +19,6 @@ public record JobStatusDto(
     String errorMessage,
     int retryCount,
     Instant updatedAt,
-    UUID baseTranscriptId
+    UUID baseTranscriptId,
+    UUID userTranscriptId
 ) {}

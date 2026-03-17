@@ -1,5 +1,6 @@
 package com.app.categorise.domain.service;
 
+import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.data.entity.TranscriptionJobEntity;
 import com.app.categorise.data.repository.TranscriptionJobRepository;
 import org.slf4j.Logger;
@@ -65,12 +66,12 @@ public class JobPollerService {
             // Run the existing transcription pipeline
             // processVideoAndCreateTranscript returns a CompletableFuture;
             // .join() blocks since we're already on the media executor thread
-            videoService.processVideoAndCreateTranscript(
+            TranscriptDtoWithAliases result = videoService.processVideoAndCreateTranscript(
                     job.getVideoUrl(), job.getUserId()
             ).join();
 
-            // Mark completed (looks up baseTranscriptId by videoUrl)
-            jobService.markCompletedForUrl(job, job.getVideoUrl());
+            // Mark completed with both baseTranscriptId (by URL lookup) and userTranscriptId
+            jobService.markCompletedForUrl(job, job.getVideoUrl(), result.id());
             rateLimitService.recordTranscription(job.getUserId());
             log.info("Job {} completed successfully, videoUrl={}", job.getId(), job.getVideoUrl());
 

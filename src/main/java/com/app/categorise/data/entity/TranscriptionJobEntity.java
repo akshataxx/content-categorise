@@ -39,6 +39,9 @@ public class TranscriptionJobEntity {
     @Column(name = "base_transcript_id")
     private UUID baseTranscriptId;
 
+    @Column(name = "user_transcript_id")
+    private UUID userTranscriptId;
+
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
@@ -120,6 +123,14 @@ public class TranscriptionJobEntity {
 
     public void setBaseTranscriptId(UUID baseTranscriptId) {
         this.baseTranscriptId = baseTranscriptId;
+    }
+
+    public UUID getUserTranscriptId() {
+        return userTranscriptId;
+    }
+
+    public void setUserTranscriptId(UUID userTranscriptId) {
+        this.userTranscriptId = userTranscriptId;
     }
 
     public Instant getUpdatedAt() {

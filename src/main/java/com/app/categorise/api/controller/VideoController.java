@@ -71,7 +71,7 @@ public class VideoController {
                 .whenComplete((transcriptDto, ex) -> {
                     if (ex == null) {
                         if (isNewJob) {
-                            transcriptionJobService.markCompletedForUrl(job, videoUrl);
+                            transcriptionJobService.markCompletedForUrl(job, videoUrl, transcriptDto.id());
                         }
                         rateLimitService.recordTranscription(userId);
                         log.info("Transcription completed for jobId={}, videoUrl={}", job.getId(), videoUrl);

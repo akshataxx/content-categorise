@@ -106,7 +106,7 @@ class VideoControllerTest {
         // Verify job lifecycle
         verify(transcriptionJobService).createOrGetExisting(testUserId, testVideoUrl);
         verify(transcriptionJobService).transitionToProcessing(mockJob);
-        verify(transcriptionJobService).markCompletedForUrl(mockJob, testVideoUrl);
+        verify(transcriptionJobService).markCompletedForUrl(mockJob, testVideoUrl, testTranscriptDtoWithAlias.id());
         
         // Verify the rate limit check and recording
         verify(rateLimitService).checkRateLimit(testUserId);

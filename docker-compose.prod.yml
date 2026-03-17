@@ -42,6 +42,10 @@ services:
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8081}
+      FIREBASE_ENABLED: ${FIREBASE_ENABLED:-false}
+      FIREBASE_SERVICE_ACCOUNT_PATH: /app/secrets/firebase-service-account.json
+    volumes:
+      - ${FIREBASE_SERVICE_ACCOUNT_HOST_PATH:-/dev/null}:/app/secrets/firebase-service-account.json:ro
     # App only exposed internally to Caddy reverse proxy
     expose:
       - "8081"

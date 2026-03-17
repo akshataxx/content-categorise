@@ -39,6 +39,9 @@ build/
 config/google-play-service-account.json
 config/*.json
 
+# Firebase
+firebase-service-account.json
+
 .DS_Store
 
 # Application logs

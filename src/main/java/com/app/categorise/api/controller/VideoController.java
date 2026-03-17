@@ -1,9 +1,12 @@
 package com.app.categorise.api.controller;
 
+import com.app.categorise.api.dto.JobSubmissionResponse;
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
+import com.app.categorise.data.entity.TranscriptionJobEntity;
+import com.app.categorise.domain.model.JobStatus;
 import com.app.categorise.domain.model.RateLimitResult;
 import com.app.categorise.domain.service.RateLimitService;
-import com.app.categorise.domain.service.UntranscribedLinkService;
+import com.app.categorise.domain.service.TranscriptionJobService;
 import com.app.categorise.domain.service.VideoService;
 import com.app.categorise.exception.RateLimitExceededException;
 import com.app.categorise.security.UserPrincipal;
@@ -16,6 +19,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.Map;
 import java.util.UUID;
 
@@ -26,13 +30,13 @@ public class VideoController {
     private static final Logger log = LoggerFactory.getLogger(VideoController.class);
     
     private final VideoService videoService;
-    private final UntranscribedLinkService untranscribedLinkService;
+    private final TranscriptionJobService transcriptionJobService;
     private final RateLimitService rateLimitService;
 
-    public VideoController(VideoService videoService, UntranscribedLinkService untranscribedLinkService, 
+    public VideoController(VideoService videoService, TranscriptionJobService transcriptionJobService,
                           RateLimitService rateLimitService) {
         this.videoService = videoService;
-        this.untranscribedLinkService = untranscribedLinkService;
+        this.transcriptionJobService = transcriptionJobService;
         this.rateLimitService = rateLimitService;
     }
 
@@ -40,7 +44,7 @@ public class VideoController {
     @PostMapping("/transcribe")
     public CompletableFuture<ResponseEntity<TranscriptDtoWithAliases>> handleVideo(
             @RequestBody Map<String, String> request,
-            @AuthenticationPrincipal UserPrincipal principal) throws Exception {
+            @AuthenticationPrincipal UserPrincipal principal) {
         String videoUrl = request.get("videoUrl");
         log.info("POST /api/video/transcribe received for videoUrl={}", videoUrl);
 
@@ -54,16 +58,37 @@ public class VideoController {
             throw new RateLimitExceededException(rateLimitResult);
         }
 
-        return processVideoAsync(videoUrl, userId)
-                .thenApply(transcriptDto -> {
-                    log.info("POST /api/video/transcribe completed successfully for videoUrl={}, transcriptId={}", 
-                            videoUrl, transcriptDto.id());
-                    return ResponseEntity.ok(transcriptDto);
-                });
+        // Create durable job row
+        TranscriptionJobEntity job = transcriptionJobService.createOrGetExisting(userId, videoUrl);
+        boolean isNewJob = job.getStatus() == JobStatus.PENDING;
+
+        if (isNewJob) {
+            transcriptionJobService.transitionToProcessing(job);
+        }
+
+        // Run pipeline inline (same as before) - handles base transcript dedup internally
+        return videoService.processVideoAndCreateTranscript(videoUrl, userId)
+                .whenComplete((transcriptDto, ex) -> {
+                    if (ex == null) {
+                        if (isNewJob) {
+                            transcriptionJobService.markCompletedForUrl(job, videoUrl, transcriptDto.id());
+                        }
+                        rateLimitService.recordTranscription(userId);
+                        log.info("Transcription completed for jobId={}, videoUrl={}", job.getId(), videoUrl);
+                    } else {
+                        Throwable cause = (ex instanceof CompletionException) ? ex.getCause() : ex;
+                        if (isNewJob) {
+                            transcriptionJobService.handleFailure(job,
+                                    (cause instanceof Exception) ? (Exception) cause : new RuntimeException(cause));
+                        }
+                    }
+                })
+                .thenApply(ResponseEntity::ok);
     }
 
+    @Operation(summary = "Submit a video URL for async transcription", description = "Creates a durable job and returns immediately with job ID")
     @PostMapping("/transcribe-async")
-    public ResponseEntity<Void> transcribeAsync(
+    public ResponseEntity<JobSubmissionResponse> transcribeAsync(
             @RequestBody Map<String, String> request,
             @AuthenticationPrincipal UserPrincipal principal) {
         String videoUrl = request.get("videoUrl");
@@ -73,24 +98,17 @@ public class VideoController {
         
         UUID userId = principal.getId();
 
-        // Check rate limits before starting async processing
+        // Check rate limits before accepting job
         RateLimitResult rateLimitResult = rateLimitService.checkRateLimit(userId);
         if (!rateLimitResult.isAllowed()) {
             throw new RateLimitExceededException(rateLimitResult);
         }
 
-        processVideoAsync(videoUrl, userId);
-        return ResponseEntity.accepted().build();
-    }
+        // Create durable job row - poller picks it up (WP03)
+        TranscriptionJobEntity job = transcriptionJobService.createOrGetExisting(userId, videoUrl);
 
-    private CompletableFuture<TranscriptDtoWithAliases> processVideoAsync(String videoUrl, UUID userId) {
-        return videoService.processVideoAndCreateTranscript(videoUrl, userId)
-                .whenComplete((transcriptDto, ex) -> {
-                    if (ex == null) {
-                        untranscribedLinkService.deleteLink(userId, videoUrl);
-                        rateLimitService.recordTranscription(userId);
-                    }
-                });
+        return ResponseEntity.accepted()
+                .body(new JobSubmissionResponse(job.getId(), job.getStatus().name()));
     }
 
     private void validateRequest(String videoUrl, UserPrincipal principal) {

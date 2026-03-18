@@ -39,6 +39,10 @@ public class TranscriptionJobEntity {
     @Column(name = "base_transcript_id")
     private UUID baseTranscriptId;
 
+    @OneToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "user_transcript_id", insertable = false, updatable = false)
+    private UserTranscriptEntity userTranscript;
+
     @Column(name = "user_transcript_id")
     private UUID userTranscriptId;
 
@@ -123,6 +127,10 @@ public class TranscriptionJobEntity {
 
     public void setBaseTranscriptId(UUID baseTranscriptId) {
         this.baseTranscriptId = baseTranscriptId;
+    }
+
+    public UserTranscriptEntity getUserTranscript() {
+        return userTranscript;
     }
 
     public UUID getUserTranscriptId() {

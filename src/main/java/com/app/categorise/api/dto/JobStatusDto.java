@@ -20,5 +20,6 @@ public record JobStatusDto(
     int retryCount,
     Instant updatedAt,
     UUID baseTranscriptId,
-    UUID userTranscriptId
+    UUID userTranscriptId,
+    String transcriptTitle
 ) {}

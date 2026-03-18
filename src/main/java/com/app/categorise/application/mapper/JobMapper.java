@@ -1,7 +1,9 @@
 package com.app.categorise.application.mapper;
 
 import com.app.categorise.api.dto.JobStatusDto;
+import com.app.categorise.data.entity.BaseTranscriptEntity;
 import com.app.categorise.data.entity.TranscriptionJobEntity;
+import com.app.categorise.data.entity.UserTranscriptEntity;
 import org.springframework.stereotype.Component;
 
 /**
@@ -12,6 +14,15 @@ import org.springframework.stereotype.Component;
 public class JobMapper {
 
     public JobStatusDto toDto(TranscriptionJobEntity entity) {
+        String title = null;
+        UserTranscriptEntity ut = entity.getUserTranscript();
+        if (ut != null) {
+            BaseTranscriptEntity bt = ut.getBaseTranscript();
+            if (bt != null) {
+                title = bt.getTitle();
+            }
+        }
+
         return new JobStatusDto(
             entity.getId(),
             entity.getVideoUrl(),
@@ -20,7 +31,8 @@ public class JobMapper {
             entity.getRetryCount(),
             entity.getUpdatedAt(),
             entity.getBaseTranscriptId(),
-            entity.getUserTranscriptId()
+            entity.getUserTranscriptId(),
+            title
         );
     }
 }

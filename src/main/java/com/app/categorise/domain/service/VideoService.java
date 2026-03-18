@@ -113,6 +113,13 @@ public class VideoService {
             }
 
             command.add("--write-info-json");
+
+            // TikTok-specific fixes for anti-bot measures
+            command.add("--extractor-args");
+            command.add("tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com");
+            command.add("--user-agent");
+            command.add("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36");
+
             command.add("-f");
             command.add("worstaudio/worst");  // Try audio-only, fallback to worst quality video
             command.add("-x");

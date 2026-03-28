@@ -68,7 +68,7 @@ curl https://34-151-189-90.sslip.io/actuator/health
 ### Step 1: Build and Push New Docker Image (Local Machine)
 
 ```bash
-docker buildx build --platform linux/amd64 -t gcr.io/content-categorisation/content-app:latest --push .
+docker buildx build --platform linux/amd64 -t gcr.io/content-categorisation/content-app:prod --push .
 ```
 
 ### Step 2: SSH into GCE Instance
@@ -229,4 +229,4 @@ docker-compose -f docker-compose.prod.yml up -d
 | Zone | `australia-southeast1-b` |
 | External IP | `34.151.189.90` |
 | HTTPS URL | `https://34-151-189-90.sslip.io` |
-| Container Registry | `gcr.io/content-categorisation/content-app:latest` |
+| Container Registry | `gcr.io/content-categorisation/content-app:prod` |

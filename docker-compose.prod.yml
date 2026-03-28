@@ -75,6 +75,25 @@ services:
     networks:
       - app-network
 
+  # Lightweight sidecar that restarts the app container daily at 4 AM
+  # This triggers entrypoint.sh which updates yt-dlp on startup
+  restart-scheduler:
+    image: docker:cli
+    container_name: content-restart-scheduler
+    restart: unless-stopped
+    environment:
+      RESTART_SCHEDULE: "${RESTART_SCHEDULE:-0 4 * * *}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Restart scheduler started (cron: $$RESTART_SCHEDULE)"
+        echo "$$RESTART_SCHEDULE docker restart content-app" | crontab -
+        crond -f -l 2
+    networks:
+      - app-network
+
 volumes:
   pgdata:
   caddy_data:

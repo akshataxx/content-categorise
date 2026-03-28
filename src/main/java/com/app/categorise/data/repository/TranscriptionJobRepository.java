@@ -21,7 +21,7 @@ import java.util.UUID;
  *
  * Provides queries for:
  * - Crash recovery (resetProcessingToPending)
- * - Deduplication check (findByUserIdAndVideoUrlAndStatusIn)
+ * - Deduplication check (findTopByUserIdAndVideoUrlOrderByUpdatedAtDesc)
  * - User job listing with pagination (findByUserId, findByUserIdAndStatus)
  * - Cleanup of old completed/failed jobs
  *
@@ -47,15 +47,14 @@ public interface TranscriptionJobRepository extends JpaRepository<TranscriptionJ
     // --- Deduplication (WP02: job service) ---
 
     /**
-     * Check for an existing active job for the same user and video URL.
-     * Used to prevent duplicate job submissions.
+     * Find the most recent job for a given user and video URL, regardless of status.
+     * Used by createOrGetExisting to decide whether to reuse, retry, or create a new job.
      *
      * @param userId   the user's ID
      * @param videoUrl the video URL
-     * @param statuses list of active statuses to check (typically PENDING, PROCESSING)
-     * @return matching job if one exists
+     * @return the latest job if one exists
      */
-    Optional<TranscriptionJobEntity> findByUserIdAndVideoUrlAndStatusIn(UUID userId, String videoUrl, List<JobStatus> statuses);
+    Optional<TranscriptionJobEntity> findTopByUserIdAndVideoUrlOrderByUpdatedAtDesc(UUID userId, String videoUrl);
 
     // --- User job listing (WP04: API) ---
 

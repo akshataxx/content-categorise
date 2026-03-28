@@ -13,7 +13,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -41,20 +40,39 @@ public class TranscriptionJobService {
 
     @Transactional
     public TranscriptionJobEntity createOrGetExisting(UUID userId, String videoUrl) {
-        // 1. Check for existing active job (PENDING or PROCESSING)
+        // 1. Find the most recent job for this user+URL regardless of status
         Optional<TranscriptionJobEntity> existing = jobRepository
-                .findByUserIdAndVideoUrlAndStatusIn(userId, videoUrl, List.of(JobStatus.PENDING, JobStatus.PROCESSING));
+                .findTopByUserIdAndVideoUrlOrderByUpdatedAtDesc(userId, videoUrl);
+
         if (existing.isPresent()) {
             TranscriptionJobEntity existingJob = existing.get();
-            log.info("Returning existing job {} (status={}) for user={} videoUrl={}",
-                    existingJob.getId(), existingJob.getStatus(), userId, videoUrl);
-            return existingJob;
+
+            switch (existingJob.getStatus()) {
+                case PENDING, PROCESSING -> {
+                    // Already queued or in-flight — return as-is to avoid duplicates
+                    log.info("Returning existing {} job {} for user={} videoUrl={}",
+                            existingJob.getStatus(), existingJob.getId(), userId, videoUrl);
+                    return existingJob;
+                }
+                case COMPLETED -> {
+                    // Already done — return so the caller can use the result
+                    log.info("Returning existing COMPLETED job {} for user={} videoUrl={}",
+                            existingJob.getId(), userId, videoUrl);
+                    return existingJob;
+                }
+                case FAILED -> {
+                    // Previous attempt failed — create a fresh job so the user can retry
+                    log.info("Previous job {} FAILED for user={} videoUrl={}, creating new PENDING job",
+                            existingJob.getId(), userId, videoUrl);
+                }
+            }
         }
 
-        // 2. Check if transcript already exists (another user already transcribed this URL)
+        // 2. Check if base transcript already exists (another user already transcribed this URL)
+        //    No active job for this user — create an instant COMPLETED job linked to it
         Optional<BaseTranscriptEntity> existingTranscript = baseTranscriptRepository.findByVideoUrl(videoUrl);
         if (existingTranscript.isPresent()) {
-            log.info("Transcript already exists for videoUrl={}, creating COMPLETED job", videoUrl);
+            log.info("Transcript already exists for videoUrl={}, creating COMPLETED job for user={}", videoUrl, userId);
             TranscriptionJobEntity job = new TranscriptionJobEntity();
             job.setUserId(userId);
             job.setVideoUrl(videoUrl);

@@ -3,6 +3,8 @@ package com.app.categorise.domain.service;
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.data.entity.TranscriptionJobEntity;
 import com.app.categorise.data.repository.TranscriptionJobRepository;
+import com.app.categorise.domain.model.RateLimitResult;
+import com.app.categorise.util.LogSanitizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -52,7 +54,7 @@ public class JobPollerService {
     public void pollAndProcess() {
         Optional<TranscriptionJobEntity> claimed = jobRepository.claimNextPending();
         claimed.ifPresent(job -> {
-            log.info("Claimed job {} for processing, videoUrl={}", job.getId(), job.getVideoUrl());
+            log.info("Claimed job {} for processing, videoUrl={}", job.getId(), LogSanitizer.sanitize(job.getVideoUrl()));
             mediaExecutor.execute(() -> executeJob(job));
         });
     }
@@ -63,6 +65,16 @@ public class JobPollerService {
      */
     private void executeJob(TranscriptionJobEntity job) {
         try {
+            // Re-check rate limits before processing to prevent quota bypass for queued jobs
+            RateLimitResult rateLimitResult = rateLimitService.checkRateLimit(job.getUserId());
+            if (!rateLimitResult.isAllowed()) {
+                log.warn("Job {} rejected at processing time — user {} over rate limit ({})",
+                        job.getId(), job.getUserId(), rateLimitResult.getLimitType());
+                jobService.handleFailure(job,
+                        new RuntimeException("Rate limit exceeded at processing time: " + rateLimitResult.getReason()));
+                return;
+            }
+
             // Run the existing transcription pipeline
             // processVideoAndCreateTranscript returns a CompletableFuture;
             // .join() blocks since we're already on the media executor thread
@@ -72,8 +84,7 @@ public class JobPollerService {
 
             // Mark completed with both baseTranscriptId (by URL lookup) and userTranscriptId
             jobService.markCompletedForUrl(job, job.getVideoUrl(), result.id());
-            rateLimitService.recordTranscription(job.getUserId());
-            log.info("Job {} completed successfully, videoUrl={}", job.getId(), job.getVideoUrl());
+            log.info("Job {} completed successfully, videoUrl={}", job.getId(), LogSanitizer.sanitize(job.getVideoUrl()));
 
         } catch (Exception ex) {
             log.error("Job {} failed: {}", job.getId(), ex.getMessage(), ex);

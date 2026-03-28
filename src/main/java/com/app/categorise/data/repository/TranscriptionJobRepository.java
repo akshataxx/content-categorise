@@ -21,7 +21,7 @@ import java.util.UUID;
  *
  * Provides queries for:
  * - Crash recovery (resetProcessingToPending)
- * - Deduplication check (findByUserIdAndVideoUrlAndStatusIn)
+ * - Deduplication check (findTopByUserIdAndVideoUrlOrderByUpdatedAtDesc)
  * - User job listing with pagination (findByUserId, findByUserIdAndStatus)
  * - Cleanup of old completed/failed jobs
  *

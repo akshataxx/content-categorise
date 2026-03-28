@@ -6,61 +6,54 @@ import com.app.categorise.domain.model.RateLimitResult;
 import java.util.UUID;
 
 /**
- * RateLimitService - Domain service interface for rate limiting functionality
- * Provides methods to check rate limits, record transcriptions, and manage user limits
+ * RateLimitService - Domain service interface for rate limiting functionality.
+ *
+ * Rate limits are derived from the user's subscription tier by default.
+ * Per-user overrides can be set via {@link #setUserOverride} for special cases
+ * (e.g. beta testers, custom deals). When no override exists, tier defaults apply.
  */
 public interface RateLimitService {
 
     /**
-     * Check if a user can make a transcription request based on all rate limits
+     * Check if a user can make a transcription request based on all rate limits.
+     * Checks total quota (from actual transcripts), daily burst, and per-minute burst.
      * @param userId The user ID to check
      * @return RateLimitResult indicating if request is allowed and relevant metadata
      */
     RateLimitResult checkRateLimit(UUID userId);
 
     /**
-     * Record a successful transcription for rate limiting tracking
-     * This should be called after a transcription is successfully completed
+     * Record a transcription for burst-limit tracking (minute and day windows).
      * @param userId The user ID who made the transcription
      */
     void recordTranscription(UUID userId);
 
     /**
-     * Get the rate limit configuration for a user
+     * Get the effective rate limit configuration for a user.
+     * Returns the per-user override if one exists, otherwise tier defaults.
      * @param userId The user ID
-     * @return RateLimitConfig containing the user's limits, or default if not found
+     * @return RateLimitConfig containing the user's effective limits
      */
-    RateLimitConfig getUserRateLimits(UUID userId);
+    RateLimitConfig getEffectiveLimits(UUID userId);
 
     /**
-     * Update rate limit configuration for a user
+     * Set a per-user rate limit override. Use for special cases only —
+     * most users should rely on tier defaults derived from their subscription.
      * @param userId The user ID
-     * @param config The new rate limit configuration
+     * @param config The override configuration
      */
-    void updateUserRateLimits(UUID userId, RateLimitConfig config);
+    void setUserOverride(UUID userId, RateLimitConfig config);
 
     /**
-     * Initialize default rate limits for a new user
+     * Remove a per-user rate limit override, reverting to tier defaults.
      * @param userId The user ID
      */
-    void initializeDefaultLimits(UUID userId);
+    void removeUserOverride(UUID userId);
 
     /**
-     * Check if a user has rate limit configuration
+     * Check if a user has a per-user rate limit override set.
      * @param userId The user ID
-     * @return true if user has rate limits configured, false otherwise
+     * @return true if user has an override, false if using tier defaults
      */
-    boolean hasRateLimits(UUID userId);
-
-    /**
-     * Apply premium rate limits for a user (e.g. on subscription upgrade)
-     * @param userId The user ID
-     */
-    void applyPremiumLimits(UUID userId);
-
-    /**
-     * Apply free-tier rate limits for a user (e.g. on subscription downgrade)
-     * @param userId The user ID
-     */
-    void applyFreeLimits(UUID userId);
+    boolean hasUserOverride(UUID userId);
 }

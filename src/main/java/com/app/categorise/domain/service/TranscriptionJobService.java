@@ -12,6 +12,8 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.app.categorise.util.LogSanitizer;
+
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -51,19 +53,19 @@ public class TranscriptionJobService {
                 case PENDING, PROCESSING -> {
                     // Already queued or in-flight — return as-is to avoid duplicates
                     log.info("Returning existing {} job {} for user={} videoUrl={}",
-                            existingJob.getStatus(), existingJob.getId(), userId, videoUrl);
+                            existingJob.getStatus(), existingJob.getId(), userId, LogSanitizer.sanitize(videoUrl));
                     return existingJob;
                 }
                 case COMPLETED -> {
                     // Already done — return so the caller can use the result
                     log.info("Returning existing COMPLETED job {} for user={} videoUrl={}",
-                            existingJob.getId(), userId, videoUrl);
+                            existingJob.getId(), userId, LogSanitizer.sanitize(videoUrl));
                     return existingJob;
                 }
                 case FAILED -> {
                     // Previous attempt failed — create a fresh job so the user can retry
                     log.info("Previous job {} FAILED for user={} videoUrl={}, creating new PENDING job",
-                            existingJob.getId(), userId, videoUrl);
+                            existingJob.getId(), userId, LogSanitizer.sanitize(videoUrl));
                 }
             }
         }
@@ -72,7 +74,7 @@ public class TranscriptionJobService {
         //    No active job for this user — create an instant COMPLETED job linked to it
         Optional<BaseTranscriptEntity> existingTranscript = baseTranscriptRepository.findByVideoUrl(videoUrl);
         if (existingTranscript.isPresent()) {
-            log.info("Transcript already exists for videoUrl={}, creating COMPLETED job for user={}", videoUrl, userId);
+            log.info("Transcript already exists for videoUrl={}, creating COMPLETED job for user={}", LogSanitizer.sanitize(videoUrl), userId);
             TranscriptionJobEntity job = new TranscriptionJobEntity();
             job.setUserId(userId);
             job.setVideoUrl(videoUrl);
@@ -87,7 +89,7 @@ public class TranscriptionJobService {
         job.setVideoUrl(videoUrl);
         job.setStatus(JobStatus.PENDING);
         job = jobRepository.save(job);
-        log.info("Job {} created for user={} videoUrl={}", job.getId(), userId, videoUrl);
+        log.info("Job {} created for user={} videoUrl={}", job.getId(), userId, LogSanitizer.sanitize(videoUrl));
         return job;
     }
 

@@ -169,9 +169,24 @@ class VideoServiceTest {
         @Test
         @DisplayName("Extracts audio and metadata successfully")
         void extractAudioAndMetadata_invokesProcessExecutor() throws Exception {
-            String testUrl = "https://example.com/video";
+            String testUrl = "https://www.youtube.com/watch?v=abc123";
             assertDoesNotThrow(() -> videoService.extractAudioAndMetadata(testUrl));
             verify(processExecutor, atLeastOnce()).run(any(String[].class));
+        }
+
+        @Test
+        @DisplayName("Includes -- separator before videoUrl to prevent argument injection")
+        void extractAudioAndMetadata_includesArgSeparatorBeforeUrl() throws Exception {
+            String testUrl = "https://www.youtube.com/watch?v=abc123";
+            videoService.extractAudioAndMetadata(testUrl);
+
+            org.mockito.ArgumentCaptor<String[]> captor = org.mockito.ArgumentCaptor.forClass(String[].class);
+            verify(processExecutor, atLeastOnce()).run(captor.capture());
+
+            String[] command = captor.getValue();
+            // The last two elements should be "--" followed by the URL
+            assertEquals("--", command[command.length - 2], "Second-to-last arg should be '--' separator");
+            assertEquals(testUrl, command[command.length - 1], "Last arg should be the video URL");
         }
     }
 

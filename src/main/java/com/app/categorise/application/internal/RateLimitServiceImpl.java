@@ -21,8 +21,14 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * RateLimitServiceImpl - Implementation of rate limiting business logic
- * Handles checking rate limits, recording usage, and managing configurations
+ * RateLimitServiceImpl - Implementation of rate limiting business logic.
+ *
+ * Limits are derived from the user's subscription tier by default:
+ * - Free tier:    5/min, 100/day, 3 total transcripts
+ * - Premium tier: 5/min, 100/day, 10000 total transcripts
+ *
+ * Per-user overrides (stored in user_rate_limits table) take precedence
+ * when they exist, for special cases like beta testers or custom deals.
  */
 @Service
 @Transactional
@@ -36,15 +42,15 @@ public class RateLimitServiceImpl implements RateLimitService {
     private final RateLimitMapper mapper;
     private final SubscriptionService subscriptionService;
 
-    // Free-tier rate limits
-    private static final int DEFAULT_TRANSCRIPTS_PER_MINUTE = 5;
-    private static final int DEFAULT_TRANSCRIPTS_PER_DAY = 100;
-    private static final int DEFAULT_TOTAL_TRANSCRIPTS = 3;
+    // Free-tier defaults
+    static final int DEFAULT_TRANSCRIPTS_PER_MINUTE = 5;
+    static final int DEFAULT_TRANSCRIPTS_PER_DAY = 100;
+    static final int DEFAULT_TOTAL_TRANSCRIPTS = 3;
 
-    // Premium rate limits
-    private static final int PREMIUM_TRANSCRIPTS_PER_MINUTE = 5;
-    private static final int PREMIUM_TRANSCRIPTS_PER_DAY = 100;
-    private static final int PREMIUM_TOTAL_TRANSCRIPTS = 10000;
+    // Premium-tier defaults
+    static final int PREMIUM_TRANSCRIPTS_PER_MINUTE = 5;
+    static final int PREMIUM_TRANSCRIPTS_PER_DAY = 100;
+    static final int PREMIUM_TOTAL_TRANSCRIPTS = 10000;
 
     public RateLimitServiceImpl(UserRateLimitRepository rateLimitRepository,
        UserRateLimitTrackingRepository trackingRepository,
@@ -64,14 +70,8 @@ public class RateLimitServiceImpl implements RateLimitService {
     public RateLimitResult checkRateLimit(UUID userId) {
         logger.debug("Checking rate limits for user: {}", userId);
 
-        // Check if user has premium subscription - bypass most limits for premium users
-        if (subscriptionService.hasActivePremiumSubscription(userId)) {
-            logger.debug("User {} has premium subscription, allowing request", userId);
-            return RateLimitResult.allowed(Integer.MAX_VALUE, null, RateLimitResult.RateLimitType.TOTAL);
-        }
-
-        // Get user's rate limit configuration
-        RateLimitConfig config = getUserRateLimits(userId);
+        // Resolve effective limits: override row > tier defaults
+        RateLimitConfig config = getEffectiveLimits(userId);
 
         // Check total transcript limit first (most restrictive for free users)
         RateLimitResult totalLimitResult = checkTotalTranscriptLimit(userId, config);
@@ -103,13 +103,13 @@ public class RateLimitServiceImpl implements RateLimitService {
         logger.debug("Recording transcription for user: {}", userId);
 
         Instant now = Instant.now();
-        
+
         // Record for minute window
-        recordUsageForWindow(userId, UserRateLimitTrackingEntity.WindowType.MINUTE, 
+        recordUsageForWindow(userId, UserRateLimitTrackingEntity.WindowType.MINUTE,
                            truncateToMinute(now));
-        
+
         // Record for day window
-        recordUsageForWindow(userId, UserRateLimitTrackingEntity.WindowType.DAY, 
+        recordUsageForWindow(userId, UserRateLimitTrackingEntity.WindowType.DAY,
                            truncateToDay(now));
 
         logger.debug("Transcription recorded for user: {}", userId);
@@ -117,26 +117,28 @@ public class RateLimitServiceImpl implements RateLimitService {
 
     @Override
     @Transactional(readOnly = true)
-    public RateLimitConfig getUserRateLimits(UUID userId) {
-        Optional<UserRateLimitEntity> entity = rateLimitRepository.findByUserId(userId);
-        
-        if (entity.isPresent()) {
-            return mapper.toDomainModel(entity.get());
+    public RateLimitConfig getEffectiveLimits(UUID userId) {
+        // Check for per-user override first
+        Optional<UserRateLimitEntity> override = rateLimitRepository.findByUserId(userId);
+
+        if (override.isPresent()) {
+            logger.debug("Using per-user override limits for user {}", userId);
+            return mapper.toDomainModel(override.get());
         }
-        
-        // Return default configuration if not found
-        logger.debug("No rate limits found for user {}, returning defaults", userId);
-        return createDefaultConfig(userId);
+
+        // No override — derive from subscription tier
+        boolean isPremium = subscriptionService.hasActivePremiumSubscription(userId);
+        return tierDefaults(userId, isPremium);
     }
 
     @Override
-    public void updateUserRateLimits(UUID userId, RateLimitConfig config) {
-        logger.info("Updating rate limits for user: {}", userId);
-        
-        Optional<UserRateLimitEntity> existingEntity = rateLimitRepository.findByUserId(userId);
-        
-        if (existingEntity.isPresent()) {
-            UserRateLimitEntity entity = existingEntity.get();
+    public void setUserOverride(UUID userId, RateLimitConfig config) {
+        logger.info("Setting rate limit override for user: {}", userId);
+
+        Optional<UserRateLimitEntity> existing = rateLimitRepository.findByUserId(userId);
+
+        if (existing.isPresent()) {
+            UserRateLimitEntity entity = existing.get();
             mapper.updateEntity(entity, config);
             rateLimitRepository.save(entity);
         } else {
@@ -146,30 +148,19 @@ public class RateLimitServiceImpl implements RateLimitService {
             }
             rateLimitRepository.save(newEntity);
         }
-        
-        logger.info("Rate limits updated for user: {}", userId);
+
+        logger.info("Rate limit override set for user: {}", userId);
     }
 
     @Override
-    public void initializeDefaultLimits(UUID userId) {
-        if (!hasRateLimits(userId)) {
-            logger.info("Initializing default rate limits for user: {}", userId);
-            
-            UserRateLimitEntity entity = new UserRateLimitEntity(
-                userId, 
-                DEFAULT_TRANSCRIPTS_PER_MINUTE,
-                DEFAULT_TRANSCRIPTS_PER_DAY, 
-                DEFAULT_TOTAL_TRANSCRIPTS
-            );
-            
-            rateLimitRepository.save(entity);
-            logger.info("Default rate limits initialized for user: {}", userId);
-        }
+    public void removeUserOverride(UUID userId) {
+        logger.info("Removing rate limit override for user: {}", userId);
+        rateLimitRepository.findByUserId(userId).ifPresent(rateLimitRepository::delete);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public boolean hasRateLimits(UUID userId) {
+    public boolean hasUserOverride(UUID userId) {
         return rateLimitRepository.existsByUserId(userId);
     }
 
@@ -177,14 +168,14 @@ public class RateLimitServiceImpl implements RateLimitService {
     private RateLimitResult checkTotalTranscriptLimit(UUID userId, RateLimitConfig config) {
         long totalTranscripts = transcriptRepository.countByUserId(userId);
         int limit = config.getTotalTranscriptsLimit();
-        
+
         if (totalTranscripts >= limit) {
             return RateLimitResult.denied(
                 String.format("Total transcript limit exceeded (%d/%d)", totalTranscripts, limit),
                 RateLimitResult.RateLimitType.TOTAL
             );
         }
-        
+
         int remaining = (int) (limit - totalTranscripts);
         return RateLimitResult.allowed(remaining, null, RateLimitResult.RateLimitType.TOTAL);
     }
@@ -193,7 +184,7 @@ public class RateLimitServiceImpl implements RateLimitService {
         Instant dayStart = truncateToDay(Instant.now());
         int currentCount = getCurrentCount(userId, UserRateLimitTrackingEntity.WindowType.DAY, dayStart);
         int limit = config.getTranscriptsPerDayLimit();
-        
+
         if (currentCount >= limit) {
             Instant resetTime = dayStart.plus(1, ChronoUnit.DAYS);
             return RateLimitResult.denied(
@@ -202,7 +193,7 @@ public class RateLimitServiceImpl implements RateLimitService {
                 resetTime
             );
         }
-        
+
         int remaining = limit - currentCount;
         Instant resetTime = dayStart.plus(1, ChronoUnit.DAYS);
         return RateLimitResult.allowed(remaining, resetTime, RateLimitResult.RateLimitType.PER_DAY);
@@ -212,7 +203,7 @@ public class RateLimitServiceImpl implements RateLimitService {
         Instant minuteStart = truncateToMinute(Instant.now());
         int currentCount = getCurrentCount(userId, UserRateLimitTrackingEntity.WindowType.MINUTE, minuteStart);
         int limit = config.getTranscriptsPerMinuteLimit();
-        
+
         if (currentCount >= limit) {
             Instant resetTime = minuteStart.plus(1, ChronoUnit.MINUTES);
             return RateLimitResult.denied(
@@ -221,7 +212,7 @@ public class RateLimitServiceImpl implements RateLimitService {
                 resetTime
             );
         }
-        
+
         int remaining = limit - currentCount;
         Instant resetTime = minuteStart.plus(1, ChronoUnit.MINUTES);
         return RateLimitResult.allowed(remaining, resetTime, RateLimitResult.RateLimitType.PER_MINUTE);
@@ -236,7 +227,7 @@ public class RateLimitServiceImpl implements RateLimitService {
     private void recordUsageForWindow(UUID userId, UserRateLimitTrackingEntity.WindowType windowType, Instant windowStart) {
         // Try to increment existing record
         int rowsUpdated = trackingRepository.incrementRequestCount(userId, windowStart, windowType);
-        
+
         if (rowsUpdated == 0) {
             // No existing record, create new one with count = 1
             UserRateLimitTrackingEntity newRecord = new UserRateLimitTrackingEntity(userId, windowStart, windowType, 1);
@@ -252,39 +243,16 @@ public class RateLimitServiceImpl implements RateLimitService {
         return instant.truncatedTo(ChronoUnit.DAYS);
     }
 
-    @Override
-    public void applyPremiumLimits(UUID userId) {
-        logger.info("Applying premium rate limits for user: {}", userId);
-        RateLimitConfig premiumConfig = new RateLimitConfig(
-            null, userId,
-            PREMIUM_TRANSCRIPTS_PER_MINUTE,
-            PREMIUM_TRANSCRIPTS_PER_DAY,
-            PREMIUM_TOTAL_TRANSCRIPTS,
-            null, null
-        );
-        updateUserRateLimits(userId, premiumConfig);
-    }
-
-    @Override
-    public void applyFreeLimits(UUID userId) {
-        logger.info("Applying free-tier rate limits for user: {}", userId);
-        RateLimitConfig freeConfig = new RateLimitConfig(
-            null, userId,
-            DEFAULT_TRANSCRIPTS_PER_MINUTE,
-            DEFAULT_TRANSCRIPTS_PER_DAY,
-            DEFAULT_TOTAL_TRANSCRIPTS,
-            null, null
-        );
-        updateUserRateLimits(userId, freeConfig);
-    }
-
-    private RateLimitConfig createDefaultConfig(UUID userId) {
+    /**
+     * Build a RateLimitConfig from tier defaults (no database row needed).
+     */
+    private RateLimitConfig tierDefaults(UUID userId, boolean isPremium) {
         return new RateLimitConfig(
             null,
             userId,
-            DEFAULT_TRANSCRIPTS_PER_MINUTE,
-            DEFAULT_TRANSCRIPTS_PER_DAY,
-            DEFAULT_TOTAL_TRANSCRIPTS,
+            isPremium ? PREMIUM_TRANSCRIPTS_PER_MINUTE : DEFAULT_TRANSCRIPTS_PER_MINUTE,
+            isPremium ? PREMIUM_TRANSCRIPTS_PER_DAY : DEFAULT_TRANSCRIPTS_PER_DAY,
+            isPremium ? PREMIUM_TOTAL_TRANSCRIPTS : DEFAULT_TOTAL_TRANSCRIPTS,
             null,
             null
         );

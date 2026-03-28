@@ -129,6 +129,7 @@ public class VideoService {
             command.add("5");
             command.add("-o");
             command.add(outputTemplate);
+            command.add("--");  // Prevent argument injection if videoUrl starts with --
             command.add(videoUrl);
 
             processExecutor.run(command.toArray(new String[0]));

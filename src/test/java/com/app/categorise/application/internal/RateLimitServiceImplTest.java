@@ -188,10 +188,11 @@ class RateLimitServiceImplTest {
         }
 
         @Test
-        @DisplayName("Should use default config when user has no rate limits")
-        void shouldUseDefaultConfigWhenUserHasNoRateLimits() {
-            // Given
+        @DisplayName("Should use free-tier defaults when no override exists and user is not premium")
+        void shouldUseFreeTierDefaultsWhenNoOverrideExists() {
+            // Given — no override row, not premium
             when(rateLimitRepository.findByUserId(userId)).thenReturn(Optional.empty());
+            when(subscriptionService.hasActivePremiumSubscription(userId)).thenReturn(false);
             when(transcriptRepository.countByUserId(userId)).thenReturn(0L);
             when(trackingRepository.findByUserIdAndWindowStartAndWindowType(
                     eq(userId), any(Instant.class), any(UserRateLimitTrackingEntity.WindowType.class)))
@@ -204,6 +205,24 @@ class RateLimitServiceImplTest {
             assertThat(result.isAllowed()).isTrue();
             assertThat(result.getRemainingRequests()).isEqualTo(5); // Default minute limit
             assertThat(result.getLimitType()).isEqualTo(RateLimitResult.RateLimitType.PER_MINUTE);
+        }
+
+        @Test
+        @DisplayName("Should use premium-tier defaults when no override exists and user is premium")
+        void shouldUsePremiumTierDefaultsWhenNoOverrideAndPremium() {
+            // Given — no override row, but premium subscriber
+            when(rateLimitRepository.findByUserId(userId)).thenReturn(Optional.empty());
+            when(subscriptionService.hasActivePremiumSubscription(userId)).thenReturn(true);
+            when(transcriptRepository.countByUserId(userId)).thenReturn(5000L);
+            when(trackingRepository.findByUserIdAndWindowStartAndWindowType(
+                    eq(userId), any(Instant.class), any(UserRateLimitTrackingEntity.WindowType.class)))
+                    .thenReturn(Optional.empty());
+
+            // When
+            RateLimitResult result = rateLimitService.checkRateLimit(userId);
+
+            // Then — premium total limit is 10000, user has 5000, so allowed
+            assertThat(result.isAllowed()).isTrue();
         }
     }
 
@@ -253,62 +272,74 @@ class RateLimitServiceImplTest {
     }
 
     @Nested
-    @DisplayName("getUserRateLimits")
-    class GetUserRateLimitsTests {
+    @DisplayName("getEffectiveLimits")
+    class GetEffectiveLimitsTests {
 
         @Test
-        @DisplayName("Should return user rate limits when they exist")
-        void shouldReturnUserRateLimitsWhenTheyExist() {
+        @DisplayName("Should return override when one exists")
+        void shouldReturnOverrideWhenOneExists() {
             // Given
             when(rateLimitRepository.findByUserId(userId)).thenReturn(Optional.of(rateLimitEntity));
             when(mapper.toDomainModel(rateLimitEntity)).thenReturn(rateLimitConfig);
 
             // When
-            RateLimitConfig result = rateLimitService.getUserRateLimits(userId);
+            RateLimitConfig result = rateLimitService.getEffectiveLimits(userId);
 
             // Then
             assertThat(result).isEqualTo(rateLimitConfig);
             verify(mapper).toDomainModel(rateLimitEntity);
+            verify(subscriptionService, never()).hasActivePremiumSubscription(any());
         }
 
         @Test
-        @DisplayName("Should return default config when user has no rate limits")
-        void shouldReturnDefaultConfigWhenUserHasNoRateLimits() {
+        @DisplayName("Should return free-tier defaults when no override and not premium")
+        void shouldReturnFreeTierDefaultsWhenNoOverrideAndNotPremium() {
             // Given
             when(rateLimitRepository.findByUserId(userId)).thenReturn(Optional.empty());
+            when(subscriptionService.hasActivePremiumSubscription(userId)).thenReturn(false);
 
             // When
-            RateLimitConfig result = rateLimitService.getUserRateLimits(userId);
+            RateLimitConfig result = rateLimitService.getEffectiveLimits(userId);
 
             // Then
             assertThat(result.getUserId()).isEqualTo(userId);
-            assertThat(result.getTranscriptsPerMinuteLimit()).isEqualTo(5);
-            assertThat(result.getTranscriptsPerDayLimit()).isEqualTo(100);
-            assertThat(result.getTotalTranscriptsLimit()).isEqualTo(3);
-            assertThat(result.getId()).isNull(); // Default config has no ID
+            assertThat(result.getTranscriptsPerMinuteLimit()).isEqualTo(RateLimitServiceImpl.DEFAULT_TRANSCRIPTS_PER_MINUTE);
+            assertThat(result.getTranscriptsPerDayLimit()).isEqualTo(RateLimitServiceImpl.DEFAULT_TRANSCRIPTS_PER_DAY);
+            assertThat(result.getTotalTranscriptsLimit()).isEqualTo(RateLimitServiceImpl.DEFAULT_TOTAL_TRANSCRIPTS);
+            assertThat(result.getId()).isNull();
+        }
+
+        @Test
+        @DisplayName("Should return premium-tier defaults when no override and premium")
+        void shouldReturnPremiumTierDefaultsWhenNoOverrideAndPremium() {
+            // Given
+            when(rateLimitRepository.findByUserId(userId)).thenReturn(Optional.empty());
+            when(subscriptionService.hasActivePremiumSubscription(userId)).thenReturn(true);
+
+            // When
+            RateLimitConfig result = rateLimitService.getEffectiveLimits(userId);
+
+            // Then
+            assertThat(result.getTotalTranscriptsLimit()).isEqualTo(RateLimitServiceImpl.PREMIUM_TOTAL_TRANSCRIPTS);
         }
     }
 
     @Nested
-    @DisplayName("updateUserRateLimits")
-    class UpdateUserRateLimitsTests {
+    @DisplayName("setUserOverride")
+    class SetUserOverrideTests {
 
         @Test
-        @DisplayName("Should update existing rate limits")
-        void shouldUpdateExistingRateLimits() {
+        @DisplayName("Should update existing override")
+        void shouldUpdateExistingOverride() {
             // Given
             RateLimitConfig updatedConfig = new RateLimitConfig(
-                    rateLimitConfig.getId(),
-                    userId,
-                    10, 200, 20000,
-                    rateLimitConfig.getCreatedAt(),
-                    Instant.now()
+                    rateLimitConfig.getId(), userId, 10, 200, 20000,
+                    rateLimitConfig.getCreatedAt(), Instant.now()
             );
-            
             when(rateLimitRepository.findByUserId(userId)).thenReturn(Optional.of(rateLimitEntity));
 
             // When
-            rateLimitService.updateUserRateLimits(userId, updatedConfig);
+            rateLimitService.setUserOverride(userId, updatedConfig);
 
             // Then
             verify(mapper).updateEntity(rateLimitEntity, updatedConfig);
@@ -316,19 +347,16 @@ class RateLimitServiceImplTest {
         }
 
         @Test
-        @DisplayName("Should create new rate limits when none exist")
-        void shouldCreateNewRateLimitsWhenNoneExist() {
+        @DisplayName("Should create new override when none exists")
+        void shouldCreateNewOverrideWhenNoneExists() {
             // Given
-            RateLimitConfig newConfig = new RateLimitConfig(
-                    null, userId, 10, 200, 20000, null, null
-            );
+            RateLimitConfig newConfig = new RateLimitConfig(null, userId, 10, 200, 20000, null, null);
             UserRateLimitEntity newEntity = new UserRateLimitEntity(userId, 10, 200, 20000);
-            
             when(rateLimitRepository.findByUserId(userId)).thenReturn(Optional.empty());
             when(mapper.toEntity(newConfig)).thenReturn(newEntity);
 
             // When
-            rateLimitService.updateUserRateLimits(userId, newConfig);
+            rateLimitService.setUserOverride(userId, newConfig);
 
             // Then
             verify(mapper).toEntity(newConfig);
@@ -337,64 +365,21 @@ class RateLimitServiceImplTest {
     }
 
     @Nested
-    @DisplayName("initializeDefaultLimits")
-    class InitializeDefaultLimitsTests {
+    @DisplayName("hasUserOverride")
+    class HasUserOverrideTests {
 
         @Test
-        @DisplayName("Should initialize default limits for new user")
-        void shouldInitializeDefaultLimitsForNewUser() {
-            // Given
-            when(rateLimitRepository.existsByUserId(userId)).thenReturn(false);
-
-            // When
-            rateLimitService.initializeDefaultLimits(userId);
-
-            // Then
-            verify(rateLimitRepository).save(any(UserRateLimitEntity.class));
-        }
-
-        @Test
-        @DisplayName("Should not initialize limits when user already has them")
-        void shouldNotInitializeLimitsWhenUserAlreadyHasThem() {
-            // Given
+        @DisplayName("Should return true when user has an override")
+        void shouldReturnTrueWhenUserHasOverride() {
             when(rateLimitRepository.existsByUserId(userId)).thenReturn(true);
-
-            // When
-            rateLimitService.initializeDefaultLimits(userId);
-
-            // Then
-            verify(rateLimitRepository, never()).save(any(UserRateLimitEntity.class));
-        }
-    }
-
-    @Nested
-    @DisplayName("hasRateLimits")
-    class HasRateLimitsTests {
-
-        @Test
-        @DisplayName("Should return true when user has rate limits")
-        void shouldReturnTrueWhenUserHasRateLimits() {
-            // Given
-            when(rateLimitRepository.existsByUserId(userId)).thenReturn(true);
-
-            // When
-            boolean result = rateLimitService.hasRateLimits(userId);
-
-            // Then
-            assertThat(result).isTrue();
+            assertThat(rateLimitService.hasUserOverride(userId)).isTrue();
         }
 
         @Test
-        @DisplayName("Should return false when user has no rate limits")
-        void shouldReturnFalseWhenUserHasNoRateLimits() {
-            // Given
+        @DisplayName("Should return false when user has no override")
+        void shouldReturnFalseWhenUserHasNoOverride() {
             when(rateLimitRepository.existsByUserId(userId)).thenReturn(false);
-
-            // When
-            boolean result = rateLimitService.hasRateLimits(userId);
-
-            // Then
-            assertThat(result).isFalse();
+            assertThat(rateLimitService.hasUserOverride(userId)).isFalse();
         }
     }
 }

@@ -6,11 +6,9 @@ import com.app.categorise.data.repository.UserSubscriptionRepository;
 import com.app.categorise.data.repository.UserTranscriptRepository;
 import com.app.categorise.domain.model.SubscriptionSource;
 import com.app.categorise.domain.model.UserSubscription;
-import com.app.categorise.domain.service.RateLimitService;
 import com.app.categorise.domain.service.SubscriptionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,16 +30,13 @@ public class SubscriptionServiceImpl implements SubscriptionService {
     private final UserSubscriptionRepository subscriptionRepository;
     private final UserTranscriptRepository transcriptRepository;
     private final SubscriptionMapper mapper;
-    private final RateLimitService rateLimitService;
     
     public SubscriptionServiceImpl(UserSubscriptionRepository subscriptionRepository,
                                   UserTranscriptRepository transcriptRepository,
-                                  SubscriptionMapper mapper,
-                                  @Lazy RateLimitService rateLimitService) {
+                                  SubscriptionMapper mapper) {
         this.subscriptionRepository = subscriptionRepository;
         this.transcriptRepository = transcriptRepository;
         this.mapper = mapper;
-        this.rateLimitService = rateLimitService;
     }
     
     @Override
@@ -139,7 +134,6 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         entity.setAutoRenew(true);
 
         UserSubscriptionEntity saved = subscriptionRepository.save(entity);
-        rateLimitService.applyPremiumLimits(userId);
         logger.info("Successfully upgraded user {} to premium via Google Play", userId);
 
         return mapper.toDomainModel(saved);
@@ -186,7 +180,6 @@ public class SubscriptionServiceImpl implements SubscriptionService {
         entity.setAutoRenew(true);
 
         subscriptionRepository.save(entity);
-        rateLimitService.applyPremiumLimits(userId);
 
         logger.info("User {} upgraded to {} via App Store, expires {}",
                 userId, type, expirationDate);
@@ -207,7 +200,6 @@ public class SubscriptionServiceImpl implements SubscriptionService {
             entity.setStatus(UserSubscriptionEntity.SubscriptionStatus.CANCELLED);
             entity.setAutoRenew(false);
             subscriptionRepository.save(entity);
-            rateLimitService.applyFreeLimits(userId);
 
             logger.info("Subscription marked as cancelled for user: {}. " +
                     "User should cancel via Google Play Store to stop billing.", userId);

@@ -36,9 +36,6 @@ public class AppleAuthService {
     @Autowired
     private SubscriptionService subscriptionService;
     
-    @Autowired
-    private RateLimitService rateLimitService;
-    
     @org.springframework.beans.factory.annotation.Value("${app.jwtRefreshExpirationInMs}")
     private long jwtRefreshExpirationInMs;
 
@@ -190,9 +187,8 @@ public class AppleAuthService {
 
         UserEntity savedUser = userRepository.save(newUser);
         
-        // Initialize free subscription and rate limits for new user (matching Google auth)
+        // Initialize free subscription for new user
         subscriptionService.initializeFreeSubscription(savedUser.getId());
-        rateLimitService.initializeDefaultLimits(savedUser.getId());
 
         return savedUser;
     }

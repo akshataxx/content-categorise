@@ -42,9 +42,6 @@ public class AuthService {
     private SubscriptionService subscriptionService;
 
     @Autowired
-    private RateLimitService rateLimitService;
-
-    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Value("${google.client-id}")
@@ -98,9 +95,8 @@ public class AuthService {
                 newUser.setPictureUrl(pictureUrl);
                 UserEntity savedUser = userRepository.save(newUser);
 
-                // Initialize free subscription and rate limits for new user
+                // Initialize free subscription for new user
                 subscriptionService.initializeFreeSubscription(savedUser.getId());
-                rateLimitService.initializeDefaultLimits(savedUser.getId());
 
                 return savedUser;
             });

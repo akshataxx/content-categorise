@@ -12,6 +12,8 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.app.categorise.util.LogSanitizer;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -47,14 +49,14 @@ public class TranscriptionJobService {
         if (existing.isPresent()) {
             TranscriptionJobEntity existingJob = existing.get();
             log.info("Returning existing job {} (status={}) for user={} videoUrl={}",
-                    existingJob.getId(), existingJob.getStatus(), userId, videoUrl);
+                    existingJob.getId(), existingJob.getStatus(), userId, LogSanitizer.sanitize(videoUrl));
             return existingJob;
         }
 
         // 2. Check if transcript already exists (another user already transcribed this URL)
         Optional<BaseTranscriptEntity> existingTranscript = baseTranscriptRepository.findByVideoUrl(videoUrl);
         if (existingTranscript.isPresent()) {
-            log.info("Transcript already exists for videoUrl={}, creating COMPLETED job", videoUrl);
+            log.info("Transcript already exists for videoUrl={}, creating COMPLETED job", LogSanitizer.sanitize(videoUrl));
             TranscriptionJobEntity job = new TranscriptionJobEntity();
             job.setUserId(userId);
             job.setVideoUrl(videoUrl);
@@ -69,7 +71,7 @@ public class TranscriptionJobService {
         job.setVideoUrl(videoUrl);
         job.setStatus(JobStatus.PENDING);
         job = jobRepository.save(job);
-        log.info("Job {} created for user={} videoUrl={}", job.getId(), userId, videoUrl);
+        log.info("Job {} created for user={} videoUrl={}", job.getId(), userId, LogSanitizer.sanitize(videoUrl));
         return job;
     }
 

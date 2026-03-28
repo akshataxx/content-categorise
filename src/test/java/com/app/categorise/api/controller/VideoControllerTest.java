@@ -45,7 +45,7 @@ class VideoControllerTest {
     @InjectMocks
     private VideoController videoController;
 
-    private final String testVideoUrl = "https://example.com/video";
+    private final String testVideoUrl = "https://www.youtube.com/watch?v=abc123";
     private final UUID testUserId = UUID.randomUUID();
     private TranscriptDtoWithAliases testTranscriptDtoWithAlias;
 
@@ -177,8 +177,8 @@ class VideoControllerTest {
         
         verify(rateLimitService).checkRateLimit(testUserId);
         verify(videoService).processVideoAndCreateTranscript(testVideoUrl, testUserId);
-        // Should not record transcription when service throws exception
-        verify(rateLimitService, never()).recordTranscription(testUserId);
+        // Rate limit is recorded upfront at submission time (TOCTOU fix)
+        verify(rateLimitService).recordTranscription(testUserId);
         // Should handle the failure on the job
         verify(transcriptionJobService).handleFailure(eq(mockJob), any(Exception.class));
     }

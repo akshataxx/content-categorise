@@ -10,6 +10,8 @@ import com.app.categorise.domain.service.TranscriptionJobService;
 import com.app.categorise.domain.service.VideoService;
 import com.app.categorise.exception.RateLimitExceededException;
 import com.app.categorise.security.UserPrincipal;
+import com.app.categorise.util.LogSanitizer;
+import com.app.categorise.util.VideoUrlValidator;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
@@ -46,7 +48,7 @@ public class VideoController {
             @RequestBody Map<String, String> request,
             @AuthenticationPrincipal UserPrincipal principal) {
         String videoUrl = request.get("videoUrl");
-        log.info("POST /api/video/transcribe received for videoUrl={}", videoUrl);
+        log.info("POST /api/video/transcribe received for videoUrl={}", LogSanitizer.sanitize(videoUrl));
 
         validateRequest(videoUrl, principal);
 
@@ -57,6 +59,9 @@ public class VideoController {
         if (!rateLimitResult.isAllowed()) {
             throw new RateLimitExceededException(rateLimitResult);
         }
+
+        // Reserve rate limit slot upfront to prevent TOCTOU race condition
+        rateLimitService.recordTranscription(userId);
 
         // Create durable job row
         TranscriptionJobEntity job = transcriptionJobService.createOrGetExisting(userId, videoUrl);
@@ -73,8 +78,7 @@ public class VideoController {
                         if (isNewJob) {
                             transcriptionJobService.markCompletedForUrl(job, videoUrl, transcriptDto.id());
                         }
-                        rateLimitService.recordTranscription(userId);
-                        log.info("Transcription completed for jobId={}, videoUrl={}", job.getId(), videoUrl);
+                        log.info("Transcription completed for jobId={}, videoUrl={}", job.getId(), LogSanitizer.sanitize(videoUrl));
                     } else {
                         Throwable cause = (ex instanceof CompletionException) ? ex.getCause() : ex;
                         if (isNewJob) {
@@ -92,7 +96,7 @@ public class VideoController {
             @RequestBody Map<String, String> request,
             @AuthenticationPrincipal UserPrincipal principal) {
         String videoUrl = request.get("videoUrl");
-        log.info("POST /api/video/transcribe-async received for videoUrl={}", videoUrl);
+        log.info("POST /api/video/transcribe-async received for videoUrl={}", LogSanitizer.sanitize(videoUrl));
 
         validateRequest(videoUrl, principal);
         
@@ -104,6 +108,9 @@ public class VideoController {
             throw new RateLimitExceededException(rateLimitResult);
         }
 
+        // Reserve rate limit slot upfront to prevent TOCTOU race condition
+        rateLimitService.recordTranscription(userId);
+
         // Create durable job row - poller picks it up (WP03)
         TranscriptionJobEntity job = transcriptionJobService.createOrGetExisting(userId, videoUrl);
 
@@ -112,11 +119,9 @@ public class VideoController {
     }
 
     private void validateRequest(String videoUrl, UserPrincipal principal) {
-        if (videoUrl == null || videoUrl.isBlank()) {
-            throw new IllegalArgumentException("Missing 'videoUrl' in request body");
-        }
         if (principal == null) {
             throw new IllegalArgumentException("User not authenticated");
         }
+        VideoUrlValidator.validate(videoUrl);
     }
 }

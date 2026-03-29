@@ -75,8 +75,10 @@ jobs:
       - name: Smoke test — verify yt-dlp works in the new image
         if: steps.should_update.outputs.update == 'true'
         run: |
-          EXPECTED="${{ steps.version_check.outputs.latest }}"
-          ACTUAL=$(docker run --rm --entrypoint yt-dlp ${{ env.IMAGE }}:latest --version 2>&1) || true
+          # PyPI returns "2026.3.17", yt-dlp reports "2026.03.17" — normalise by removing leading zeros from each segment
+          normalise() { echo "$1" | awk -F. '{printf "%d.%d.%d\n", $1, $2, $3}'; }
+          EXPECTED=$(normalise "${{ steps.version_check.outputs.latest }}")
+          ACTUAL=$(normalise "$(docker run --rm --entrypoint yt-dlp ${{ env.IMAGE }}:latest --version 2>&1)")
           echo "Expected: $EXPECTED | Actual: $ACTUAL"
           if [ "$EXPECTED" != "$ACTUAL" ]; then
             echo "::error::yt-dlp version mismatch — aborting deploy"

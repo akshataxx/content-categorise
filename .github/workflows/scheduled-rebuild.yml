@@ -1,0 +1,99 @@
+name: Update yt-dlp
+
+# Checks daily for a new yt-dlp release. If one exists, layers the update
+# on top of the currently deployed image (app code stays untouched).
+
+on:
+  schedule:
+    # Daily at 4:00 AM UTC
+    - cron: "0 4 * * *"
+  workflow_dispatch: # Allow manual trigger (always rebuilds)
+
+env:
+  IMAGE: gcr.io/content-categorisation/content-app
+
+jobs:
+  check-and-update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for new yt-dlp version on PyPI
+        id: version_check
+        run: |
+          LATEST=$(pip3 index versions yt-dlp 2>/dev/null | head -1 | grep -oP '\(\K[^)]+')
+          echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
+          echo "Latest yt-dlp on PyPI: $LATEST"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Check if this yt-dlp version is already deployed
+        id: should_update
+        run: |
+          YTDLP_VERSION="${{ steps.version_check.outputs.latest }}"
+
+          EXISTING=$(gcloud container images list-tags ${{ env.IMAGE }} \
+            --filter="tags~^ytdlp-${YTDLP_VERSION}$" \
+            --format=json 2>/dev/null)
+
+          if [ "$EXISTING" = "[]" ] || [ -z "$EXISTING" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "update=true" >> "$GITHUB_OUTPUT"
+            echo "No image found for yt-dlp $YTDLP_VERSION or manual trigger — will update"
+          else
+            echo "update=false" >> "$GITHUB_OUTPUT"
+            echo "Image for yt-dlp $YTDLP_VERSION already exists — skipping"
+          fi
+
+      - name: Configure Docker for GCR
+        if: steps.should_update.outputs.update == 'true'
+        run: gcloud auth configure-docker --quiet
+
+      - name: Pull currently deployed image
+        if: steps.should_update.outputs.update == 'true'
+        run: docker pull ${{ env.IMAGE }}:prod
+
+      - name: Build updated image (yt-dlp only, app code untouched)
+        if: steps.should_update.outputs.update == 'true'
+        run: |
+          cat <<'EOF' | docker build --platform linux/amd64 \
+            -t ${{ env.IMAGE }}:prod \
+            -t ${{ env.IMAGE }}:ytdlp-${{ steps.version_check.outputs.latest }} \
+            -f - .
+          FROM ${{ env.IMAGE }}:prod
+          USER root
+          RUN pip3 install --break-system-packages --upgrade "yt-dlp[curl-cffi]"
+          USER app
+          EOF
+
+      - name: Smoke test — verify yt-dlp works in the new image
+        if: steps.should_update.outputs.update == 'true'
+        run: |
+          EXPECTED="${{ steps.version_check.outputs.latest }}"
+          ACTUAL=$(docker run --rm ${{ env.IMAGE }}:prod yt-dlp --version 2>/dev/null)
+          echo "Expected: $EXPECTED | Actual: $ACTUAL"
+          if [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo "::error::yt-dlp version mismatch — aborting deploy"
+            exit 1
+          fi
+          echo "Smoke test passed ✅"
+
+      - name: Push image
+        if: steps.should_update.outputs.update == 'true'
+        run: |
+          docker push ${{ env.IMAGE }}:prod
+          docker push ${{ env.IMAGE }}:ytdlp-${{ steps.version_check.outputs.latest }}
+
+      - name: Deploy to GCE
+        if: steps.should_update.outputs.update == 'true'
+        uses: google-github-actions/ssh-compute@v1
+        with:
+          instance_name: content-backend-vm
+          zone: australia-southeast1-b
+          ssh_private_key: ${{ secrets.GCE_SSH_PRIVATE_KEY }}
+          command: |
+            docker pull ${{ env.IMAGE }}:prod
+            docker compose -f docker-compose.prod.yml up -d app

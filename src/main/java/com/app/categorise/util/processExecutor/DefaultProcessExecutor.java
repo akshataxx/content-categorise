@@ -10,7 +10,7 @@ import java.io.IOException;
 @Component
 public class DefaultProcessExecutor implements ProcessExecutor {
     @Override
-    public void run(String... command) throws IOException, InterruptedException {
-        ProcessRunner.runCommand(command);
+    public void run(int timeoutMinutes, String... command) throws IOException, InterruptedException {
+        ProcessRunner.runCommand(timeoutMinutes, command);
     }
 }

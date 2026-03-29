@@ -15,7 +15,7 @@ public class TestProcessExecutor implements ProcessExecutor {
     private final AtomicInteger calls = new AtomicInteger();
 
     @Override
-    public void run(String... command) throws IOException, InterruptedException {
+    public void run(int timeoutMinutes, String... command) throws IOException, InterruptedException {
         calls.incrementAndGet();
         // no-op
     }

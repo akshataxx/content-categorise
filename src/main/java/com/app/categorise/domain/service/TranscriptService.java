@@ -1,6 +1,7 @@
 package com.app.categorise.domain.service;
 
 import com.app.categorise.application.mapper.VideoMapper;
+import com.app.categorise.data.entity.BaseTranscriptEntity;
 import com.app.categorise.data.entity.UserTranscriptEntity;
 import com.app.categorise.data.repository.BaseTranscriptRepository;
 import com.app.categorise.data.repository.UserTranscriptRepository;
@@ -57,8 +58,30 @@ public class TranscriptService {
         List<UserTranscriptEntity> userTranscripts = userTranscriptRepository.filterByUser(userId, categories, account, from, to);
         
         return userTranscripts.stream()
+            .filter(ut -> isValidTranscript(ut.getBaseTranscript()))
             .map(ut -> videoMapper.buildResponse(ut.getBaseTranscript(), ut))
             .toList();
+    }
+
+    private boolean isValidTranscript(BaseTranscriptEntity base) {
+        if (base == null) return false;
+        if (base.getTranscript() == null || base.getTranscript().isBlank()) {
+            logger.warn("Excluding transcript id={} with blank transcript text", base.getId());
+            return false;
+        }
+        if (base.getTitle() == null || base.getTitle().isBlank()) {
+            logger.warn("Excluding transcript id={} with missing title", base.getId());
+            return false;
+        }
+        if (base.getDuration() == null || base.getDuration() <= 0) {
+            logger.warn("Excluding transcript id={} with invalid duration={}", base.getId(), base.getDuration());
+            return false;
+        }
+        if (base.getUploadedAt() == null || base.getUploadedAt().getEpochSecond() == 0) {
+            logger.warn("Excluding transcript id={} with invalid uploadedAt={}", base.getId(), base.getUploadedAt());
+            return false;
+        }
+        return true;
     }
 
     public TranscriptDtoWithAliases save(UserTranscriptEntity userTranscript) {

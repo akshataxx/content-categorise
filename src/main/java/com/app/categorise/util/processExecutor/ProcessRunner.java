@@ -11,10 +11,13 @@ import java.io.InputStreamReader;
  */
 public class ProcessRunner {
     /**
-     * Runs a shell command and prints the output
-     * @param command the shell command to run
+     * Runs a shell command and waits up to {@code timeoutMinutes} for it to complete.
+     * If the process does not finish in time it is forcibly killed and an exception is thrown.
+     *
+     * @param timeoutMinutes maximum time to wait for the process to finish
+     * @param command        the shell command to run
      */
-    public static void  runCommand(String... command) throws IOException, InterruptedException {
+    public static void runCommand(int timeoutMinutes, String... command) throws IOException, InterruptedException {
         // Resolve full path for common tools if they're not absolute paths
         String[] resolvedCommand = new String[command.length];
         for (int i = 0; i < command.length; i++) {
@@ -24,7 +27,7 @@ public class ProcessRunner {
                 resolvedCommand[i] = command[i];
             }
         }
-        
+
         //Build the command
         ProcessBuilder processBuilder = new ProcessBuilder(resolvedCommand);
 
@@ -43,8 +46,14 @@ public class ProcessRunner {
             }
         }
 
-        // Wait for the command to finish
-        int exitCode = process.waitFor();
+        // Wait for the command to finish within the timeout window
+        boolean finished = process.waitFor(timeoutMinutes, java.util.concurrent.TimeUnit.MINUTES);
+        if (!finished) {
+            process.destroyForcibly();
+            throw new RuntimeException("Command timed out after " + timeoutMinutes + " minute(s): " + resolvedCommand[0]);
+        }
+
+        int exitCode = process.exitValue();
         if (exitCode != 0) {
             throw new RuntimeException("Command failed with exit code: " + exitCode);
         }

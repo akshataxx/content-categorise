@@ -59,6 +59,7 @@ class VideoServiceTest {
         Executor direct = Runnable::run; // run async work on calling thread in tests
         videoService = new VideoService(
                 "/usr/bin/ffmpeg",
+                4,
                 direct,
                 baseTranscriptRepository,
                 categoryAliasService,
@@ -156,7 +157,7 @@ class VideoServiceTest {
             verify(userTranscript).setLastAccessedAt(any(Instant.class));
             verify(userTranscriptRepository).save(userTranscript);
             verify(videoMapper).buildResponse(baseTranscript, userTranscript);
-            verify(processExecutor, never()).run(any(String[].class));
+            verify(processExecutor, never()).run(anyInt(), any(String[].class));
 
             verify(categorisationService, never()).classifyAndSuggestAlias(anyString(), anyString(), anyString());
             verify(videoMapper, never()).createUserTranscriptEntity(any(), any(), any());
@@ -171,7 +172,7 @@ class VideoServiceTest {
         void extractAudioAndMetadata_invokesProcessExecutor() throws Exception {
             String testUrl = "https://www.youtube.com/watch?v=abc123";
             assertDoesNotThrow(() -> videoService.extractAudioAndMetadata(testUrl));
-            verify(processExecutor, atLeastOnce()).run(any(String[].class));
+            verify(processExecutor, atLeastOnce()).run(anyInt(), any(String[].class));
         }
 
         @Test
@@ -181,7 +182,7 @@ class VideoServiceTest {
             videoService.extractAudioAndMetadata(testUrl);
 
             org.mockito.ArgumentCaptor<String[]> captor = org.mockito.ArgumentCaptor.forClass(String[].class);
-            verify(processExecutor, atLeastOnce()).run(captor.capture());
+            verify(processExecutor, atLeastOnce()).run(anyInt(), captor.capture());
 
             String[] command = captor.getValue();
             // The last two elements should be "--" followed by the URL

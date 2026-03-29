@@ -210,6 +210,8 @@ public class VideoService {
                 TikTokMetadata metadata = extractMetadata(files.getMetadataFile());
                 System.out.println(metadata);
 
+                validateTranscriptData(transcriptText, metadata, videoUrl);
+
                 // Create new base transcript
                 baseTranscript = videoMapper.createBaseTranscriptEntity(videoUrl, transcriptText, metadata);
                 baseTranscript = baseTranscriptRepository.save(baseTranscript);
@@ -262,6 +264,29 @@ public class VideoService {
         userTranscript = userTranscriptRepository.save(userTranscript);
 
         return videoMapper.buildResponse(baseTranscript, userTranscript, category.getName(), alias);
+    }
+
+    private void validateTranscriptData(String transcriptText, TikTokMetadata metadata, String videoUrl) {
+        List<String> errors = new ArrayList<>();
+
+        if (transcriptText == null || transcriptText.isBlank()) {
+            errors.add("transcript text is empty");
+        }
+        if (metadata.getTitle() == null || metadata.getTitle().isBlank()) {
+            errors.add("title is missing");
+        }
+        if (metadata.getDuration() <= 0) {
+            errors.add("duration is invalid (" + metadata.getDuration() + ")");
+        }
+        if (metadata.getUploadedEpoch() <= 0) {
+            errors.add("uploadedAt timestamp is invalid (" + metadata.getUploadedEpoch() + ")");
+        }
+
+        if (!errors.isEmpty()) {
+            String message = "Video processing produced incomplete data for URL [" + videoUrl + "]: " + String.join(", ", errors);
+            System.err.println(message);
+            throw new IllegalStateException(message);
+        }
     }
 
     private boolean isFfmpegLocationValid() {

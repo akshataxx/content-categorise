@@ -103,4 +103,8 @@ jobs:
           instance_name: content-backend-vm
           zone: australia-southeast1-b
           ssh_private_key: ${{ secrets.GCE_SSH_PRIVATE_KEY }}
-          command: "whoami && groups && docker pull ${{ env.IMAGE }}:latest && docker compose -f docker-compose.prod.yml up -d app"
+          script: |
+            whoami
+            groups
+            docker pull ${{ env.IMAGE }}:latest
+            docker compose -f docker-compose.prod.yml up -d app

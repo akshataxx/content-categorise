@@ -41,7 +41,8 @@ jobs:
 
           EXISTING=$(gcloud container images list-tags ${{ env.IMAGE }} \
             --filter="tags~^ytdlp-${YTDLP_VERSION}$" \
-            --format=json 2>/dev/null)
+            --format=json 2>&1) || true
+          echo "gcloud output: $EXISTING"
 
           if [ "$EXISTING" = "[]" ] || [ -z "$EXISTING" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "update=true" >> "$GITHUB_OUTPUT"

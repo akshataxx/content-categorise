@@ -96,6 +96,15 @@ jobs:
         if: steps.should_update.outputs.update == 'true'
         run: pip3 install numpy
 
+      - name: Create deploy script
+        if: steps.should_update.outputs.update == 'true'
+        run: |
+          cat > /tmp/deploy.sh <<'EOF'
+          docker pull gcr.io/content-categorisation/content-app:latest
+          docker compose -f docker-compose.prod.yml up -d app
+          EOF
+          chmod +x /tmp/deploy.sh
+
       - name: Deploy to GCE
         if: steps.should_update.outputs.update == 'true'
         uses: google-github-actions/ssh-compute@v2
@@ -103,4 +112,4 @@ jobs:
           instance_name: content-backend-vm
           zone: australia-southeast1-b
           ssh_private_key: ${{ secrets.GCE_SSH_PRIVATE_KEY }}
-          command: "bash -c 'docker pull ${{ env.IMAGE }}:latest && docker compose -f docker-compose.prod.yml up -d app'"
+          script: /tmp/deploy.sh

@@ -76,7 +76,7 @@ jobs:
         if: steps.should_update.outputs.update == 'true'
         run: |
           EXPECTED="${{ steps.version_check.outputs.latest }}"
-          ACTUAL=$(docker run --rm ${{ env.IMAGE }}:latest yt-dlp --version 2>&1) || true
+          ACTUAL=$(docker run --rm --entrypoint yt-dlp ${{ env.IMAGE }}:latest --version 2>&1) || true
           echo "Expected: $EXPECTED | Actual: $ACTUAL"
           if [ "$EXPECTED" != "$ACTUAL" ]; then
             echo "::error::yt-dlp version mismatch — aborting deploy"

@@ -94,7 +94,7 @@ jobs:
 
       - name: Deploy to GCE
         if: steps.should_update.outputs.update == 'true'
-        uses: google-github-actions/ssh-compute@v1  # v2 has a sshpk/Node24 compatibility bug — revisit when fixed
+        uses: google-github-actions/ssh-compute@v2
         with:
           instance_name: content-backend-vm
           zone: australia-southeast1-b

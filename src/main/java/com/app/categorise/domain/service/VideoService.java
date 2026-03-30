@@ -13,6 +13,7 @@ import com.app.categorise.data.entity.UserTranscriptEntity;
 import com.app.categorise.data.repository.BaseTranscriptRepository;
 import com.app.categorise.data.repository.UserTranscriptRepository;
 import com.app.categorise.data.dto.TranscriptCategorisationResult;
+import com.app.categorise.util.FileUtils;
 import com.app.categorise.util.processExecutor.ProcessExecutor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
@@ -59,9 +60,11 @@ public class VideoService {
     private final UserTranscriptRepository userTranscriptRepository;
 
     private final String ffmpegLocation;
+    private final int ytDlpTimeoutMinutes;
 
     public VideoService(
         @Value("${app.ffmpeg.location}") String ffmpegLocation,
+        @Value("${app.ytdlp.timeout-minutes}") int ytDlpTimeoutMinutes,
         @Qualifier("mediaExecutor") Executor mediaExecutor,
         BaseTranscriptRepository baseTranscriptRepository,
         CategoryAliasService categoryAliasService,
@@ -74,6 +77,7 @@ public class VideoService {
         WhisperClient whisperClient
     ){
         this.ffmpegLocation = ffmpegLocation;
+        this.ytDlpTimeoutMinutes = ytDlpTimeoutMinutes;
         this.mediaExecutor = mediaExecutor;
         this.baseTranscriptRepository = baseTranscriptRepository;
         this.categoryAliasService = categoryAliasService;
@@ -132,13 +136,12 @@ public class VideoService {
             command.add("--");  // Prevent argument injection if videoUrl starts with --
             command.add(videoUrl);
 
-            processExecutor.run(command.toArray(new String[0]));
+            processExecutor.run(ytDlpTimeoutMinutes, command.toArray(new String[0]));
 
             File audioFile = new File(baseName + ".mp3");
             File metadataFile = new File(baseName + ".info.json");
-            File videoFile = new File(baseName + ".mp4");  // Potential leftover video file
 
-            return new ProcessedVideoFiles(audioFile, metadataFile, videoFile, tempDir);
+            return new ProcessedVideoFiles(audioFile, metadataFile, tempDir);
         } catch (Exception e) {
             // Clean up temp directory if yt-dlp fails, so partial files don't pile up
             deleteTempDirectory(tempDir);
@@ -147,17 +150,7 @@ public class VideoService {
     }
 
     private void deleteTempDirectory(Path dir) {
-        try {
-            File[] files = dir.toFile().listFiles();
-            if (files != null) {
-                for (File file : files) {
-                    file.delete();
-                }
-            }
-            Files.deleteIfExists(dir);
-        } catch (Exception e) {
-            System.err.println("Failed to clean up temp directory: " + dir);
-        }
+        FileUtils.deleteRecursively(dir);
     }
 
     // Transcribe audio using OpenAI Whisper API

@@ -125,6 +125,62 @@ class TranscriptServiceTest {
         }
     }
 
+
+    @Nested
+    @DisplayName("All Filtered Transcripts")
+    class AllFilteredTranscriptsTests {
+
+        @Test
+        @DisplayName("Returns valid transcripts and excludes malformed ones")
+        void allFilteredTranscripts_excludesMalformedRecords() {
+            UserTranscriptEntity valid = createMockUserTranscriptEntity(userTranscriptId1);
+            valid.getBaseTranscript().setDuration(60.0);
+            valid.getBaseTranscript().setUploadedAt(Instant.ofEpochSecond(1700000000L));
+
+            UserTranscriptEntity noTitle = createMockUserTranscriptEntity(userTranscriptId2);
+            noTitle.getBaseTranscript().setTitle(null);
+            noTitle.getBaseTranscript().setDuration(60.0);
+            noTitle.getBaseTranscript().setUploadedAt(Instant.ofEpochSecond(1700000000L));
+
+            UUID id3 = UUID.randomUUID();
+            UserTranscriptEntity zeroDuration = createMockUserTranscriptEntity(id3);
+            zeroDuration.getBaseTranscript().setDuration(0.0);
+            zeroDuration.getBaseTranscript().setUploadedAt(Instant.ofEpochSecond(1700000000L));
+
+            when(userTranscriptRepository.filterByUser(userId, null, null, null, null))
+                    .thenReturn(List.of(valid, noTitle, zeroDuration));
+
+            TranscriptDtoWithAliases dto = mock(TranscriptDtoWithAliases.class);
+            when(videoMapper.buildResponse(valid.getBaseTranscript(), valid)).thenReturn(dto);
+
+            List<TranscriptDtoWithAliases> results = transcriptService.allFilteredTranscripts(userId, null, null, null, null);
+
+            assertEquals(1, results.size());
+            assertEquals(dto, results.get(0));
+            verify(videoMapper, never()).buildResponse(noTitle.getBaseTranscript(), noTitle);
+            verify(videoMapper, never()).buildResponse(zeroDuration.getBaseTranscript(), zeroDuration);
+        }
+
+        @Test
+        @DisplayName("Returns all transcripts when all are valid")
+        void allFilteredTranscripts_allValid_returnsAll() {
+            UserTranscriptEntity e1 = createMockUserTranscriptEntity(userTranscriptId1);
+            e1.getBaseTranscript().setDuration(60.0);
+            e1.getBaseTranscript().setUploadedAt(Instant.ofEpochSecond(1700000000L));
+            UserTranscriptEntity e2 = createMockUserTranscriptEntity(userTranscriptId2);
+            e2.getBaseTranscript().setDuration(90.0);
+            e2.getBaseTranscript().setUploadedAt(Instant.ofEpochSecond(1700000000L));
+
+            when(userTranscriptRepository.filterByUser(userId, null, null, null, null))
+                    .thenReturn(List.of(e1, e2));
+            when(videoMapper.buildResponse(any(BaseTranscriptEntity.class), any(UserTranscriptEntity.class)))
+                    .thenReturn(mock(TranscriptDtoWithAliases.class));
+
+            List<TranscriptDtoWithAliases> results = transcriptService.allFilteredTranscripts(userId, null, null, null, null);
+
+            assertEquals(2, results.size());
+        }
+    }
     @Nested
     @DisplayName("All Filtered Transcripts")
     class AllFilteredTranscriptsTests {

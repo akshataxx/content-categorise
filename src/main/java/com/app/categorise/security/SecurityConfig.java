@@ -1,5 +1,6 @@
 package com.app.categorise.security;
 
+import com.app.categorise.security.jwt.JwtAuthenticationEntryPoint;
 import com.app.categorise.security.jwt.JwtAuthenticationFilter;
 import jakarta.servlet.DispatcherType;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +20,10 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
         jsr250Enabled = true
 )
 public class SecurityConfig {
+
+    @Autowired
+    private JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
+
     @Bean
     public JwtAuthenticationFilter jwtAuthenticationFilter() {
         return new JwtAuthenticationFilter();
@@ -35,6 +40,7 @@ public class SecurityConfig {
             .cors(cors -> cors.disable())
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtAuthenticationEntryPoint))
             .authorizeHttpRequests(auth -> auth
                 // Allow ASYNC and ERROR dispatches without authentication (auth was done on initial request)
                 .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()

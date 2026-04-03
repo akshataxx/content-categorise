@@ -13,9 +13,13 @@ import com.app.categorise.data.entity.UserTranscriptEntity;
 import com.app.categorise.data.repository.BaseTranscriptRepository;
 import com.app.categorise.data.repository.UserTranscriptRepository;
 import com.app.categorise.data.dto.TranscriptCategorisationResult;
+import com.app.categorise.exception.VideoProcessingException;
 import com.app.categorise.util.FileUtils;
+import com.app.categorise.util.LogSanitizer;
 import com.app.categorise.util.processExecutor.ProcessExecutor;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -42,6 +46,8 @@ import java.util.UUID;
 
 @Service
 public class VideoService {
+
+    private static final Logger log = LoggerFactory.getLogger(VideoService.class);
 
     private final ProcessExecutor processExecutor;
 
@@ -113,7 +119,7 @@ public class VideoService {
                 command.add("--ffmpeg-location");
                 command.add(ffmpegLocation);
             } else {
-                System.out.println("FFmpeg location not configured or invalid; falling back to PATH resolution.");
+                log.warn("FFmpeg location not configured or invalid; falling back to PATH resolution.");
             }
 
             command.add("--write-info-json");
@@ -195,13 +201,15 @@ public class VideoService {
         if (existingTranscript.isPresent()) {
             // Transcript exists, reuse it
             baseTranscript = existingTranscript.get();
-            System.out.println("Reusing existing transcript for: " + baseTranscript.getVideoUrl());
+            log.info("Reusing existing transcript for: {}", LogSanitizer.sanitize(baseTranscript.getVideoUrl()));
         } else {
             // New transcript needed
             try (ProcessedVideoFiles files = extractAudioAndMetadata(videoUrl)) {
                 String transcriptText = transcribeAudio(files.getAudioFile());
                 TikTokMetadata metadata = extractMetadata(files.getMetadataFile());
-                System.out.println(metadata);
+                log.debug("Extracted metadata: {}", metadata);
+
+                validateTranscriptData(transcriptText, metadata, videoUrl);
 
                 // Create new base transcript
                 baseTranscript = videoMapper.createBaseTranscriptEntity(videoUrl, transcriptText, metadata);
@@ -257,6 +265,29 @@ public class VideoService {
         return videoMapper.buildResponse(baseTranscript, userTranscript, category.getName(), alias);
     }
 
+    void validateTranscriptData(String transcriptText, TikTokMetadata metadata, String videoUrl) {
+        List<String> errors = new ArrayList<>();
+
+        if (transcriptText == null || transcriptText.isBlank()) {
+            errors.add("transcript text is empty");
+        }
+        if (metadata.getTitle() == null || metadata.getTitle().isBlank()) {
+            errors.add("title is missing");
+        }
+        if (metadata.getDuration() <= 0) {
+            errors.add("duration is invalid (" + metadata.getDuration() + ")");
+        }
+        if (metadata.getUploadedEpoch() <= 0) {
+            errors.add("uploadedAt timestamp is invalid (" + metadata.getUploadedEpoch() + ")");
+        }
+
+        if (!errors.isEmpty()) {
+            String message = "Video processing produced incomplete data for URL [" + LogSanitizer.sanitize(videoUrl) + "]: " + String.join(", ", errors);
+            log.error(message);
+            throw new VideoProcessingException(message);
+        }
+    }
+
     private boolean isFfmpegLocationValid() {
         return ffmpegLocation != null
             && !ffmpegLocation.isBlank()
@@ -269,7 +300,7 @@ public class VideoService {
         if (result.category() != null && !result.category().isBlank()) return result.category();
         if (result.genericTopic() != null && !result.genericTopic().isBlank()) return result.genericTopic();
         if (result.suggestedAlias() != null && !result.suggestedAlias().isBlank()) return result.suggestedAlias();
-        System.out.println("No category found for video: " + videoUrl);
+        log.warn("No category found for video: {}", LogSanitizer.sanitize(videoUrl));
         throw new Exception("No category found for video: " + videoUrl);
     }
 

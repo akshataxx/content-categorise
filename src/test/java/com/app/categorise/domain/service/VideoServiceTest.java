@@ -3,6 +3,7 @@ package com.app.categorise.domain.service;
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.application.mapper.VideoMapper;
 import com.app.categorise.data.client.whisper.WhisperClient;
+import com.app.categorise.data.dto.TikTokMetadata;
 import com.app.categorise.data.dto.TranscriptCategorisationResult;
 import com.app.categorise.data.client.openai.OpenAIClient;
 import com.app.categorise.data.entity.BaseTranscriptEntity;
@@ -10,6 +11,7 @@ import com.app.categorise.data.entity.CategoryEntity;
 import com.app.categorise.data.entity.UserTranscriptEntity;
 import com.app.categorise.data.repository.BaseTranscriptRepository;
 import com.app.categorise.data.repository.UserTranscriptRepository;
+import com.app.categorise.exception.VideoProcessingException;
 import com.app.categorise.util.processExecutor.ProcessExecutor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -205,6 +207,100 @@ class VideoServiceTest {
 
             assertEquals(expectedTranscript, result);
             verify(whisperClient).transcribeAudio(audioFile);
+        }
+    }
+
+    @Nested
+    @DisplayName("Validate Transcript Data")
+    class ValidateTranscriptDataTests {
+
+        private TikTokMetadata validMetadata;
+
+        @BeforeEach
+        void setUpMetadata() {
+            validMetadata = new TikTokMetadata();
+            validMetadata.setTitle("My Video Title");
+            validMetadata.setDuration(60);
+            validMetadata.setUploadedEpoch(1700000000L);
+        }
+
+        @Test
+        @DisplayName("Does not throw when all data is valid")
+        void validate_allValid_doesNotThrow() {
+            assertDoesNotThrow(() ->
+                videoService.validateTranscriptData("some transcript", validMetadata, "https://example.com/video")
+            );
+        }
+
+        @Test
+        @DisplayName("Throws VideoProcessingException when transcript text is null")
+        void validate_nullTranscript_throwsVideoProcessingException() {
+            VideoProcessingException ex = assertThrows(VideoProcessingException.class, () ->
+                videoService.validateTranscriptData(null, validMetadata, "https://example.com/video")
+            );
+            assertTrue(ex.getMessage().contains("transcript text is empty"));
+        }
+
+        @Test
+        @DisplayName("Throws VideoProcessingException when transcript text is blank")
+        void validate_blankTranscript_throwsVideoProcessingException() {
+            VideoProcessingException ex = assertThrows(VideoProcessingException.class, () ->
+                videoService.validateTranscriptData("   ", validMetadata, "https://example.com/video")
+            );
+            assertTrue(ex.getMessage().contains("transcript text is empty"));
+        }
+
+        @Test
+        @DisplayName("Throws VideoProcessingException when title is missing")
+        void validate_missingTitle_throwsVideoProcessingException() {
+            validMetadata.setTitle(null);
+            VideoProcessingException ex = assertThrows(VideoProcessingException.class, () ->
+                videoService.validateTranscriptData("some transcript", validMetadata, "https://example.com/video")
+            );
+            assertTrue(ex.getMessage().contains("title is missing"));
+        }
+
+        @Test
+        @DisplayName("Throws VideoProcessingException when duration is zero")
+        void validate_zeroDuration_throwsVideoProcessingException() {
+            validMetadata.setDuration(0);
+            VideoProcessingException ex = assertThrows(VideoProcessingException.class, () ->
+                videoService.validateTranscriptData("some transcript", validMetadata, "https://example.com/video")
+            );
+            assertTrue(ex.getMessage().contains("duration is invalid"));
+        }
+
+        @Test
+        @DisplayName("Throws VideoProcessingException when duration is negative")
+        void validate_negativeDuration_throwsVideoProcessingException() {
+            validMetadata.setDuration(-5);
+            VideoProcessingException ex = assertThrows(VideoProcessingException.class, () ->
+                videoService.validateTranscriptData("some transcript", validMetadata, "https://example.com/video")
+            );
+            assertTrue(ex.getMessage().contains("duration is invalid"));
+        }
+
+        @Test
+        @DisplayName("Throws VideoProcessingException when uploadedEpoch is invalid")
+        void validate_invalidUploadedEpoch_throwsVideoProcessingException() {
+            validMetadata.setUploadedEpoch(0L);
+            VideoProcessingException ex = assertThrows(VideoProcessingException.class, () ->
+                videoService.validateTranscriptData("some transcript", validMetadata, "https://example.com/video")
+            );
+            assertTrue(ex.getMessage().contains("uploadedAt timestamp is invalid"));
+        }
+
+        @Test
+        @DisplayName("Exception message includes all errors when multiple fields are invalid")
+        void validate_multipleErrors_messageContainsAll() {
+            validMetadata.setTitle(null);
+            validMetadata.setDuration(0);
+            VideoProcessingException ex = assertThrows(VideoProcessingException.class, () ->
+                videoService.validateTranscriptData(null, validMetadata, "https://example.com/video")
+            );
+            assertTrue(ex.getMessage().contains("transcript text is empty"));
+            assertTrue(ex.getMessage().contains("title is missing"));
+            assertTrue(ex.getMessage().contains("duration is invalid"));
         }
     }
 

@@ -181,6 +181,7 @@ class TranscriptServiceTest {
             assertEquals(2, results.size());
         }
     }
+
     @Nested
     @DisplayName("Delete Transcripts")
     class DeleteTranscriptsTests {

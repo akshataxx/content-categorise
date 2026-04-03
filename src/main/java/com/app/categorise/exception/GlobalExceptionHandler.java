@@ -83,6 +83,12 @@ public class GlobalExceptionHandler {
                 .body(error);
     }
 
+    @ExceptionHandler(VideoProcessingException.class)
+    public ResponseEntity<ErrorResponse> handleVideoProcessing(VideoProcessingException ex, WebRequest request) {
+        logger.error("Video processing failed: {}", ex.getMessage());
+        return buildErrorResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex, request);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(Exception ex, WebRequest request) {
         logger.error("Unexpected error occurred", ex);

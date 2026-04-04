@@ -5,6 +5,7 @@ import com.app.categorise.data.entity.TranscriptionJobEntity;
 import com.app.categorise.data.repository.BaseTranscriptRepository;
 import com.app.categorise.data.repository.TranscriptionJobRepository;
 import com.app.categorise.domain.model.JobStatus;
+import com.app.categorise.domain.model.VideoPlatform;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -78,6 +79,7 @@ public class TranscriptionJobService {
             TranscriptionJobEntity job = new TranscriptionJobEntity();
             job.setUserId(userId);
             job.setVideoUrl(videoUrl);
+            job.setPlatform(VideoPlatform.fromUrl(videoUrl).name());
             job.setStatus(JobStatus.COMPLETED);
             job.setBaseTranscriptId(existingTranscript.get().getId());
             return jobRepository.save(job);
@@ -87,6 +89,7 @@ public class TranscriptionJobService {
         TranscriptionJobEntity job = new TranscriptionJobEntity();
         job.setUserId(userId);
         job.setVideoUrl(videoUrl);
+        job.setPlatform(VideoPlatform.fromUrl(videoUrl).name());
         job.setStatus(JobStatus.PENDING);
         job = jobRepository.save(job);
         log.info("Job {} created for user={} videoUrl={}", job.getId(), userId, LogSanitizer.sanitize(videoUrl));

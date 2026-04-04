@@ -1,6 +1,7 @@
 package com.app.categorise.domain.service;
 
-import com.app.categorise.data.dto.TikTokMetadata;
+import com.app.categorise.data.dto.VideoMetadata;
+import com.app.categorise.domain.model.VideoPlatform;
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.application.internal.ProcessedVideoFiles;
 import com.app.categorise.application.mapper.VideoMapper;
@@ -97,7 +98,7 @@ public class VideoService {
     }
 
     /**
-     * @param videoUrl The TikTok video URL to download and extract audio from.
+     * @param videoUrl The video URL to download and extract audio from.
      * @return A list containing two files:
      *         <ul>
      *             <li>Index 0: The audio file (output.mp3)</li>
@@ -124,9 +125,11 @@ public class VideoService {
 
             command.add("--write-info-json");
 
-            // TikTok-specific fixes for anti-bot measures
-            command.add("--extractor-args");
-            command.add("tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com");
+            // TikTok-specific args for anti-bot measures (only needed for TikTok URLs)
+            if (VideoPlatform.fromUrl(videoUrl) == VideoPlatform.TIKTOK) {
+                command.add("--extractor-args");
+                command.add("tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com");
+            }
             command.add("--user-agent");
             command.add("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36");
 
@@ -165,9 +168,9 @@ public class VideoService {
     }
 
 
-    public TikTokMetadata extractMetadata(File metadataFile) throws Exception {
+    public VideoMetadata extractMetadata(File metadataFile) throws Exception {
         ObjectMapper mapper = new ObjectMapper();
-        return mapper.readValue(metadataFile, TikTokMetadata.class);
+        return mapper.readValue(metadataFile, VideoMetadata.class);
     }
 
     /**
@@ -177,7 +180,7 @@ public class VideoService {
      * 3. Check if user already has access to this transcript
      * 4. If user has access, update last accessed; if not, create new user association
      *
-     * @param videoUrl The TikTok video URL to process.
+     * @param videoUrl The video URL to process.
      * @param userId The ID of the user submitting the video.
      * @return A {@link TranscriptDtoWithAliases} containing all the necessary information for the client.
      */
@@ -206,13 +209,16 @@ public class VideoService {
             // New transcript needed
             try (ProcessedVideoFiles files = extractAudioAndMetadata(videoUrl)) {
                 String transcriptText = transcribeAudio(files.getAudioFile());
-                TikTokMetadata metadata = extractMetadata(files.getMetadataFile());
+                VideoMetadata metadata = extractMetadata(files.getMetadataFile());
                 log.debug("Extracted metadata: {}", metadata);
+                VideoPlatform platform = metadata.getExtractor() != null
+                    ? VideoPlatform.fromExtractor(metadata.getExtractor())
+                    : VideoPlatform.fromUrl(videoUrl);
 
                 validateTranscriptData(transcriptText, metadata, videoUrl);
 
                 // Create new base transcript
-                baseTranscript = videoMapper.createBaseTranscriptEntity(videoUrl, transcriptText, metadata);
+                baseTranscript = videoMapper.createBaseTranscriptEntity(videoUrl, transcriptText, metadata, platform);
                 baseTranscript = baseTranscriptRepository.save(baseTranscript);
             }
         }
@@ -238,6 +244,11 @@ public class VideoService {
                 baseTranscript.getTitle(),
                 baseTranscript.getDescription()
             );
+
+        // Set the AI-generated title if not already present
+        if (baseTranscript.getGeneratedTitle() == null && categorisationResult.generatedTitle() != null) {
+            baseTranscript.setGeneratedTitle(categorisationResult.generatedTitle());
+        }
 
         // Determine the category and save it if it doesn't exist
         String categoryName = determineCategory(categorisationResult, videoUrl);
@@ -265,7 +276,7 @@ public class VideoService {
         return videoMapper.buildResponse(baseTranscript, userTranscript, category.getName(), alias);
     }
 
-    void validateTranscriptData(String transcriptText, TikTokMetadata metadata, String videoUrl) {
+    void validateTranscriptData(String transcriptText, VideoMetadata metadata, String videoUrl) {
         List<String> errors = new ArrayList<>();
 
         if (transcriptText == null || transcriptText.isBlank()) {

@@ -68,7 +68,9 @@ class VideoControllerTest {
                 UUID.randomUUID(),           // categoryId
                 "testCategory",              // category
                 Instant.now(),               // createdAt
-                null                         // notes
+                null,                        // notes
+                null,                        // platform
+                null                         // generatedTitle
         );
     }
 

@@ -30,5 +30,8 @@ public record TranscriptDtoWithAliases(
     String category,
     Instant createdAt,
     /** User's personal notes for this transcript. */
-    String notes
+    String notes,
+    String platform,
+    /** AI-generated title capturing the video's tone and main point. Null for older transcripts. */
+    String generatedTitle
 ) {}

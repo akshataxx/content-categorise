@@ -38,6 +38,7 @@ public class BaseTranscriptEntity {
     private String identifier;
     private Instant createdAt;
     private Instant transcribedAt;
+    private String platform;
 
     public BaseTranscriptEntity() {}
 
@@ -181,6 +182,25 @@ public class BaseTranscriptEntity {
 
     public void setTranscribedAt(Instant transcribedAt) {
         this.transcribedAt = transcribedAt;
+    }
+
+    @Column(name = "generated_title")
+    private String generatedTitle;
+
+    public String getPlatform() {
+        return platform;
+    }
+
+    public String getGeneratedTitle() {
+        return generatedTitle;
+    }
+
+    public void setGeneratedTitle(String generatedTitle) {
+        this.generatedTitle = generatedTitle;
+    }
+
+    public void setPlatform(String platform) {
+        this.platform = platform;
     }
 
     @Override

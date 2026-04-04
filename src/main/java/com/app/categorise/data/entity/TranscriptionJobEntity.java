@@ -49,6 +49,9 @@ public class TranscriptionJobEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "platform", length = 20)
+    private String platform;
+
     public TranscriptionJobEntity() {}
 
     @PrePersist
@@ -147,6 +150,14 @@ public class TranscriptionJobEntity {
 
     public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getPlatform() {
+        return platform;
+    }
+
+    public void setPlatform(String platform) {
+        this.platform = platform;
     }
 
     @Override

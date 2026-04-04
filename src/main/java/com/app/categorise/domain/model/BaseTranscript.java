@@ -22,6 +22,8 @@ public class BaseTranscript {
     private String identifier;
     private Instant createdAt;
     private Instant transcribedAt;
+    private String platform;
+    private String generatedTitle;
 
     public BaseTranscript() {}
 
@@ -156,6 +158,22 @@ public class BaseTranscript {
 
     public void setTranscribedAt(Instant transcribedAt) {
         this.transcribedAt = transcribedAt;
+    }
+
+    public String getPlatform() {
+        return platform;
+    }
+
+    public void setPlatform(String platform) {
+        this.platform = platform;
+    }
+
+    public String getGeneratedTitle() {
+        return generatedTitle;
+    }
+
+    public void setGeneratedTitle(String generatedTitle) {
+        this.generatedTitle = generatedTitle;
     }
 
     @Override

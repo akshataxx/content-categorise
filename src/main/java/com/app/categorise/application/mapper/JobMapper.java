@@ -32,7 +32,8 @@ public class JobMapper {
             entity.getUpdatedAt(),
             entity.getBaseTranscriptId(),
             entity.getUserTranscriptId(),
-            title
+            title,
+            entity.getPlatform()
         );
     }
 }

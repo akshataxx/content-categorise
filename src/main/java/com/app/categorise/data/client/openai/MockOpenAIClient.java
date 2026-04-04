@@ -17,15 +17,15 @@ public class MockOpenAIClient implements OpenAIClient {
 
         if (title.toLowerCase().contains("recipe") || description.toLowerCase().contains("cooking")) {
             System.out.println("Result: Matched 'Recipe'");
-            return new TranscriptCategorisationResult("Recipe", "food", "Mock-Chef-Mode");
+            return new TranscriptCategorisationResult("Recipe", "food", "Mock-Chef-Mode", "Mock Generated Title");
         }
         if (title.toLowerCase().contains("tech") || description.toLowerCase().contains("gadget")) {
             System.out.println("Result: Matched 'tech'");
-            return new TranscriptCategorisationResult(null, "tech", "Mock-Tech-Tok");
+            return new TranscriptCategorisationResult(null, "tech", "Mock-Tech-Tok", "Mock Generated Title");
         }
 
         System.out.println("Result: Default match");
-        return new TranscriptCategorisationResult(null, "general", "Mock-Cool-Vibes");
+        return new TranscriptCategorisationResult(null, "general", "Mock-Cool-Vibes", "Mock Generated Title");
     }
 
     @Override

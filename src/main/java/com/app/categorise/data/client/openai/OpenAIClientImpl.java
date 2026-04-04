@@ -52,12 +52,13 @@ public class OpenAIClientImpl implements OpenAIClient {
     public String buildDeveloperPrompt(List<String> categories) {
         String categoryList = String.join(", ", categories.stream().map(c -> "\"" + c + "\"").toArray(String[]::new));
 
-        return "You are an AI that classifies short-form social media videos (e.g., TikToks). You are given the title, description, and transcript of a video. Respond ONLY with a valid JSON object with  **exactly** three keys: 'categoryId', 'genericTopic', and 'suggestedAlias'.\n" +
+        return "You are an AI that classifies short-form social media videos (e.g., TikToks, YouTube Shorts, Instagram Reels). You are given the title, description, and transcript of a video. Respond ONLY with a valid JSON object with **exactly** four keys: 'categoryId', 'genericTopic', 'suggestedAlias', and 'generatedTitle'.\n" +
             "1. 'categoryId': If the content primarily belongs to one of the following special categories, ["
             + categoryList +
             "], provide that categoryId name. Otherwise, this MUST be null.\n" +
             "2. \"genericTopic\": Return a single, lowercase, one-word keyword that describes the overall topic (e.g., \"tech\", \"fashion\", \"comedy\", \"health\"). This field MUST always be present.\n" +
-            "3. 'suggestedAlias': Create a trendy, engaging, and short (1-3 words) alias for the video. This alias should be catchy and follow recent trends in social media. Make sure not be cringe. Make sure it isn't specific to the video. It's supposed to be an alias for the categoryId \n\n" +
+            "3. 'suggestedAlias': Create a trendy, engaging, and short (1-3 words) alias for the video. This alias should be catchy and follow recent trends in social media. Make sure not be cringe. Make sure it isn't specific to the video. It's supposed to be an alias for the categoryId \n" +
+            "4. 'generatedTitle': Generate a short, engaging title (max 60 characters) that captures the tone and main point of the video. Base this on the transcript and description content, NOT the original title. Think of it as a headline for a phone screen — punchy, clear, and true to the vibe of the video. This field MUST always be present.\n\n" +
             "DO NOT include any explanation or extra text. Just output the JSON object.\n\n";
     }
 
@@ -127,7 +128,8 @@ public class OpenAIClientImpl implements OpenAIClient {
                     : null;
             String topic = root.path("genericTopic").asText("default-topic");
             String alias = root.path("suggestedAlias").asText("default-alias");
-            return new TranscriptCategorisationResult(category, topic, alias);
+            String generatedTitle = root.path("generatedTitle").asText(null);
+            return new TranscriptCategorisationResult(category, topic, alias, generatedTitle);
         } catch (JsonProcessingException e) {
             throw new RuntimeException("Failed to parse OpenAI response", e);
         }

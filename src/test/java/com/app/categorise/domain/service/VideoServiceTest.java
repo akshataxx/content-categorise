@@ -3,7 +3,7 @@ package com.app.categorise.domain.service;
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.application.mapper.VideoMapper;
 import com.app.categorise.data.client.whisper.WhisperClient;
-import com.app.categorise.data.dto.TikTokMetadata;
+import com.app.categorise.data.dto.VideoMetadata;
 import com.app.categorise.data.dto.TranscriptCategorisationResult;
 import com.app.categorise.data.client.openai.OpenAIClient;
 import com.app.categorise.data.entity.BaseTranscriptEntity;
@@ -101,7 +101,9 @@ class VideoServiceTest {
                 categoryId,
                 "testCategory",
                 Instant.now(),
-                null // notes
+                null, // notes
+                null, // platform
+                null  // generatedTitle
         );
     }
 
@@ -116,7 +118,7 @@ class VideoServiceTest {
             when(userTranscriptRepository.findByUserIdAndBaseTranscript_Id(userId, baseTranscriptId))
                     .thenReturn(Optional.empty());
 
-            TranscriptCategorisationResult catRes = new TranscriptCategorisationResult("testCategory", "genericTopic", "recipe");
+            TranscriptCategorisationResult catRes = new TranscriptCategorisationResult("testCategory", "genericTopic", "recipe", "Test Generated Title");
             when(categorisationService.classifyAndSuggestAlias(anyString(), anyString(), anyString()))
                     .thenReturn(catRes);
 
@@ -214,11 +216,11 @@ class VideoServiceTest {
     @DisplayName("Validate Transcript Data")
     class ValidateTranscriptDataTests {
 
-        private TikTokMetadata validMetadata;
+        private VideoMetadata validMetadata;
 
         @BeforeEach
         void setUpMetadata() {
-            validMetadata = new TikTokMetadata();
+            validMetadata = new VideoMetadata();
             validMetadata.setTitle("My Video Title");
             validMetadata.setDuration(60);
             validMetadata.setUploadedEpoch(1700000000L);

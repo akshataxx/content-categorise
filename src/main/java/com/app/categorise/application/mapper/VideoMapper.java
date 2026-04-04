@@ -1,10 +1,11 @@
 package com.app.categorise.application.mapper;
 
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
-import com.app.categorise.data.dto.TikTokMetadata;
+import com.app.categorise.data.dto.VideoMetadata;
 import com.app.categorise.data.entity.BaseTranscriptEntity;
 import com.app.categorise.data.entity.CategoryEntity;
 import com.app.categorise.data.entity.UserTranscriptEntity;
+import com.app.categorise.domain.model.VideoPlatform;
 import com.app.categorise.domain.service.CategoryAliasService;
 import com.app.categorise.data.entity.CategoryAliasEntity;
 import org.springframework.stereotype.Component;
@@ -28,8 +29,8 @@ public class VideoMapper {
     /**
      * Creates a BaseTranscriptEntity from video URL, transcript text, and metadata
      */
-    public BaseTranscriptEntity createBaseTranscriptEntity(String videoUrl, String transcriptText, TikTokMetadata metadata) {
-        return new BaseTranscriptEntity(
+    public BaseTranscriptEntity createBaseTranscriptEntity(String videoUrl, String transcriptText, VideoMetadata metadata, VideoPlatform platform) {
+        BaseTranscriptEntity entity = new BaseTranscriptEntity(
             videoUrl,
             transcriptText,
             null, // structuredContent will be filled later after categorization
@@ -42,6 +43,8 @@ public class VideoMapper {
             metadata.getIdentifierId(),
             metadata.getIdentifier()
         );
+        entity.setPlatform(platform.name());
+        return entity;
     }
 
 
@@ -78,7 +81,9 @@ public class VideoMapper {
             userTranscript.getCategoryId(),
             categoryName,
             userTranscript.getCreatedAt(),
-            userTranscript.getNotes()
+            userTranscript.getNotes(),
+            baseTranscript.getPlatform(),
+            baseTranscript.getGeneratedTitle()
         );
     }
 

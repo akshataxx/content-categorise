@@ -21,5 +21,6 @@ public record JobStatusDto(
     Instant updatedAt,
     UUID baseTranscriptId,
     UUID userTranscriptId,
-    String transcriptTitle
+    String transcriptTitle,
+    String platform
 ) {}

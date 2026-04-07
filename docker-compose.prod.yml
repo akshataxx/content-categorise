@@ -20,7 +20,7 @@ services:
       - app-network
 
   app:
-    image: gcr.io/content-categorisation/content-app:prod
+    image: gcr.io/content-categorisation/content-app:latest
     container_name: content-app
     restart: unless-stopped
     depends_on:

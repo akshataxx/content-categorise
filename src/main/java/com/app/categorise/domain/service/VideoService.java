@@ -125,6 +125,7 @@ public class VideoService {
      * @throws VideoProcessingException if yt-dlp fails or the output cannot be parsed.
      */
     public VideoMetadata fetchMetadata(String videoUrl) {
+        long startMs = System.currentTimeMillis();
         List<String> command = new ArrayList<>();
         command.add("yt-dlp");
         command.add("--dump-json");
@@ -141,26 +142,35 @@ public class VideoService {
         command.add("--");
         command.add(videoUrl);
 
+        log.info("[transcription] fetching_metadata url={}", LogSanitizer.sanitize(videoUrl));
         String stdout;
         try {
             stdout = processExecutor.run(metadataTimeoutMinutes, command.toArray(new String[0]));
         } catch (Exception e) {
-            log.error("yt-dlp metadata fetch failed for URL [{}]: {}",
+            log.error("[transcription] metadata_fetch_failed url={} error={}",
                 LogSanitizer.sanitize(videoUrl), e.getMessage(), e);
             throw new VideoProcessingException(USER_FACING_FETCH_ERROR, e);
         }
 
         if (stdout == null || stdout.isBlank()) {
-            log.error("yt-dlp returned empty output for URL [{}]", LogSanitizer.sanitize(videoUrl));
+            log.error("[transcription] metadata_fetch_failed url={} reason=empty_output",
+                LogSanitizer.sanitize(videoUrl));
             throw new VideoProcessingException(USER_FACING_FETCH_ERROR);
         }
 
+        VideoMetadata metadata;
         try {
-            return objectMapper.readValue(stdout, VideoMetadata.class);
+            metadata = objectMapper.readValue(stdout, VideoMetadata.class);
         } catch (Exception e) {
-            log.error("Failed to parse yt-dlp JSON for URL [{}]: {}", LogSanitizer.sanitize(videoUrl), stdout, e);
+            log.error("[transcription] metadata_parse_failed url={} stdout={}",
+                LogSanitizer.sanitize(videoUrl), stdout, e);
             throw new VideoProcessingException(USER_FACING_FETCH_ERROR, e);
         }
+
+        log.info("[transcription] metadata_fetched title=\"{}\" platform={} duration_s={} elapsed_ms={}",
+            metadata.getTitle(), metadata.getExtractor(), metadata.getDuration(),
+            System.currentTimeMillis() - startMs);
+        return metadata;
     }
 
     /**
@@ -172,6 +182,7 @@ public class VideoService {
      */
     public ProcessedVideoFiles downloadAudio(String videoUrl) throws Exception {
         Path tempDir = Files.createTempDirectory("media-" + UUID.randomUUID());
+        long startMs = System.currentTimeMillis();
         try {
             String baseName = tempDir.resolve("output").toString();
             String outputTemplate = baseName + ".%(ext)s";
@@ -206,9 +217,13 @@ public class VideoService {
             command.add("--");
             command.add(videoUrl);
 
+            log.info("[transcription] downloading_audio url={}", LogSanitizer.sanitize(videoUrl));
             processExecutor.run(ytDlpTimeoutMinutes, command.toArray(new String[0]));
 
             File audioFile = new File(baseName + ".mp3");
+            long sizeKb = audioFile.exists() ? audioFile.length() / 1024 : -1;
+            log.info("[transcription] audio_downloaded size_kb={} elapsed_ms={}",
+                sizeKb, System.currentTimeMillis() - startMs);
 
             return new ProcessedVideoFiles(audioFile, tempDir);
         } catch (Exception e) {
@@ -223,7 +238,13 @@ public class VideoService {
 
     // Transcribe audio using OpenAI Whisper API
     public String transcribeAudio(File audioFile) {
-        return whisperClient.transcribeAudio(audioFile);
+        long startMs = System.currentTimeMillis();
+        log.debug("[transcription] transcribing_audio file={} size_kb={}",
+            audioFile.getName(), audioFile.length() / 1024);
+        String text = whisperClient.transcribeAudio(audioFile);
+        log.info("[transcription] transcribed chars={} elapsed_ms={}",
+            text == null ? 0 : text.length(), System.currentTimeMillis() - startMs);
+        return text;
     }
 
     /**
@@ -248,17 +269,20 @@ public class VideoService {
     }
 
     private TranscriptDtoWithAliases _processVideoAndCreateTranscript(String videoUrl, UUID userId) throws Exception {
-        
-        // Check if transcript already exists
-        Optional<BaseTranscriptEntity> existingTranscript = 
+        long pipelineStartMs = System.currentTimeMillis();
+        log.info("[transcription] starting url={} user={}", LogSanitizer.sanitize(videoUrl), userId);
+
+        // Tier-1 dedup: check if a base transcript already exists for this exact URL
+        Optional<BaseTranscriptEntity> existingTranscript =
             baseTranscriptRepository.findByVideoUrl(videoUrl);
-        
+
         BaseTranscriptEntity baseTranscript;
         if (existingTranscript.isPresent()) {
-            // Transcript exists, reuse it
             baseTranscript = existingTranscript.get();
-            log.info("Reusing existing transcript for: {}", LogSanitizer.sanitize(baseTranscript.getVideoUrl()));
+            log.info("[transcription] cache_hit base_transcript_id={} url={}",
+                baseTranscript.getId(), LogSanitizer.sanitize(baseTranscript.getVideoUrl()));
         } else {
+            log.info("[transcription] cache_miss url={}", LogSanitizer.sanitize(videoUrl));
             // New transcript needed — validate URL via metadata fetch, then download audio
             VideoMetadata metadata = fetchMetadata(videoUrl);
 
@@ -267,7 +291,6 @@ public class VideoService {
 
             try (ProcessedVideoFiles files = downloadAudio(videoUrl)) {
                 String transcriptText = transcribeAudio(files.getAudioFile());
-                log.debug("Extracted metadata: {}", metadata);
                 VideoPlatform platform = metadata.getExtractor() != null
                     ? VideoPlatform.fromExtractor(metadata.getExtractor())
                     : VideoPlatform.fromUrl(videoUrl);
@@ -277,24 +300,30 @@ public class VideoService {
                 // Create new base transcript
                 baseTranscript = videoMapper.createBaseTranscriptEntity(videoUrl, transcriptText, metadata, platform);
                 baseTranscript = baseTranscriptRepository.save(baseTranscript);
+                log.info("[transcription] base_transcript_saved id={} platform={} chars={}",
+                    baseTranscript.getId(), platform, transcriptText.length());
             }
         }
-        
+
         // Check if user already has this transcript
-        Optional<UserTranscriptEntity> existingUserTranscript = 
+        Optional<UserTranscriptEntity> existingUserTranscript =
             userTranscriptRepository.findByUserIdAndBaseTranscript_Id(
                 userId, baseTranscript.getId());
-        
+
         if (existingUserTranscript.isPresent()) {
             // User already has this transcript, update last accessed
             UserTranscriptEntity userTranscript = existingUserTranscript.get();
             userTranscript.setLastAccessedAt(Instant.now());
             userTranscriptRepository.save(userTranscript);
-            
+            log.info("[transcription] complete user={} base_transcript_id={} user_transcript_id={} reused=true total_ms={}",
+                userId, baseTranscript.getId(), userTranscript.getId(),
+                System.currentTimeMillis() - pipelineStartMs);
+
             return videoMapper.buildResponse(baseTranscript, userTranscript);
         }
-        
+
         // Create new user association with categorization
+        log.debug("[transcription] categorising base_transcript_id={}", baseTranscript.getId());
         TranscriptCategorisationResult categorisationResult =
             categorisationService.classifyAndSuggestAlias(
                 baseTranscript.getTranscript(),
@@ -310,9 +339,12 @@ public class VideoService {
         // Determine the category and save it if it doesn't exist
         String categoryName = determineCategory(categorisationResult, videoUrl);
         CategoryEntity category = categoryService.saveIfNotExists(categoryName, "", userId);
+        log.info("[transcription] categorised category=\"{}\" alias=\"{}\" base_transcript_id={}",
+            categoryName, categorisationResult.suggestedAlias(), baseTranscript.getId());
 
         // Extract structured content if not already present
         if (baseTranscript.getStructuredContent() == null || baseTranscript.getStructuredContent().isEmpty()) {
+            log.debug("[transcription] extracting_structured_content base_transcript_id={}", baseTranscript.getId());
             String structuredContent = openAIClient.extractStructuredContent(
                 baseTranscript.getTranscript(),
                 baseTranscript.getTitle(),
@@ -329,6 +361,10 @@ public class VideoService {
         // Create user transcript association
         UserTranscriptEntity userTranscript = videoMapper.createUserTranscriptEntity(userId, baseTranscript, category);
         userTranscript = userTranscriptRepository.save(userTranscript);
+
+        log.info("[transcription] complete user={} base_transcript_id={} user_transcript_id={} reused=false total_ms={}",
+            userId, baseTranscript.getId(), userTranscript.getId(),
+            System.currentTimeMillis() - pipelineStartMs);
 
         return videoMapper.buildResponse(baseTranscript, userTranscript, category.getName(), alias);
     }

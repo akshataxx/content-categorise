@@ -3,44 +3,38 @@ package com.app.categorise.util.processExecutor;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
-import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Test double that does not execute real OS commands.
+ *
+ * <p>Records every call and exposes hooks to stub the returned output or to
+ * throw an exception, so individual tests can drive both the success and
+ * failure paths through {@link ProcessExecutor#run}.
  */
 @Component
 @Primary
 public class TestProcessExecutor implements ProcessExecutor {
     private final AtomicInteger calls = new AtomicInteger();
-    private final AtomicInteger captureCalls = new AtomicInteger();
-    private volatile String captureOutput = "";
-    private volatile RuntimeException captureException = null;
-    private volatile String[] lastCaptureCommand = new String[0];
+    private volatile String output = "";
+    private volatile RuntimeException exception = null;
+    private volatile String[] lastCommand = new String[0];
 
     @Override
-    public void run(int timeoutMinutes, String... command) throws IOException, InterruptedException {
+    public String run(int timeoutMinutes, String... command) {
         calls.incrementAndGet();
-        // no-op
-    }
-
-    @Override
-    public String runAndCapture(int timeoutMinutes, String... command) throws IOException, InterruptedException {
-        captureCalls.incrementAndGet();
-        lastCaptureCommand = command;
-        if (captureException != null) {
-            throw captureException;
+        lastCommand = command;
+        if (exception != null) {
+            throw exception;
         }
-        return captureOutput;
+        return output;
     }
 
     public int calls() { return calls.get(); }
 
-    public int captureCalls() { return captureCalls.get(); }
+    public String[] lastCommand() { return lastCommand; }
 
-    public String[] lastCaptureCommand() { return lastCaptureCommand; }
+    public void setOutput(String output) { this.output = output; }
 
-    public void setCaptureOutput(String output) { this.captureOutput = output; }
-
-    public void setCaptureException(RuntimeException ex) { this.captureException = ex; }
+    public void setException(RuntimeException ex) { this.exception = ex; }
 }

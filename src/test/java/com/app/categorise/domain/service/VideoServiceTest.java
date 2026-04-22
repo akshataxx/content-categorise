@@ -139,7 +139,7 @@ class VideoServiceTest {
         @Test
         @DisplayName("Successfully parses yt-dlp JSON into VideoMetadata")
         void fetchMetadata_parsesJsonIntoVideoMetadata() {
-            testProcessExecutor.setCaptureOutput(SAMPLE_YTDLP_JSON);
+            testProcessExecutor.setOutput(SAMPLE_YTDLP_JSON);
 
             VideoMetadata metadata = videoService.fetchMetadata("https://www.youtube.com/watch?v=abc123");
 
@@ -157,12 +157,12 @@ class VideoServiceTest {
         @Test
         @DisplayName("Builds correct yt-dlp command")
         void fetchMetadata_buildsCorrectCommand() {
-            testProcessExecutor.setCaptureOutput(SAMPLE_YTDLP_JSON);
+            testProcessExecutor.setOutput(SAMPLE_YTDLP_JSON);
             String url = "https://www.youtube.com/watch?v=abc123";
 
             videoService.fetchMetadata(url);
 
-            String[] cmd = testProcessExecutor.lastCaptureCommand();
+            String[] cmd = testProcessExecutor.lastCommand();
             List<String> cmdList = Arrays.asList(cmd);
             assertTrue(cmdList.contains("yt-dlp"));
             assertTrue(cmdList.contains("--dump-json"));
@@ -178,11 +178,11 @@ class VideoServiceTest {
         @Test
         @DisplayName("Adds TikTok extractor args for TikTok URLs")
         void fetchMetadata_addsTikTokExtractorArgs() {
-            testProcessExecutor.setCaptureOutput(SAMPLE_YTDLP_JSON);
+            testProcessExecutor.setOutput(SAMPLE_YTDLP_JSON);
 
             videoService.fetchMetadata("https://www.tiktok.com/@user/video/123");
 
-            List<String> cmdList = Arrays.asList(testProcessExecutor.lastCaptureCommand());
+            List<String> cmdList = Arrays.asList(testProcessExecutor.lastCommand());
             assertTrue(cmdList.contains("--extractor-args"));
             assertTrue(cmdList.contains("tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com"));
         }
@@ -190,11 +190,11 @@ class VideoServiceTest {
         @Test
         @DisplayName("Does NOT add TikTok extractor args for non-TikTok URLs")
         void fetchMetadata_noTikTokArgsForYouTubeUrl() {
-            testProcessExecutor.setCaptureOutput(SAMPLE_YTDLP_JSON);
+            testProcessExecutor.setOutput(SAMPLE_YTDLP_JSON);
 
             videoService.fetchMetadata("https://www.youtube.com/watch?v=abc123");
 
-            List<String> cmdList = Arrays.asList(testProcessExecutor.lastCaptureCommand());
+            List<String> cmdList = Arrays.asList(testProcessExecutor.lastCommand());
             assertFalse(cmdList.contains("--extractor-args"));
             assertFalse(cmdList.contains("tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com"));
         }
@@ -202,7 +202,7 @@ class VideoServiceTest {
         @Test
         @DisplayName("Throws VideoProcessingException with generic message when yt-dlp fails")
         void fetchMetadata_throwsOnYtDlpFailure() {
-            testProcessExecutor.setCaptureException(
+            testProcessExecutor.setException(
                 new RuntimeException("yt-dlp: ERROR: Unsupported URL"));
 
             VideoProcessingException ex = assertThrows(VideoProcessingException.class,
@@ -215,7 +215,7 @@ class VideoServiceTest {
         @Test
         @DisplayName("Throws VideoProcessingException with generic message when JSON is malformed")
         void fetchMetadata_throwsOnMalformedJson() {
-            testProcessExecutor.setCaptureOutput("not valid json");
+            testProcessExecutor.setOutput("not valid json");
 
             VideoProcessingException ex = assertThrows(VideoProcessingException.class,
                 () -> videoService.fetchMetadata("https://www.youtube.com/watch?v=abc123"));
@@ -227,7 +227,7 @@ class VideoServiceTest {
         @Test
         @DisplayName("Throws VideoProcessingException with generic message when stdout is empty")
         void fetchMetadata_throwsOnEmptyStdout() {
-            testProcessExecutor.setCaptureOutput("");
+            testProcessExecutor.setOutput("");
 
             VideoProcessingException ex = assertThrows(VideoProcessingException.class,
                 () -> videoService.fetchMetadata("https://www.youtube.com/watch?v=abc123"));
@@ -268,31 +268,11 @@ class VideoServiceTest {
             // We need a mock to capture the command args for run()
             // Since TestProcessExecutor.run() is a no-op that doesn't capture args,
             // let's use a spy approach
-            var capturedCommands = new java.util.ArrayList<String[]>();
-            var capturingExecutor = new com.app.categorise.util.processExecutor.ProcessExecutor() {
-                @Override
-                public void run(int timeoutMinutes, String... command) {
-                    capturedCommands.add(command);
-                }
-                @Override
-                public String runAndCapture(int timeoutMinutes, String... command) {
-                    return "";
-                }
-            };
-
-            Executor direct = Runnable::run;
-            VideoService serviceWithCapture = new VideoService(
-                "/usr/bin/ffmpeg", 4, 1, direct,
-                baseTranscriptRepository, categoryAliasService, categorisationService,
-                categoryService, new ObjectMapper(), openAIClient, capturingExecutor,
-                userTranscriptRepository, videoMapper, whisperClient
-            );
-
             String testUrl = "https://www.youtube.com/watch?v=abc123";
-            serviceWithCapture.downloadAudio(testUrl);
+            videoService.downloadAudio(testUrl);
 
-            assertFalse(capturedCommands.isEmpty(), "Should have captured at least one command");
-            String[] command = capturedCommands.getFirst();
+            String[] command = testProcessExecutor.lastCommand();
+            assertNotNull(command, "Should have captured the command");
             List<String> cmdList = Arrays.asList(command);
             assertFalse(cmdList.contains("--write-info-json"), "--write-info-json should not be in downloadAudio command");
             // Verify -- separator before URL
@@ -333,8 +313,8 @@ class VideoServiceTest {
             verify(categorisationService).classifyAndSuggestAlias(transcriptText, "Test Video", "Test Description");
             verify(videoMapper).createUserTranscriptEntity(userId, baseTranscript, category);
             verify(userTranscriptRepository).save(userTranscript);
-            // Should NOT call fetchMetadata when base transcript exists
-            assertEquals(0, testProcessExecutor.captureCalls());
+            // Should NOT call yt-dlp at all when base transcript exists
+            assertEquals(0, testProcessExecutor.calls());
         }
 
         @Test
@@ -357,8 +337,7 @@ class VideoServiceTest {
             verify(userTranscript).setLastAccessedAt(any(Instant.class));
             verify(userTranscriptRepository).save(userTranscript);
             verify(videoMapper).buildResponse(baseTranscript, userTranscript);
-            // Should NOT call fetchMetadata or downloadAudio
-            assertEquals(0, testProcessExecutor.captureCalls());
+            // Should NOT call yt-dlp at all (neither metadata fetch nor audio download)
             assertEquals(0, testProcessExecutor.calls());
 
             verify(categorisationService, never()).classifyAndSuggestAlias(anyString(), anyString(), anyString());
@@ -369,7 +348,7 @@ class VideoServiceTest {
         @DisplayName("First-time URL processes successfully end-to-end")
         void firstTimeUrl_processesSuccessfully() throws Exception {
             when(baseTranscriptRepository.findByVideoUrl(videoUrl)).thenReturn(Optional.empty());
-            testProcessExecutor.setCaptureOutput(SAMPLE_YTDLP_JSON);
+            testProcessExecutor.setOutput(SAMPLE_YTDLP_JSON);
 
             when(whisperClient.transcribeAudio(any(File.class))).thenReturn(transcriptText);
             when(videoMapper.createBaseTranscriptEntity(eq(videoUrl), eq(transcriptText), any(VideoMetadata.class), any()))
@@ -393,17 +372,15 @@ class VideoServiceTest {
 
             assertNotNull(result);
             assertEquals(expectedResponse, result);
-            // fetchMetadata called once via runAndCapture
-            assertEquals(1, testProcessExecutor.captureCalls());
-            // downloadAudio called once via run
-            assertEquals(1, testProcessExecutor.calls());
+            // yt-dlp called twice: once for metadata fetch, once for audio download
+            assertEquals(2, testProcessExecutor.calls());
         }
 
         @Test
         @DisplayName("First-time URL with invalid yt-dlp metadata throws VideoProcessingException")
         void firstTimeUrl_invalidMetadata_throwsVideoProcessingException() {
             when(baseTranscriptRepository.findByVideoUrl(videoUrl)).thenReturn(Optional.empty());
-            testProcessExecutor.setCaptureException(
+            testProcessExecutor.setException(
                 new RuntimeException("yt-dlp: ERROR: Unsupported URL"));
 
             ExecutionException ex = assertThrows(ExecutionException.class,

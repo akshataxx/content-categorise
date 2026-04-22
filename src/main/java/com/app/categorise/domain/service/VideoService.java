@@ -143,7 +143,7 @@ public class VideoService {
 
         String stdout;
         try {
-            stdout = processExecutor.runAndCapture(metadataTimeoutMinutes, command.toArray(new String[0]));
+            stdout = processExecutor.run(metadataTimeoutMinutes, command.toArray(new String[0]));
         } catch (Exception e) {
             log.error("yt-dlp metadata fetch failed for URL [{}]: {}",
                 LogSanitizer.sanitize(videoUrl), e.getMessage(), e);

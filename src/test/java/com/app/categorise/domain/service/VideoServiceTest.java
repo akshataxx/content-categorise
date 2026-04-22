@@ -87,6 +87,7 @@ class VideoServiceTest {
                 "", // ytDlpLocation: blank → fallback to "yt-dlp"
                 4,
                 1,
+                10, // maxVideoDurationMinutes
                 direct,
                 baseTranscriptRepository,
                 categoryAliasService,
@@ -159,7 +160,7 @@ class VideoServiceTest {
         @DisplayName("Uses configured yt-dlp location when set")
         void fetchMetadata_usesConfiguredYtDlpLocation() {
             VideoService configuredService = new VideoService(
-                "/usr/bin/ffmpeg", "/custom/path/yt-dlp", 4, 1, Runnable::run,
+                "/usr/bin/ffmpeg", "/custom/path/yt-dlp", 4, 1, 10, Runnable::run,
                 baseTranscriptRepository, categoryAliasService, categorisationService,
                 categoryService, new ObjectMapper(), openAIClient, testProcessExecutor,
                 userTranscriptRepository, videoMapper, whisperClient
@@ -618,6 +619,76 @@ class VideoServiceTest {
             );
             assertEquals("Could not process video — incomplete data received. Please try again later.",
                 ex.getMessage());
+        }
+    }
+
+    @Nested
+    @DisplayName("Validate Duration Limit")
+    class ValidateDurationLimitTests {
+
+        private VideoMetadata metadata(int durationSeconds) {
+            VideoMetadata m = new VideoMetadata();
+            m.setTitle("ok");
+            m.setDuration(durationSeconds);
+            m.setUploadedEpoch(1700000000L);
+            return m;
+        }
+
+        @Test
+        @DisplayName("Does not throw when video is exactly at the limit")
+        void durationAtLimit_doesNotThrow() {
+            // 10-min limit is set in setUp(); 600s = exactly 10 minutes
+            assertDoesNotThrow(() ->
+                videoService.validateDurationLimit(metadata(600), "https://example.com/video"));
+        }
+
+        @Test
+        @DisplayName("Does not throw when video is well under the limit")
+        void durationUnderLimit_doesNotThrow() {
+            assertDoesNotThrow(() ->
+                videoService.validateDurationLimit(metadata(120), "https://example.com/video"));
+        }
+
+        @Test
+        @DisplayName("Throws clear user-facing error when video exceeds the limit")
+        void durationOverLimit_throwsClearError() {
+            // 15 min video, 10 min limit
+            VideoProcessingException ex = assertThrows(VideoProcessingException.class, () ->
+                videoService.validateDurationLimit(metadata(15 * 60), "https://example.com/video"));
+            assertEquals("Video is too long (15 min). Maximum supported duration is 10 minutes.",
+                ex.getMessage());
+        }
+
+        @Test
+        @DisplayName("Rounds up partial minutes when reporting duration")
+        void durationJustOverLimit_roundsUpInError() {
+            // 10m1s = should report 11 min and reject
+            VideoProcessingException ex = assertThrows(VideoProcessingException.class, () ->
+                videoService.validateDurationLimit(metadata(601), "https://example.com/video"));
+            assertEquals("Video is too long (11 min). Maximum supported duration is 10 minutes.",
+                ex.getMessage());
+        }
+
+        @Test
+        @DisplayName("Pipeline rejects over-limit video before downloading audio")
+        void overLimitVideo_doesNotTriggerDownload() throws Exception {
+            // Set up: cache miss, fetchMetadata returns a 30-minute video
+            String overLimitJson = """
+                {"id":"abc","fulltitle":"Long Video","duration":1800,"timestamp":1700000000,"extractor":"youtube"}
+                """;
+            when(baseTranscriptRepository.findByVideoUrl(videoUrl)).thenReturn(Optional.empty());
+            testProcessExecutor.setOutput(overLimitJson);
+
+            ExecutionException ex = assertThrows(ExecutionException.class,
+                () -> videoService.processVideoAndCreateTranscript(videoUrl, userId)
+                    .get(2, TimeUnit.SECONDS));
+
+            assertInstanceOf(VideoProcessingException.class, ex.getCause());
+            assertTrue(ex.getCause().getMessage().contains("too long"),
+                "Expected 'too long' in message, got: " + ex.getCause().getMessage());
+            // Only metadata fetch — audio download was NOT called
+            assertEquals(1, testProcessExecutor.calls(),
+                "Audio download must be skipped when duration limit is exceeded");
         }
     }
 

@@ -59,6 +59,9 @@ public class VideoService {
     private static final String USER_FACING_CATEGORISATION_ERROR =
         "Could not categorise this video. Please try again later.";
 
+    private static final String USER_FACING_DURATION_LIMIT_ERROR_TEMPLATE =
+        "Video is too long (%d min). Maximum supported duration is %d minutes.";
+
     private static final String USER_AGENT =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
@@ -84,12 +87,14 @@ public class VideoService {
     private final String ytDlpLocation;
     private final int ytDlpTimeoutMinutes;
     private final int metadataTimeoutMinutes;
+    private final int maxVideoDurationMinutes;
 
     public VideoService(
         @Value("${app.ffmpeg.location}") String ffmpegLocation,
         @Value("${app.ytdlp.location:}") String ytDlpLocation,
         @Value("${app.ytdlp.timeout-minutes}") int ytDlpTimeoutMinutes,
         @Value("${app.ytdlp.metadata-timeout-minutes:1}") int metadataTimeoutMinutes,
+        @Value("${app.video.max-duration-minutes:10}") int maxVideoDurationMinutes,
         @Qualifier("mediaExecutor") Executor mediaExecutor,
         BaseTranscriptRepository baseTranscriptRepository,
         CategoryAliasService categoryAliasService,
@@ -106,6 +111,7 @@ public class VideoService {
         this.ytDlpLocation = (ytDlpLocation == null || ytDlpLocation.isBlank()) ? "yt-dlp" : ytDlpLocation;
         this.ytDlpTimeoutMinutes = ytDlpTimeoutMinutes;
         this.metadataTimeoutMinutes = metadataTimeoutMinutes;
+        this.maxVideoDurationMinutes = maxVideoDurationMinutes;
         this.mediaExecutor = mediaExecutor;
         this.baseTranscriptRepository = baseTranscriptRepository;
         this.categoryAliasService = categoryAliasService;
@@ -292,6 +298,9 @@ public class VideoService {
             // Fail fast on incomplete metadata BEFORE incurring audio download + Whisper cost
             validateMetadata(metadata, videoUrl);
 
+            // Reject videos longer than the configured cap before paying for audio + Whisper
+            validateDurationLimit(metadata, videoUrl);
+
             try (ProcessedVideoFiles files = downloadAudio(videoUrl)) {
                 String transcriptText = transcribeAudio(files.getAudioFile());
                 VideoPlatform platform = metadata.getExtractor() != null
@@ -381,6 +390,26 @@ public class VideoService {
         List<String> errors = collectMetadataErrors(metadata);
         if (!errors.isEmpty()) {
             failWithGenericProcessingError(errors, videoUrl);
+        }
+    }
+
+    /**
+     * Rejects videos longer than the configured cap. Called immediately after
+     * {@link #validateMetadata} so we never download audio or call Whisper for
+     * an over-limit video.
+     *
+     * <p>Uses a per-video-type-agnostic message ("Video is too long, max is X min")
+     * because this is expected user input — not an error condition.
+     */
+    void validateDurationLimit(VideoMetadata metadata, String videoUrl) {
+        long durationSeconds = metadata.getDuration();
+        long durationMinutes = (durationSeconds + 59) / 60; // round up so 9m01s reads as 10
+        if (durationMinutes > maxVideoDurationMinutes) {
+            log.info("[transcription] rejected_too_long url={} duration_seconds={} duration_minutes={} limit_minutes={}",
+                LogSanitizer.sanitize(videoUrl), durationSeconds, durationMinutes, maxVideoDurationMinutes);
+            throw new VideoProcessingException(
+                String.format(USER_FACING_DURATION_LIMIT_ERROR_TEMPLATE, durationMinutes, maxVideoDurationMinutes)
+            );
         }
     }
 

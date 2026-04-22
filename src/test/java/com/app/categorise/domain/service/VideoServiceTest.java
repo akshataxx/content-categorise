@@ -558,6 +558,95 @@ class VideoServiceTest {
         }
     }
 
+    @Nested
+    @DisplayName("Validate Metadata (early, pre-download)")
+    class ValidateMetadataTests {
+
+        private VideoMetadata validMetadata;
+
+        @BeforeEach
+        void setUpMetadata() {
+            validMetadata = new VideoMetadata();
+            validMetadata.setTitle("My Video Title");
+            validMetadata.setDuration(60);
+            validMetadata.setUploadedEpoch(1700000000L);
+        }
+
+        @Test
+        @DisplayName("Does not throw when metadata is complete")
+        void validateMetadata_complete_doesNotThrow() {
+            assertDoesNotThrow(() ->
+                videoService.validateMetadata(validMetadata, "https://example.com/video")
+            );
+        }
+
+        @Test
+        @DisplayName("Throws generic message when title is missing")
+        void validateMetadata_missingTitle_throwsGeneric() {
+            validMetadata.setTitle(null);
+            VideoProcessingException ex = assertThrows(VideoProcessingException.class, () ->
+                videoService.validateMetadata(validMetadata, "https://example.com/video")
+            );
+            assertEquals("Could not process video — incomplete data received. Please try again later.",
+                ex.getMessage());
+        }
+
+        @Test
+        @DisplayName("Throws generic message when duration is zero")
+        void validateMetadata_zeroDuration_throwsGeneric() {
+            validMetadata.setDuration(0);
+            VideoProcessingException ex = assertThrows(VideoProcessingException.class, () ->
+                videoService.validateMetadata(validMetadata, "https://example.com/video")
+            );
+            assertEquals("Could not process video — incomplete data received. Please try again later.",
+                ex.getMessage());
+        }
+
+        @Test
+        @DisplayName("Throws generic message when uploadedEpoch is invalid")
+        void validateMetadata_invalidEpoch_throwsGeneric() {
+            validMetadata.setUploadedEpoch(0L);
+            VideoProcessingException ex = assertThrows(VideoProcessingException.class, () ->
+                videoService.validateMetadata(validMetadata, "https://example.com/video")
+            );
+            assertEquals("Could not process video — incomplete data received. Please try again later.",
+                ex.getMessage());
+        }
+    }
+
+    @Nested
+    @DisplayName("Validate Transcript Text (post-Whisper)")
+    class ValidateTranscriptTextTests {
+
+        @Test
+        @DisplayName("Does not throw when transcript text is non-blank")
+        void validateText_nonBlank_doesNotThrow() {
+            assertDoesNotThrow(() ->
+                videoService.validateTranscriptText("some transcript", "https://example.com/video")
+            );
+        }
+
+        @Test
+        @DisplayName("Throws generic message when transcript text is null")
+        void validateText_null_throwsGeneric() {
+            VideoProcessingException ex = assertThrows(VideoProcessingException.class, () ->
+                videoService.validateTranscriptText(null, "https://example.com/video")
+            );
+            assertEquals("Could not process video — incomplete data received. Please try again later.",
+                ex.getMessage());
+        }
+
+        @Test
+        @DisplayName("Throws generic message when transcript text is blank")
+        void validateText_blank_throwsGeneric() {
+            VideoProcessingException ex = assertThrows(VideoProcessingException.class, () ->
+                videoService.validateTranscriptText("   ", "https://example.com/video")
+            );
+            assertEquals("Could not process video — incomplete data received. Please try again later.",
+                ex.getMessage());
+        }
+    }
+
     private BaseTranscriptEntity createBaseTranscriptEntity() {
         BaseTranscriptEntity entity = new BaseTranscriptEntity();
         entity.setId(baseTranscriptId);

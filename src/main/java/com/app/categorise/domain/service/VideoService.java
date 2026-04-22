@@ -261,6 +261,10 @@ public class VideoService {
         } else {
             // New transcript needed — validate URL via metadata fetch, then download audio
             VideoMetadata metadata = fetchMetadata(videoUrl);
+
+            // Fail fast on incomplete metadata BEFORE incurring audio download + Whisper cost
+            validateMetadata(metadata, videoUrl);
+
             try (ProcessedVideoFiles files = downloadAudio(videoUrl)) {
                 String transcriptText = transcribeAudio(files.getAudioFile());
                 log.debug("Extracted metadata: {}", metadata);
@@ -268,7 +272,7 @@ public class VideoService {
                     ? VideoPlatform.fromExtractor(metadata.getExtractor())
                     : VideoPlatform.fromUrl(videoUrl);
 
-                validateTranscriptData(transcriptText, metadata, videoUrl);
+                validateTranscriptText(transcriptText, videoUrl);
 
                 // Create new base transcript
                 baseTranscript = videoMapper.createBaseTranscriptEntity(videoUrl, transcriptText, metadata, platform);
@@ -329,12 +333,46 @@ public class VideoService {
         return videoMapper.buildResponse(baseTranscript, userTranscript, category.getName(), alias);
     }
 
+    /**
+     * Validates the metadata returned by yt-dlp BEFORE we incur the cost of
+     * downloading audio + calling Whisper. If any required metadata field is
+     * missing, we bail out early.
+     */
+    void validateMetadata(VideoMetadata metadata, String videoUrl) {
+        List<String> errors = collectMetadataErrors(metadata);
+        if (!errors.isEmpty()) {
+            failWithGenericProcessingError(errors, videoUrl);
+        }
+    }
+
+    /**
+     * Validates the transcript text produced by Whisper. Called AFTER
+     * transcription since the text isn't available before then.
+     */
+    void validateTranscriptText(String transcriptText, String videoUrl) {
+        if (transcriptText == null || transcriptText.isBlank()) {
+            failWithGenericProcessingError(List.of("transcript text is empty"), videoUrl);
+        }
+    }
+
+    /**
+     * Combined validation kept for back-compat with existing callers/tests.
+     * Prefer {@link #validateMetadata} (early) + {@link #validateTranscriptText}
+     * (after Whisper) at call sites that want fail-fast behaviour.
+     */
     void validateTranscriptData(String transcriptText, VideoMetadata metadata, String videoUrl) {
         List<String> errors = new ArrayList<>();
-
         if (transcriptText == null || transcriptText.isBlank()) {
             errors.add("transcript text is empty");
         }
+        errors.addAll(collectMetadataErrors(metadata));
+        if (!errors.isEmpty()) {
+            failWithGenericProcessingError(errors, videoUrl);
+        }
+    }
+
+    private List<String> collectMetadataErrors(VideoMetadata metadata) {
+        List<String> errors = new ArrayList<>();
         if (metadata.getTitle() == null || metadata.getTitle().isBlank()) {
             errors.add("title is missing");
         }
@@ -344,12 +382,14 @@ public class VideoService {
         if (metadata.getUploadedEpoch() <= 0) {
             errors.add("uploadedAt timestamp is invalid (" + metadata.getUploadedEpoch() + ")");
         }
+        return errors;
+    }
 
-        if (!errors.isEmpty()) {
-            String detailedMessage = "Video processing produced incomplete data for URL [" + LogSanitizer.sanitize(videoUrl) + "]: " + String.join(", ", errors);
-            log.error(detailedMessage);
-            throw new VideoProcessingException(USER_FACING_PROCESSING_ERROR);
-        }
+    private void failWithGenericProcessingError(List<String> errors, String videoUrl) {
+        String detailedMessage = "Video processing produced incomplete data for URL ["
+            + LogSanitizer.sanitize(videoUrl) + "]: " + String.join(", ", errors);
+        log.error(detailedMessage);
+        throw new VideoProcessingException(USER_FACING_PROCESSING_ERROR);
     }
 
     private boolean isFfmpegLocationValid() {

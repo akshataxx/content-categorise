@@ -414,6 +414,29 @@ class VideoServiceTest {
             assertEquals("Could not process video URL — please check the link and try again.",
                 ex.getCause().getMessage());
         }
+
+        @Test
+        @DisplayName("Throws VideoProcessingException with generic message when no category is found — does not leak URL")
+        void noCategoryFound_throwsGenericMessage_doesNotLeakUrl() {
+            when(baseTranscriptRepository.findByVideoUrl(videoUrl)).thenReturn(Optional.of(baseTranscript));
+            when(userTranscriptRepository.findByUserIdAndBaseTranscript_Id(userId, baseTranscriptId))
+                    .thenReturn(Optional.empty());
+
+            // All category fields are null/blank → determineCategory should fail
+            TranscriptCategorisationResult catRes = new TranscriptCategorisationResult(null, null, null, "Test Generated Title");
+            when(categorisationService.classifyAndSuggestAlias(anyString(), anyString(), anyString()))
+                    .thenReturn(catRes);
+
+            ExecutionException ex = assertThrows(ExecutionException.class,
+                () -> videoService.processVideoAndCreateTranscript(videoUrl, userId)
+                    .get(2, TimeUnit.SECONDS));
+
+            assertInstanceOf(VideoProcessingException.class, ex.getCause());
+            assertEquals("Could not categorise this video. Please try again later.",
+                ex.getCause().getMessage());
+            assertFalse(ex.getCause().getMessage().contains(videoUrl),
+                "Error message must not contain the raw video URL");
+        }
     }
 
     @Nested
@@ -456,74 +479,82 @@ class VideoServiceTest {
         }
 
         @Test
-        @DisplayName("Throws VideoProcessingException when transcript text is null")
-        void validate_nullTranscript_throwsVideoProcessingException() {
+        @DisplayName("Throws VideoProcessingException with generic message when transcript text is null")
+        void validate_nullTranscript_throwsWithGenericMessage() {
             VideoProcessingException ex = assertThrows(VideoProcessingException.class, () ->
                 videoService.validateTranscriptData(null, validMetadata, "https://example.com/video")
             );
-            assertTrue(ex.getMessage().contains("transcript text is empty"));
+            assertEquals("Could not process video — incomplete data received. Please try again later.",
+                ex.getMessage());
         }
 
         @Test
-        @DisplayName("Throws VideoProcessingException when transcript text is blank")
-        void validate_blankTranscript_throwsVideoProcessingException() {
+        @DisplayName("Throws VideoProcessingException with generic message when transcript text is blank")
+        void validate_blankTranscript_throwsWithGenericMessage() {
             VideoProcessingException ex = assertThrows(VideoProcessingException.class, () ->
                 videoService.validateTranscriptData("   ", validMetadata, "https://example.com/video")
             );
-            assertTrue(ex.getMessage().contains("transcript text is empty"));
+            assertEquals("Could not process video — incomplete data received. Please try again later.",
+                ex.getMessage());
         }
 
         @Test
-        @DisplayName("Throws VideoProcessingException when title is missing")
-        void validate_missingTitle_throwsVideoProcessingException() {
+        @DisplayName("Throws VideoProcessingException with generic message when title is missing")
+        void validate_missingTitle_throwsWithGenericMessage() {
             validMetadata.setTitle(null);
             VideoProcessingException ex = assertThrows(VideoProcessingException.class, () ->
                 videoService.validateTranscriptData("some transcript", validMetadata, "https://example.com/video")
             );
-            assertTrue(ex.getMessage().contains("title is missing"));
+            assertEquals("Could not process video — incomplete data received. Please try again later.",
+                ex.getMessage());
         }
 
         @Test
-        @DisplayName("Throws VideoProcessingException when duration is zero")
-        void validate_zeroDuration_throwsVideoProcessingException() {
+        @DisplayName("Throws VideoProcessingException with generic message when duration is zero")
+        void validate_zeroDuration_throwsWithGenericMessage() {
             validMetadata.setDuration(0);
             VideoProcessingException ex = assertThrows(VideoProcessingException.class, () ->
                 videoService.validateTranscriptData("some transcript", validMetadata, "https://example.com/video")
             );
-            assertTrue(ex.getMessage().contains("duration is invalid"));
+            assertEquals("Could not process video — incomplete data received. Please try again later.",
+                ex.getMessage());
         }
 
         @Test
-        @DisplayName("Throws VideoProcessingException when duration is negative")
-        void validate_negativeDuration_throwsVideoProcessingException() {
+        @DisplayName("Throws VideoProcessingException with generic message when duration is negative")
+        void validate_negativeDuration_throwsWithGenericMessage() {
             validMetadata.setDuration(-5);
             VideoProcessingException ex = assertThrows(VideoProcessingException.class, () ->
                 videoService.validateTranscriptData("some transcript", validMetadata, "https://example.com/video")
             );
-            assertTrue(ex.getMessage().contains("duration is invalid"));
+            assertEquals("Could not process video — incomplete data received. Please try again later.",
+                ex.getMessage());
         }
 
         @Test
-        @DisplayName("Throws VideoProcessingException when uploadedEpoch is invalid")
-        void validate_invalidUploadedEpoch_throwsVideoProcessingException() {
+        @DisplayName("Throws VideoProcessingException with generic message when uploadedEpoch is invalid")
+        void validate_invalidUploadedEpoch_throwsWithGenericMessage() {
             validMetadata.setUploadedEpoch(0L);
             VideoProcessingException ex = assertThrows(VideoProcessingException.class, () ->
                 videoService.validateTranscriptData("some transcript", validMetadata, "https://example.com/video")
             );
-            assertTrue(ex.getMessage().contains("uploadedAt timestamp is invalid"));
+            assertEquals("Could not process video — incomplete data received. Please try again later.",
+                ex.getMessage());
         }
 
         @Test
-        @DisplayName("Exception message includes all errors when multiple fields are invalid")
-        void validate_multipleErrors_messageContainsAll() {
+        @DisplayName("Throws generic message even when multiple fields are invalid — no detail concatenation")
+        void validate_multipleErrors_stillGenericMessage() {
             validMetadata.setTitle(null);
             validMetadata.setDuration(0);
             VideoProcessingException ex = assertThrows(VideoProcessingException.class, () ->
                 videoService.validateTranscriptData(null, validMetadata, "https://example.com/video")
             );
-            assertTrue(ex.getMessage().contains("transcript text is empty"));
-            assertTrue(ex.getMessage().contains("title is missing"));
-            assertTrue(ex.getMessage().contains("duration is invalid"));
+            assertEquals("Could not process video — incomplete data received. Please try again later.",
+                ex.getMessage());
+            assertFalse(ex.getMessage().contains("transcript text is empty"));
+            assertFalse(ex.getMessage().contains("title is missing"));
+            assertFalse(ex.getMessage().contains("duration is invalid"));
         }
     }
 

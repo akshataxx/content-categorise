@@ -53,6 +53,12 @@ public class VideoService {
     private static final String USER_FACING_FETCH_ERROR =
         "Could not process video URL — please check the link and try again.";
 
+    private static final String USER_FACING_PROCESSING_ERROR =
+        "Could not process video — incomplete data received. Please try again later.";
+
+    private static final String USER_FACING_CATEGORISATION_ERROR =
+        "Could not categorise this video. Please try again later.";
+
     private static final String USER_AGENT =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
@@ -340,9 +346,9 @@ public class VideoService {
         }
 
         if (!errors.isEmpty()) {
-            String message = "Video processing produced incomplete data for URL [" + LogSanitizer.sanitize(videoUrl) + "]: " + String.join(", ", errors);
-            log.error(message);
-            throw new VideoProcessingException(message);
+            String detailedMessage = "Video processing produced incomplete data for URL [" + LogSanitizer.sanitize(videoUrl) + "]: " + String.join(", ", errors);
+            log.error(detailedMessage);
+            throw new VideoProcessingException(USER_FACING_PROCESSING_ERROR);
         }
     }
 
@@ -354,12 +360,12 @@ public class VideoService {
 
 
     // Determine the categoryId. Prioritize the classified categoryId, then the generic topic, then the suggested alias.
-    private String determineCategory(TranscriptCategorisationResult result, String videoUrl) throws Exception {
+    private String determineCategory(TranscriptCategorisationResult result, String videoUrl) {
         if (result.category() != null && !result.category().isBlank()) return result.category();
         if (result.genericTopic() != null && !result.genericTopic().isBlank()) return result.genericTopic();
         if (result.suggestedAlias() != null && !result.suggestedAlias().isBlank()) return result.suggestedAlias();
-        log.warn("No category found for video: {}", LogSanitizer.sanitize(videoUrl));
-        throw new Exception("No category found for video: " + videoUrl);
+        log.error("No category found for video: {}", LogSanitizer.sanitize(videoUrl));
+        throw new VideoProcessingException(USER_FACING_CATEGORISATION_ERROR);
     }
 
     /** Resolve the alias. If the user has a pre-existing alias for this category, use it.

@@ -50,11 +50,19 @@ public class VideoService {
 
     private static final Logger log = LoggerFactory.getLogger(VideoService.class);
 
+    private static final String USER_FACING_FETCH_ERROR =
+        "Could not process video URL — please check the link and try again.";
+
+    private static final String USER_AGENT =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
     private final ProcessExecutor processExecutor;
 
     private final WhisperClient whisperClient;
 
     private final OpenAIClient openAIClient;
+
+    private final ObjectMapper objectMapper;
 
     private final Executor mediaExecutor;
 
@@ -68,15 +76,18 @@ public class VideoService {
 
     private final String ffmpegLocation;
     private final int ytDlpTimeoutMinutes;
+    private final int metadataTimeoutMinutes;
 
     public VideoService(
         @Value("${app.ffmpeg.location}") String ffmpegLocation,
         @Value("${app.ytdlp.timeout-minutes}") int ytDlpTimeoutMinutes,
+        @Value("${app.ytdlp.metadata-timeout-minutes:1}") int metadataTimeoutMinutes,
         @Qualifier("mediaExecutor") Executor mediaExecutor,
         BaseTranscriptRepository baseTranscriptRepository,
         CategoryAliasService categoryAliasService,
         CategorisationService categorisationService,
         CategoryService categoryService,
+        ObjectMapper objectMapper,
         OpenAIClient openAIClient,
         ProcessExecutor processExecutor,
         UserTranscriptRepository userTranscriptRepository,
@@ -85,11 +96,13 @@ public class VideoService {
     ){
         this.ffmpegLocation = ffmpegLocation;
         this.ytDlpTimeoutMinutes = ytDlpTimeoutMinutes;
+        this.metadataTimeoutMinutes = metadataTimeoutMinutes;
         this.mediaExecutor = mediaExecutor;
         this.baseTranscriptRepository = baseTranscriptRepository;
         this.categoryAliasService = categoryAliasService;
         this.categorisationService = categorisationService;
         this.categoryService = categoryService;
+        this.objectMapper = objectMapper;
         this.openAIClient = openAIClient;
         this.processExecutor = processExecutor;
         this.userTranscriptRepository = userTranscriptRepository;
@@ -98,16 +111,60 @@ public class VideoService {
     }
 
     /**
-     * @param videoUrl The video URL to download and extract audio from.
-     * @return A list containing two files:
-     *         <ul>
-     *             <li>Index 0: The audio file (output.mp3)</li>
-     *             <li>Index 1: The metadata file (output.info.json)</li>
-     *         </ul>
+     * Fetches video metadata by calling {@code yt-dlp --dump-json --no-download}.
+     * This also serves as URL validation — if yt-dlp cannot process the URL, it is rejected.
+     *
+     * @param videoUrl The video URL to fetch metadata for.
+     * @return Parsed {@link VideoMetadata} from yt-dlp's JSON output.
+     * @throws VideoProcessingException if yt-dlp fails or the output cannot be parsed.
+     */
+    public VideoMetadata fetchMetadata(String videoUrl) {
+        List<String> command = new ArrayList<>();
+        command.add("yt-dlp");
+        command.add("--dump-json");
+        command.add("--no-download");
+        command.add("--no-warnings");
+        command.add("--user-agent");
+        command.add(USER_AGENT);
+
+        if (VideoPlatform.fromUrl(videoUrl) == VideoPlatform.TIKTOK) {
+            command.add("--extractor-args");
+            command.add("tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com");
+        }
+
+        command.add("--");
+        command.add(videoUrl);
+
+        String stdout;
+        try {
+            stdout = processExecutor.runAndCapture(metadataTimeoutMinutes, command.toArray(new String[0]));
+        } catch (Exception e) {
+            log.error("yt-dlp metadata fetch failed for URL [{}]: {}",
+                LogSanitizer.sanitize(videoUrl), e.getMessage(), e);
+            throw new VideoProcessingException(USER_FACING_FETCH_ERROR, e);
+        }
+
+        if (stdout == null || stdout.isBlank()) {
+            log.error("yt-dlp returned empty output for URL [{}]", LogSanitizer.sanitize(videoUrl));
+            throw new VideoProcessingException(USER_FACING_FETCH_ERROR);
+        }
+
+        try {
+            return objectMapper.readValue(stdout, VideoMetadata.class);
+        } catch (Exception e) {
+            log.error("Failed to parse yt-dlp JSON for URL [{}]: {}", LogSanitizer.sanitize(videoUrl), stdout, e);
+            throw new VideoProcessingException(USER_FACING_FETCH_ERROR, e);
+        }
+    }
+
+    /**
+     * Downloads the audio track from a video URL using yt-dlp.
+     *
+     * @param videoUrl The video URL to download audio from.
+     * @return A {@link ProcessedVideoFiles} containing the audio file (output.mp3) and temp directory.
      * @throws Exception If the download or extraction process fails.
      */
-    public ProcessedVideoFiles extractAudioAndMetadata(String videoUrl) throws Exception {
-        // Create a unique temp directory per request to avoid file collisions
+    public ProcessedVideoFiles downloadAudio(String videoUrl) throws Exception {
         Path tempDir = Files.createTempDirectory("media-" + UUID.randomUUID());
         try {
             String baseName = tempDir.resolve("output").toString();
@@ -123,18 +180,16 @@ public class VideoService {
                 log.warn("FFmpeg location not configured or invalid; falling back to PATH resolution.");
             }
 
-            command.add("--write-info-json");
-
             // TikTok-specific args for anti-bot measures (only needed for TikTok URLs)
             if (VideoPlatform.fromUrl(videoUrl) == VideoPlatform.TIKTOK) {
                 command.add("--extractor-args");
                 command.add("tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com");
             }
             command.add("--user-agent");
-            command.add("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36");
+            command.add(USER_AGENT);
 
             command.add("-f");
-            command.add("worstaudio/worst");  // Try audio-only, fallback to worst quality video
+            command.add("worstaudio/worst");
             command.add("-x");
             command.add("--audio-format");
             command.add("mp3");
@@ -142,17 +197,15 @@ public class VideoService {
             command.add("5");
             command.add("-o");
             command.add(outputTemplate);
-            command.add("--");  // Prevent argument injection if videoUrl starts with --
+            command.add("--");
             command.add(videoUrl);
 
             processExecutor.run(ytDlpTimeoutMinutes, command.toArray(new String[0]));
 
             File audioFile = new File(baseName + ".mp3");
-            File metadataFile = new File(baseName + ".info.json");
 
-            return new ProcessedVideoFiles(audioFile, metadataFile, tempDir);
+            return new ProcessedVideoFiles(audioFile, tempDir);
         } catch (Exception e) {
-            // Clean up temp directory if yt-dlp fails, so partial files don't pile up
             deleteTempDirectory(tempDir);
             throw e;
         }
@@ -165,12 +218,6 @@ public class VideoService {
     // Transcribe audio using OpenAI Whisper API
     public String transcribeAudio(File audioFile) {
         return whisperClient.transcribeAudio(audioFile);
-    }
-
-
-    public VideoMetadata extractMetadata(File metadataFile) throws Exception {
-        ObjectMapper mapper = new ObjectMapper();
-        return mapper.readValue(metadataFile, VideoMetadata.class);
     }
 
     /**
@@ -206,10 +253,10 @@ public class VideoService {
             baseTranscript = existingTranscript.get();
             log.info("Reusing existing transcript for: {}", LogSanitizer.sanitize(baseTranscript.getVideoUrl()));
         } else {
-            // New transcript needed
-            try (ProcessedVideoFiles files = extractAudioAndMetadata(videoUrl)) {
+            // New transcript needed — validate URL via metadata fetch, then download audio
+            VideoMetadata metadata = fetchMetadata(videoUrl);
+            try (ProcessedVideoFiles files = downloadAudio(videoUrl)) {
                 String transcriptText = transcribeAudio(files.getAudioFile());
-                VideoMetadata metadata = extractMetadata(files.getMetadataFile());
                 log.debug("Extracted metadata: {}", metadata);
                 VideoPlatform platform = metadata.getExtractor() != null
                     ? VideoPlatform.fromExtractor(metadata.getExtractor())

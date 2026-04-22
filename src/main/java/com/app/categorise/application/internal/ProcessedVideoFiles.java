@@ -6,27 +6,21 @@ import java.io.File;
 import java.nio.file.Path;
 
 /**
- * Represents processed video files, including audio and metadata files.
+ * Represents processed video files (audio only — metadata is fetched separately via yt-dlp --dump-json).
  * On close(), the entire temp directory is deleted recursively, cleaning up
  * all yt-dlp output regardless of container format (.mp4, .webm, .mkv, etc.).
  */
 public class ProcessedVideoFiles implements AutoCloseable {
     private final File audioFile;
-    private final File metadataFile;
     private final Path tempDir;
 
-    public ProcessedVideoFiles(File audioFile, File metadataFile, Path tempDir) {
+    public ProcessedVideoFiles(File audioFile, Path tempDir) {
         this.audioFile = audioFile;
-        this.metadataFile = metadataFile;
         this.tempDir = tempDir;
     }
 
     public File getAudioFile() {
         return audioFile;
-    }
-
-    public File getMetadataFile() {
-        return metadataFile;
     }
 
     @Override

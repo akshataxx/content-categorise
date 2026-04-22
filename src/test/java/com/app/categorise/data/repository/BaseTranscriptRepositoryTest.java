@@ -178,6 +178,83 @@ class BaseTranscriptRepositoryTest {
     }
 
     @Test
+    void shouldFindByPlatformAndPlatformVideoId_whenBothSet() {
+        // Given
+        BaseTranscriptEntity transcript = new BaseTranscriptEntity(
+                "https://www.youtube.com/watch?v=canonical1",
+                "Canonical transcript",
+                null,
+                "desc",
+                "title",
+                60.0,
+                Instant.now(),
+                "acc", "accName", "id", "idName"
+        );
+        transcript.setPlatform("YOUTUBE");
+        transcript.setPlatformVideoId("canonical1");
+        baseTranscriptRepository.save(transcript);
+
+        // When
+        Optional<BaseTranscriptEntity> found =
+                baseTranscriptRepository.findByPlatformAndPlatformVideoId("YOUTUBE", "canonical1");
+
+        // Then
+        assertThat(found).isPresent();
+        assertThat(found.get().getVideoUrl()).isEqualTo("https://www.youtube.com/watch?v=canonical1");
+        assertThat(found.get().getPlatformVideoId()).isEqualTo("canonical1");
+        assertThat(found.get().getPlatform()).isEqualTo("YOUTUBE");
+    }
+
+    @Test
+    void shouldReturnEmptyForFindByPlatformAndPlatformVideoId_whenMismatch() {
+        // Given
+        BaseTranscriptEntity transcript = new BaseTranscriptEntity(
+                "https://www.youtube.com/watch?v=mismatch",
+                "Mismatch transcript",
+                null, "desc", "title", 60.0, Instant.now(),
+                "acc", "accName", "id", "idName"
+        );
+        transcript.setPlatform("YOUTUBE");
+        transcript.setPlatformVideoId("vid_a");
+        baseTranscriptRepository.save(transcript);
+
+        // When/Then — different id
+        assertThat(baseTranscriptRepository.findByPlatformAndPlatformVideoId("YOUTUBE", "vid_b")).isEmpty();
+        // When/Then — different platform
+        assertThat(baseTranscriptRepository.findByPlatformAndPlatformVideoId("TIKTOK", "vid_a")).isEmpty();
+    }
+
+    @Test
+    void shouldAllowMultipleRowsWithNullPlatformVideoId() {
+        // Existing legacy rows leave platform_video_id NULL. The partial unique
+        // index in V23 only enforces uniqueness when both columns are non-null,
+        // so legacy rows must be free to coexist. Repository-level test only
+        // checks that NULLs round-trip cleanly; the partial-index behaviour
+        // itself is exercised by the migration in production / integration env.
+        BaseTranscriptEntity a = new BaseTranscriptEntity(
+                "https://example.com/legacy-a",
+                "legacy a",
+                null, "desc", "title", 60.0, Instant.now(),
+                "acc", "accName", "id", "idName"
+        );
+        a.setPlatform("YOUTUBE"); // platform set but platform_video_id NULL
+        baseTranscriptRepository.save(a);
+
+        BaseTranscriptEntity b = new BaseTranscriptEntity(
+                "https://example.com/legacy-b",
+                "legacy b",
+                null, "desc", "title", 60.0, Instant.now(),
+                "acc", "accName", "id", "idName"
+        );
+        b.setPlatform("YOUTUBE");
+        baseTranscriptRepository.save(b);
+
+        baseTranscriptRepository.flush(); // should NOT throw
+        assertThat(baseTranscriptRepository.existsByVideoUrl("https://example.com/legacy-a")).isTrue();
+        assertThat(baseTranscriptRepository.existsByVideoUrl("https://example.com/legacy-b")).isTrue();
+    }
+
+    @Test
     void shouldHandleNullableFields() {
         // Given - transcript with minimal required fields
         BaseTranscriptEntity transcript = new BaseTranscriptEntity();

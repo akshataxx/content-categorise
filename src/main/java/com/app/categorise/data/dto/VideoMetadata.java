@@ -7,6 +7,12 @@ import lombok.ToString;
 @ToString
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class VideoMetadata {
+    /**
+     * Canonical platform-specific video id from yt-dlp (e.g. YouTube video id,
+     * TikTok numeric id). Used together with the platform/extractor for Tier-2
+     * dedup so different URL forms of the same video share one base transcript.
+     */
+    private String id;
     private String description;
     @JsonProperty("fulltitle")
     private String title;
@@ -24,6 +30,7 @@ public class VideoMetadata {
     private String identifier;
     private String extractor;
 
+    public String getId() { return id; }
     public String getDescription() { return description; }
     public String getTitle() { return title; }
     public int getDuration() { return duration; }
@@ -34,6 +41,7 @@ public class VideoMetadata {
     public String getIdentifier() { return identifier; }
     public String getExtractor() { return extractor; }
 
+    public void setId(String id) { this.id = id; }
     public void setDescription(String description) { this.description = description; }
     public void setTitle(String title) { this.title = title; }
     public void setDuration(int duration) { this.duration = duration; }

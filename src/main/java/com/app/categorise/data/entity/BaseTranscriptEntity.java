@@ -187,6 +187,15 @@ public class BaseTranscriptEntity {
     @Column(name = "generated_title")
     private String generatedTitle;
 
+    /**
+     * Canonical platform-specific video id (e.g. YouTube video id) returned by
+     * yt-dlp. Combined with {@link #platform} this gives a stable per-video key
+     * used for Tier-2 dedup. Existing pre-V23 rows leave this NULL and continue
+     * to dedup via the URL match path.
+     */
+    @Column(name = "platform_video_id")
+    private String platformVideoId;
+
     public String getPlatform() {
         return platform;
     }
@@ -201,6 +210,14 @@ public class BaseTranscriptEntity {
 
     public void setPlatform(String platform) {
         this.platform = platform;
+    }
+
+    public String getPlatformVideoId() {
+        return platformVideoId;
+    }
+
+    public void setPlatformVideoId(String platformVideoId) {
+        this.platformVideoId = platformVideoId;
     }
 
     @Override

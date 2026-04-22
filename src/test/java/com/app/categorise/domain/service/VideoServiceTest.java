@@ -424,6 +424,135 @@ class VideoServiceTest {
         }
 
         @Test
+        @DisplayName("Tier-2 dedup: URL miss + canonical (platform,id) hit reuses base, skips download/Whisper")
+        void firstTimeUrl_canonicalHit_reusesBaseAndSkipsDownload() throws Exception {
+            // URL miss for the new submission
+            when(baseTranscriptRepository.findByVideoUrl(videoUrl)).thenReturn(Optional.empty());
+            // metadata fetch returns canonical id "abc123" / extractor "youtube"
+            testProcessExecutor.setOutput(SAMPLE_YTDLP_JSON);
+            // canonical hit on (YOUTUBE, abc123) — pretend a row already exists
+            when(baseTranscriptRepository.findByPlatformAndPlatformVideoId("YOUTUBE", "abc123"))
+                    .thenReturn(Optional.of(baseTranscript));
+            // user already has the existing base — short-circuit on the user side
+            when(userTranscriptRepository.findByUserIdAndBaseTranscript_Id(userId, baseTranscriptId))
+                    .thenReturn(Optional.of(userTranscript));
+            when(videoMapper.buildResponse(baseTranscript, userTranscript)).thenReturn(expectedResponse);
+
+            TranscriptDtoWithAliases result = videoService.processVideoAndCreateTranscript(videoUrl, userId)
+                    .get(2, TimeUnit.SECONDS);
+
+            assertNotNull(result);
+            assertEquals(expectedResponse, result);
+            // Only metadata fetch happened — no audio download / Whisper
+            assertEquals(1, testProcessExecutor.calls(),
+                "Audio download must be skipped when canonical match is found");
+            verify(whisperClient, never()).transcribeAudio(any());
+            verify(videoMapper, never()).createBaseTranscriptEntity(anyString(), anyString(), any(), any());
+            verify(baseTranscriptRepository, never()).save(any(BaseTranscriptEntity.class));
+        }
+
+        @Test
+        @DisplayName("Tier-2 dedup: URL miss + canonical miss runs the full pipeline")
+        void firstTimeUrl_canonicalMiss_runsFullPipeline() throws Exception {
+            when(baseTranscriptRepository.findByVideoUrl(videoUrl)).thenReturn(Optional.empty());
+            // canonical lookup returns empty → fall through to audio/Whisper
+            when(baseTranscriptRepository.findByPlatformAndPlatformVideoId(anyString(), anyString()))
+                    .thenReturn(Optional.empty());
+            testProcessExecutor.setOutput(SAMPLE_YTDLP_JSON);
+            when(whisperClient.transcribeAudio(any(File.class))).thenReturn(transcriptText);
+            when(videoMapper.createBaseTranscriptEntity(eq(videoUrl), eq(transcriptText), any(VideoMetadata.class), any()))
+                    .thenReturn(baseTranscript);
+            when(baseTranscriptRepository.save(baseTranscript)).thenReturn(baseTranscript);
+            when(userTranscriptRepository.findByUserIdAndBaseTranscript_Id(userId, baseTranscriptId))
+                    .thenReturn(Optional.empty());
+            TranscriptCategorisationResult catRes =
+                    new TranscriptCategorisationResult("testCategory", "genericTopic", "recipe", "Test Generated Title");
+            when(categorisationService.classifyAndSuggestAlias(anyString(), anyString(), anyString())).thenReturn(catRes);
+            when(categoryService.saveIfNotExists("testCategory", "", userId)).thenReturn(category);
+            when(categoryAliasService.findByUserIdAndCategoryId(userId, categoryId)).thenReturn(Optional.empty());
+            when(videoMapper.createUserTranscriptEntity(userId, baseTranscript, category)).thenReturn(userTranscript);
+            when(userTranscriptRepository.save(userTranscript)).thenReturn(userTranscript);
+            when(videoMapper.buildResponse(baseTranscript, userTranscript, "testCategory", "recipe"))
+                    .thenReturn(expectedResponse);
+
+            TranscriptDtoWithAliases result = videoService.processVideoAndCreateTranscript(videoUrl, userId)
+                    .get(2, TimeUnit.SECONDS);
+
+            assertNotNull(result);
+            assertEquals(expectedResponse, result);
+            // Both metadata fetch + audio download
+            assertEquals(2, testProcessExecutor.calls());
+            verify(whisperClient).transcribeAudio(any(File.class));
+            // save() may be called more than once (initial insert + structuredContent update);
+            // the important assertion is that the entity was persisted at all.
+            verify(baseTranscriptRepository, atLeastOnce()).save(baseTranscript);
+        }
+
+        @Test
+        @DisplayName("Tier-1 URL hit short-circuits before metadata fetch (regression check)")
+        void tier1UrlHit_skipsMetadataFetch() throws Exception {
+            when(baseTranscriptRepository.findByVideoUrl(videoUrl)).thenReturn(Optional.of(baseTranscript));
+            when(userTranscriptRepository.findByUserIdAndBaseTranscript_Id(userId, baseTranscriptId))
+                    .thenReturn(Optional.of(userTranscript));
+            when(videoMapper.buildResponse(baseTranscript, userTranscript)).thenReturn(expectedResponse);
+
+            videoService.processVideoAndCreateTranscript(videoUrl, userId).get(2, TimeUnit.SECONDS);
+
+            // No yt-dlp invocations at all when Tier-1 URL match hits
+            assertEquals(0, testProcessExecutor.calls());
+            verify(baseTranscriptRepository, never())
+                    .findByPlatformAndPlatformVideoId(anyString(), anyString());
+        }
+
+        @Test
+        @DisplayName("Race-condition: DataIntegrityViolation on save → re-query canonical and reuse")
+        void saveConflict_reusesCanonicalRow() throws Exception {
+            when(baseTranscriptRepository.findByVideoUrl(videoUrl)).thenReturn(Optional.empty());
+            // First canonical lookup misses (we lose the race), second lookup (after save fails) hits.
+            BaseTranscriptEntity raceWinner = createBaseTranscriptEntity();
+            when(baseTranscriptRepository.findByPlatformAndPlatformVideoId("YOUTUBE", "abc123"))
+                    .thenReturn(Optional.empty())
+                    .thenReturn(Optional.of(raceWinner));
+            testProcessExecutor.setOutput(SAMPLE_YTDLP_JSON);
+            when(whisperClient.transcribeAudio(any(File.class))).thenReturn(transcriptText);
+            when(videoMapper.createBaseTranscriptEntity(eq(videoUrl), eq(transcriptText), any(VideoMetadata.class), any()))
+                    .thenReturn(baseTranscript);
+            when(baseTranscriptRepository.save(baseTranscript))
+                    .thenThrow(new org.springframework.dao.DataIntegrityViolationException("uq_base_transcripts_platform_video_id"));
+            when(userTranscriptRepository.findByUserIdAndBaseTranscript_Id(userId, raceWinner.getId()))
+                    .thenReturn(Optional.of(userTranscript));
+            when(videoMapper.buildResponse(raceWinner, userTranscript)).thenReturn(expectedResponse);
+
+            TranscriptDtoWithAliases result = videoService.processVideoAndCreateTranscript(videoUrl, userId)
+                    .get(2, TimeUnit.SECONDS);
+
+            assertEquals(expectedResponse, result);
+            verify(baseTranscriptRepository, times(2))
+                    .findByPlatformAndPlatformVideoId("YOUTUBE", "abc123");
+        }
+
+        @Test
+        @DisplayName("Race-condition: unrelated DataIntegrityViolation (no canonical row found) propagates")
+        void saveConflict_noCanonicalRow_propagates() {
+            when(baseTranscriptRepository.findByVideoUrl(videoUrl)).thenReturn(Optional.empty());
+            // Both canonical lookups miss → conflict was on something else (e.g. video_url)
+            when(baseTranscriptRepository.findByPlatformAndPlatformVideoId("YOUTUBE", "abc123"))
+                    .thenReturn(Optional.empty());
+            testProcessExecutor.setOutput(SAMPLE_YTDLP_JSON);
+            when(whisperClient.transcribeAudio(any(File.class))).thenReturn(transcriptText);
+            when(videoMapper.createBaseTranscriptEntity(eq(videoUrl), eq(transcriptText), any(VideoMetadata.class), any()))
+                    .thenReturn(baseTranscript);
+            when(baseTranscriptRepository.save(baseTranscript))
+                    .thenThrow(new org.springframework.dao.DataIntegrityViolationException("video_url"));
+
+            ExecutionException ex = assertThrows(ExecutionException.class,
+                () -> videoService.processVideoAndCreateTranscript(videoUrl, userId)
+                    .get(2, TimeUnit.SECONDS));
+
+            assertInstanceOf(org.springframework.dao.DataIntegrityViolationException.class, ex.getCause());
+        }
+
+        @Test
         @DisplayName("Throws VideoProcessingException with generic message when no category is found — does not leak URL")
         void noCategoryFound_throwsGenericMessage_doesNotLeakUrl() {
             when(baseTranscriptRepository.findByVideoUrl(videoUrl)).thenReturn(Optional.of(baseTranscript));

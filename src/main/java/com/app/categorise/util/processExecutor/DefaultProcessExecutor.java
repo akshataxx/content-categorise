@@ -13,4 +13,9 @@ public class DefaultProcessExecutor implements ProcessExecutor {
     public void run(int timeoutMinutes, String... command) throws IOException, InterruptedException {
         ProcessRunner.runCommand(timeoutMinutes, command);
     }
+
+    @Override
+    public String runAndCapture(int timeoutMinutes, String... command) throws IOException, InterruptedException {
+        return ProcessRunner.runCommandCaptureOutput(timeoutMinutes, command);
+    }
 }

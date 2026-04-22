@@ -58,7 +58,59 @@ public class ProcessRunner {
             throw new RuntimeException("Command failed with exit code: " + exitCode);
         }
     }
-    
+
+    /**
+     * Runs a shell command, captures its combined stdout/stderr output, and returns it as a String.
+     * If the process does not finish in time it is forcibly killed and an exception is thrown.
+     *
+     * @param timeoutMinutes maximum time to wait for the process to finish
+     * @param command        the shell command to run
+     * @return the captured stdout/stderr output
+     */
+    public static String runCommandCaptureOutput(int timeoutMinutes, String... command) throws IOException, InterruptedException {
+        // Resolve full path for the executable (first element only)
+        String[] resolvedCommand = new String[command.length];
+        for (int i = 0; i < command.length; i++) {
+            if (i == 0) {
+                resolvedCommand[i] = resolveExecutablePath(command[i]);
+            } else {
+                resolvedCommand[i] = command[i];
+            }
+        }
+
+        ProcessBuilder processBuilder = new ProcessBuilder(resolvedCommand);
+        processBuilder.redirectErrorStream(true);
+
+        Process process = processBuilder.start();
+
+        StringBuilder output = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(process.getInputStream()))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                output.append(line).append("\n");
+            }
+        }
+
+        boolean finished = process.waitFor(timeoutMinutes, java.util.concurrent.TimeUnit.MINUTES);
+        if (!finished) {
+            process.destroyForcibly();
+            throw new RuntimeException("Command timed out after " + timeoutMinutes + " minute(s): " + resolvedCommand[0]);
+        }
+
+        int exitCode = process.exitValue();
+        if (exitCode != 0) {
+            String captured = output.toString();
+            // Truncate to first 4KB for error messages
+            if (captured.length() > 4096) {
+                captured = captured.substring(0, 4096);
+            }
+            throw new RuntimeException("Command failed with exit code: " + exitCode + ". Output: " + captured);
+        }
+
+        return output.toString();
+    }
+
     /**
      * Resolves the full path for common executables that might not be in PATH
      * when running from Java applications

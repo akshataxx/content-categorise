@@ -11,7 +11,6 @@ import com.app.categorise.domain.service.VideoService;
 import com.app.categorise.exception.RateLimitExceededException;
 import com.app.categorise.security.UserPrincipal;
 import com.app.categorise.util.LogSanitizer;
-import com.app.categorise.util.VideoUrlValidator;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
@@ -122,6 +121,8 @@ public class VideoController {
         if (principal == null) {
             throw new IllegalArgumentException("User not authenticated");
         }
-        VideoUrlValidator.validate(videoUrl);
+        if (videoUrl == null || videoUrl.isBlank()) {
+            throw new IllegalArgumentException("Missing 'videoUrl' in request body");
+        }
     }
 }

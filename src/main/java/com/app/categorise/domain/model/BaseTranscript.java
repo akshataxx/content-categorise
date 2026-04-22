@@ -24,6 +24,7 @@ public class BaseTranscript {
     private Instant transcribedAt;
     private String platform;
     private String generatedTitle;
+    private String platformVideoId;
 
     public BaseTranscript() {}
 
@@ -174,6 +175,14 @@ public class BaseTranscript {
 
     public void setGeneratedTitle(String generatedTitle) {
         this.generatedTitle = generatedTitle;
+    }
+
+    public String getPlatformVideoId() {
+        return platformVideoId;
+    }
+
+    public void setPlatformVideoId(String platformVideoId) {
+        this.platformVideoId = platformVideoId;
     }
 
     @Override

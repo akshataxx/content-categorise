@@ -44,6 +44,12 @@ public class VideoMapper {
             metadata.getIdentifier()
         );
         entity.setPlatform(platform.name());
+        // Canonical id from yt-dlp — used for Tier-2 dedup. May be null/blank
+        // for unrecognised extractors; we only persist when it's present so the
+        // partial unique index on (platform, platform_video_id) is satisfied.
+        if (metadata.getId() != null && !metadata.getId().isBlank()) {
+            entity.setPlatformVideoId(metadata.getId());
+        }
         return entity;
     }
 

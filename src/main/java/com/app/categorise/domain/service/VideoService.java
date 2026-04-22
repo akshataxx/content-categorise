@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Qualifier;
 
@@ -167,6 +168,8 @@ public class VideoService {
             throw new VideoProcessingException(USER_FACING_FETCH_ERROR);
         }
 
+        log.info(stdout);
+
         VideoMetadata metadata;
         try {
             metadata = objectMapper.readValue(stdout, VideoMetadata.class);
@@ -288,32 +291,45 @@ public class VideoService {
         BaseTranscriptEntity baseTranscript;
         if (existingTranscript.isPresent()) {
             baseTranscript = existingTranscript.get();
-            log.info("[transcription] cache_hit base_transcript_id={} url={}",
+            log.info("[transcription] cache_hit tier=1_url base_transcript_id={} url={}",
                 baseTranscript.getId(), LogSanitizer.sanitize(baseTranscript.getVideoUrl()));
         } else {
-            log.info("[transcription] cache_miss url={}", LogSanitizer.sanitize(videoUrl));
-            // New transcript needed — validate URL via metadata fetch, then download audio
+            log.info("[transcription] cache_miss tier=1_url url={}", LogSanitizer.sanitize(videoUrl));
+            // New transcript candidate — validate URL via metadata fetch, then check Tier-2 dedup
             VideoMetadata metadata = fetchMetadata(videoUrl);
 
-            // Fail fast on incomplete metadata BEFORE incurring audio download + Whisper cost
-            validateMetadata(metadata, videoUrl);
+            VideoPlatform platform = metadata.getExtractor() != null
+                ? VideoPlatform.fromExtractor(metadata.getExtractor())
+                : VideoPlatform.fromUrl(videoUrl);
 
-            // Reject videos longer than the configured cap before paying for audio + Whisper
-            validateDurationLimit(metadata, videoUrl);
+            // Tier-2 dedup: same underlying video shared via different URL forms
+            // (e.g. youtu.be/X vs youtube.com/watch?v=X). If we already have a
+            // transcript for this canonical (platform, video_id) we reuse it
+            // and skip audio download + Whisper + categorisation entirely.
+            BaseTranscriptEntity canonicalMatch = findCanonicalMatch(platform, metadata.getId());
+            if (canonicalMatch != null) {
+                log.info("[transcription] cache_hit tier=2_canonical base_transcript_id={} platform={} video_id={} requested_url={}",
+                    canonicalMatch.getId(), platform, metadata.getId(),
+                    LogSanitizer.sanitize(videoUrl));
+                baseTranscript = canonicalMatch;
+            } else {
+                // Fail fast on incomplete metadata BEFORE incurring audio download + Whisper cost
+                validateMetadata(metadata, videoUrl);
 
-            try (ProcessedVideoFiles files = downloadAudio(videoUrl)) {
-                String transcriptText = transcribeAudio(files.getAudioFile());
-                VideoPlatform platform = metadata.getExtractor() != null
-                    ? VideoPlatform.fromExtractor(metadata.getExtractor())
-                    : VideoPlatform.fromUrl(videoUrl);
+                // Reject videos longer than the configured cap before paying for audio + Whisper
+                validateDurationLimit(metadata, videoUrl);
 
-                validateTranscriptText(transcriptText, videoUrl);
+                try (ProcessedVideoFiles files = downloadAudio(videoUrl)) {
+                    String transcriptText = transcribeAudio(files.getAudioFile());
+                    validateTranscriptText(transcriptText, videoUrl);
 
-                // Create new base transcript
-                baseTranscript = videoMapper.createBaseTranscriptEntity(videoUrl, transcriptText, metadata, platform);
-                baseTranscript = baseTranscriptRepository.save(baseTranscript);
-                log.info("[transcription] base_transcript_saved id={} platform={} chars={}",
-                    baseTranscript.getId(), platform, transcriptText.length());
+                    // Create new base transcript with canonical id populated
+                    BaseTranscriptEntity entity =
+                        videoMapper.createBaseTranscriptEntity(videoUrl, transcriptText, metadata, platform);
+                    baseTranscript = saveOrReuseOnConflict(entity, platform, metadata.getId(), videoUrl);
+                    log.info("[transcription] base_transcript_saved id={} platform={} video_id={} chars={}",
+                        baseTranscript.getId(), platform, metadata.getId(), transcriptText.length());
+                }
             }
         }
 
@@ -458,6 +474,49 @@ public class VideoService {
             + LogSanitizer.sanitize(videoUrl) + "]: " + String.join(", ", errors);
         log.error(detailedMessage);
         throw new VideoProcessingException(USER_FACING_PROCESSING_ERROR);
+    }
+
+    /**
+     * Looks up an existing base transcript by canonical {@code (platform, videoId)}.
+     * Returns {@code null} when either input is missing/blank — in that case
+     * we cannot reliably dedup and must fall through to the full pipeline.
+     */
+    private BaseTranscriptEntity findCanonicalMatch(VideoPlatform platform, String videoId) {
+        if (platform == null || videoId == null || videoId.isBlank()) {
+            return null;
+        }
+        return baseTranscriptRepository
+            .findByPlatformAndPlatformVideoId(platform.name(), videoId)
+            .orElse(null);
+    }
+
+    /**
+     * Saves a freshly built base transcript while gracefully handling the race
+     * where two concurrent first-time submissions of the same video (via
+     * different URLs) both reach this point. The DB unique index on
+     * {@code (platform, platform_video_id)} rejects the second insert; we catch
+     * that and re-query so the loser of the race reuses the winner's row.
+     */
+    private BaseTranscriptEntity saveOrReuseOnConflict(BaseTranscriptEntity entity,
+                                                       VideoPlatform platform,
+                                                       String videoId,
+                                                       String videoUrl) {
+        try {
+            return baseTranscriptRepository.save(entity);
+        } catch (DataIntegrityViolationException e) {
+            // Likely a concurrent insert won the race. Re-query by canonical id;
+            // if found, reuse it. Otherwise the conflict was on something else
+            // (e.g. duplicate video_url) — re-throw so callers see the real error.
+            BaseTranscriptEntity existing = findCanonicalMatch(platform, videoId);
+            if (existing != null) {
+                log.info("[transcription] race_resolved_via_canonical base_transcript_id={} platform={} video_id={} url={}",
+                    existing.getId(), platform, videoId, LogSanitizer.sanitize(videoUrl));
+                return existing;
+            }
+            log.error("[transcription] save_conflict_unresolved url={} platform={} video_id={}",
+                LogSanitizer.sanitize(videoUrl), platform, videoId, e);
+            throw e;
+        }
     }
 
     private boolean isFfmpegLocationValid() {

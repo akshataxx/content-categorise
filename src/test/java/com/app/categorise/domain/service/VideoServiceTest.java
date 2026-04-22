@@ -84,6 +84,7 @@ class VideoServiceTest {
         Executor direct = Runnable::run; // run async work on calling thread in tests
         videoService = new VideoService(
                 "/usr/bin/ffmpeg",
+                "", // ytDlpLocation: blank → fallback to "yt-dlp"
                 4,
                 1,
                 direct,
@@ -152,6 +153,35 @@ class VideoServiceTest {
             assertEquals("TestChannel", metadata.getIdentifier());
             assertEquals("UC12345", metadata.getIdentifierId());
             assertEquals(1700000000L, metadata.getUploadedEpoch());
+        }
+
+        @Test
+        @DisplayName("Uses configured yt-dlp location when set")
+        void fetchMetadata_usesConfiguredYtDlpLocation() {
+            VideoService configuredService = new VideoService(
+                "/usr/bin/ffmpeg", "/custom/path/yt-dlp", 4, 1, Runnable::run,
+                baseTranscriptRepository, categoryAliasService, categorisationService,
+                categoryService, new ObjectMapper(), openAIClient, testProcessExecutor,
+                userTranscriptRepository, videoMapper, whisperClient
+            );
+            testProcessExecutor.setOutput(SAMPLE_YTDLP_JSON);
+
+            configuredService.fetchMetadata("https://www.youtube.com/watch?v=abc123");
+
+            assertEquals("/custom/path/yt-dlp", testProcessExecutor.lastCommand()[0],
+                "Should use the configured yt-dlp location as the executable");
+        }
+
+        @Test
+        @DisplayName("Falls back to literal 'yt-dlp' when location is blank (lets executor resolve via PATH)")
+        void fetchMetadata_fallsBackToLiteralYtDlpWhenBlank() {
+            // The default test setup uses "" → should fall back to "yt-dlp"
+            testProcessExecutor.setOutput(SAMPLE_YTDLP_JSON);
+
+            videoService.fetchMetadata("https://www.youtube.com/watch?v=abc123");
+
+            assertEquals("yt-dlp", testProcessExecutor.lastCommand()[0],
+                "Should fall back to literal 'yt-dlp' so DefaultProcessExecutor can resolve it via COMMON_BIN_DIRS");
         }
 
         @Test

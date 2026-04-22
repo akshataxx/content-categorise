@@ -81,11 +81,13 @@ public class VideoService {
     private final UserTranscriptRepository userTranscriptRepository;
 
     private final String ffmpegLocation;
+    private final String ytDlpLocation;
     private final int ytDlpTimeoutMinutes;
     private final int metadataTimeoutMinutes;
 
     public VideoService(
         @Value("${app.ffmpeg.location}") String ffmpegLocation,
+        @Value("${app.ytdlp.location:}") String ytDlpLocation,
         @Value("${app.ytdlp.timeout-minutes}") int ytDlpTimeoutMinutes,
         @Value("${app.ytdlp.metadata-timeout-minutes:1}") int metadataTimeoutMinutes,
         @Qualifier("mediaExecutor") Executor mediaExecutor,
@@ -101,6 +103,7 @@ public class VideoService {
         WhisperClient whisperClient
     ){
         this.ffmpegLocation = ffmpegLocation;
+        this.ytDlpLocation = (ytDlpLocation == null || ytDlpLocation.isBlank()) ? "yt-dlp" : ytDlpLocation;
         this.ytDlpTimeoutMinutes = ytDlpTimeoutMinutes;
         this.metadataTimeoutMinutes = metadataTimeoutMinutes;
         this.mediaExecutor = mediaExecutor;
@@ -127,7 +130,7 @@ public class VideoService {
     public VideoMetadata fetchMetadata(String videoUrl) {
         long startMs = System.currentTimeMillis();
         List<String> command = new ArrayList<>();
-        command.add("yt-dlp");
+        command.add(ytDlpLocation);
         command.add("--dump-json");
         command.add("--no-download");
         command.add("--no-warnings");
@@ -188,7 +191,7 @@ public class VideoService {
             String outputTemplate = baseName + ".%(ext)s";
 
             List<String> command = new ArrayList<>();
-            command.add("yt-dlp");
+            command.add(ytDlpLocation);
 
             if (isFfmpegLocationValid()) {
                 command.add("--ffmpeg-location");

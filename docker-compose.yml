@@ -31,6 +31,7 @@ services:
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres
       APP_FFMPEG_LOCATION: /usr/bin/ffmpeg
+      APP_YTDLP_LOCATION: /usr/bin/yt-dlp
       JAVA_OPTS: -XX:InitialRAMPercentage=50 -XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError
     ports:
       - "8080:8080"

@@ -208,6 +208,42 @@ class RateLimitServiceImplTest {
         }
 
         @Test
+        @DisplayName("Should allow free user when one transcription remains")
+        void shouldAllowFreeUserWhenOneTranscriptionRemains() {
+            // Given — no override row, not premium, one transcript below total limit
+            when(rateLimitRepository.findByUserId(userId)).thenReturn(Optional.empty());
+            when(subscriptionService.hasActivePremiumSubscription(userId)).thenReturn(false);
+            when(transcriptRepository.countByUserId(userId)).thenReturn(29L);
+            when(trackingRepository.findByUserIdAndWindowStartAndWindowType(
+                    eq(userId), any(Instant.class), any(UserRateLimitTrackingEntity.WindowType.class)))
+                    .thenReturn(Optional.empty());
+
+            // When
+            RateLimitResult result = rateLimitService.checkRateLimit(userId);
+
+            // Then
+            assertThat(result.isAllowed()).isTrue();
+            assertThat(result.getLimitType()).isEqualTo(RateLimitResult.RateLimitType.PER_MINUTE);
+        }
+
+        @Test
+        @DisplayName("Should deny free user at total transcript limit")
+        void shouldDenyFreeUserAtTotalTranscriptLimit() {
+            // Given — no override row, not premium, at total limit
+            when(rateLimitRepository.findByUserId(userId)).thenReturn(Optional.empty());
+            when(subscriptionService.hasActivePremiumSubscription(userId)).thenReturn(false);
+            when(transcriptRepository.countByUserId(userId)).thenReturn(30L);
+
+            // When
+            RateLimitResult result = rateLimitService.checkRateLimit(userId);
+
+            // Then
+            assertThat(result.isAllowed()).isFalse();
+            assertThat(result.getReason()).isEqualTo("Total transcript limit exceeded (30/30)");
+            assertThat(result.getLimitType()).isEqualTo(RateLimitResult.RateLimitType.TOTAL);
+        }
+
+        @Test
         @DisplayName("Should use premium-tier defaults when no override exists and user is premium")
         void shouldUsePremiumTierDefaultsWhenNoOverrideAndPremium() {
             // Given — no override row, but premium subscriber

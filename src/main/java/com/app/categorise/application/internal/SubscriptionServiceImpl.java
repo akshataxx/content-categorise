@@ -25,7 +25,7 @@ import java.util.UUID;
 public class SubscriptionServiceImpl implements SubscriptionService {
     
     private static final Logger logger = LoggerFactory.getLogger(SubscriptionServiceImpl.class);
-    private static final int FREE_TIER_LIMIT = 3;
+    private static final int FREE_TIER_LIMIT = 30;
     
     private final UserSubscriptionRepository subscriptionRepository;
     private final UserTranscriptRepository transcriptRepository;

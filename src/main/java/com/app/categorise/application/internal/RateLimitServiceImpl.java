@@ -24,7 +24,7 @@ import java.util.UUID;
  * RateLimitServiceImpl - Implementation of rate limiting business logic.
  *
  * Limits are derived from the user's subscription tier by default:
- * - Free tier:    5/min, 100/day, 3 total transcripts
+ * - Free tier:    5/min, 100/day, 30 total transcripts
  * - Premium tier: 5/min, 100/day, 10000 total transcripts
  *
  * Per-user overrides (stored in user_rate_limits table) take precedence
@@ -45,7 +45,7 @@ public class RateLimitServiceImpl implements RateLimitService {
     // Free-tier defaults
     static final int DEFAULT_TRANSCRIPTS_PER_MINUTE = 5;
     static final int DEFAULT_TRANSCRIPTS_PER_DAY = 100;
-    static final int DEFAULT_TOTAL_TRANSCRIPTS = 3;
+    static final int DEFAULT_TOTAL_TRANSCRIPTS = 30;
 
     // Premium-tier defaults
     static final int PREMIUM_TRANSCRIPTS_PER_MINUTE = 5;

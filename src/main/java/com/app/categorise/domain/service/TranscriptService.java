@@ -3,7 +3,6 @@ package com.app.categorise.domain.service;
 import com.app.categorise.application.mapper.VideoMapper;
 import com.app.categorise.data.entity.BaseTranscriptEntity;
 import com.app.categorise.data.entity.UserTranscriptEntity;
-import com.app.categorise.data.repository.BaseTranscriptRepository;
 import com.app.categorise.data.repository.UserTranscriptRepository;
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.exception.TranscriptDeletionException;
@@ -16,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -111,39 +111,39 @@ public class TranscriptService {
     }
 
     @Transactional
-    public void deleteTranscripts(List<UUID> userTranscriptIds) {
+    public void deleteTranscripts(UUID userId, List<UUID> userTranscriptIds) {
+        if (userId == null) {
+            throw new IllegalArgumentException("User ID cannot be null");
+        }
         if (userTranscriptIds == null || userTranscriptIds.isEmpty()) {
             throw new IllegalArgumentException("User transcript IDs list cannot be null or empty");
         }
 
-        logger.info("Attempting to delete {} user transcripts", userTranscriptIds.size());
+        logger.info("Attempting to delete {} user transcripts for user {}", userTranscriptIds.size(), userId);
 
         try {
-            // First, check which user transcripts exist
-            List<UUID> existingIds = userTranscriptRepository.findAllById(userTranscriptIds)
-                    .stream()
-                    .map(UserTranscriptEntity::getId)
-                    .toList();
+            List<UserTranscriptEntity> existingEntities = userTranscriptRepository.findAllByIdInAndUserId(userTranscriptIds, userId);
+            Set<UUID> existingIds = existingEntities.stream()
+                .map(UserTranscriptEntity::getId)
+                .collect(Collectors.toSet());
 
-            // Find non-existent IDs
             List<UUID> nonExistentIds = userTranscriptIds.stream()
-                    .filter(id -> !existingIds.contains(id))
-                    .collect(Collectors.toList());
+                .filter(id -> !existingIds.contains(id))
+                .toList();
 
             if (!nonExistentIds.isEmpty()) {
-                String message = String.format("The following user transcript IDs were not found: %s", nonExistentIds);
+                String message = String.format("The following user transcript IDs were not found for user %s: %s", userId, nonExistentIds);
                 logger.warn(message);
                 throw new TranscriptNotFoundException(message, nonExistentIds);
             }
 
-            // Proceed with deletion if all user transcripts exist
-            userTranscriptRepository.deleteAllById(userTranscriptIds);
-            logger.info("Successfully deleted {} user transcripts", userTranscriptIds.size());
+            userTranscriptRepository.deleteAll(existingEntities);
+            logger.info("Successfully deleted {} user transcripts for user {}", userTranscriptIds.size(), userId);
 
         } catch (TranscriptNotFoundException ex) {
             throw ex;
         }  catch (Exception ex) {
-            String message = String.format("Unexpected error occurred while deleting user transcripts: %s", ex.getMessage());
+            String message = String.format("Unexpected error occurred while deleting user transcripts for user %s: %s", userId, ex.getMessage());
             logger.error(message, ex);
             throw new TranscriptDeletionException(message, userTranscriptIds, ex);
         }

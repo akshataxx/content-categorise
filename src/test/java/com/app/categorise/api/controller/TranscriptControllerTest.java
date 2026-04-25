@@ -5,6 +5,7 @@ import com.app.categorise.domain.service.CategoryAliasService;
 import com.app.categorise.domain.service.CategoryService;
 import com.app.categorise.domain.service.TranscriptService;
 import com.app.categorise.exception.TranscriptNotFoundException;
+import com.app.categorise.security.UserPrincipal;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -21,7 +22,9 @@ import java.util.Collections;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -47,11 +50,22 @@ class TranscriptControllerTest {
 
     private UUID transcriptId1;
     private UUID transcriptId2;
+    private UUID userId;
+    private UserPrincipal userPrincipal;
 
     @BeforeEach
     void setUp() {
         transcriptId1 = UUID.randomUUID();
         transcriptId2 = UUID.randomUUID();
+        userId = UUID.randomUUID();
+        userPrincipal = new UserPrincipal(
+            userId,
+            "Test User",
+            "test@example.com",
+            "test@example.com",
+            null,
+            Collections.emptyList()
+        );
     }
 
     @Nested
@@ -67,11 +81,12 @@ class TranscriptControllerTest {
 
             // Act & Assert
             mockMvc.perform(delete("/transcript")
+                    .with(user(userPrincipal))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isNoContent());
 
-            verify(transcriptService).deleteTranscripts(Arrays.asList(transcriptId1, transcriptId2));
+            verify(transcriptService).deleteTranscripts(userId, Arrays.asList(transcriptId1, transcriptId2));
         }
 
         @Test
@@ -83,11 +98,12 @@ class TranscriptControllerTest {
 
             // Act & Assert
             mockMvc.perform(delete("/transcript")
+                    .with(user(userPrincipal))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isNoContent());
 
-            verify(transcriptService).deleteTranscripts(Collections.singletonList(transcriptId1));
+            verify(transcriptService).deleteTranscripts(userId, Collections.singletonList(transcriptId1));
         }
 
         @Test
@@ -99,11 +115,12 @@ class TranscriptControllerTest {
 
             // Act & Assert
             mockMvc.perform(delete("/transcript")
+                    .with(user(userPrincipal))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isBadRequest());
 
-            verify(transcriptService, never()).deleteTranscripts(any());
+            verify(transcriptService, never()).deleteTranscripts(any(), any());
         }
 
         @Test
@@ -115,11 +132,12 @@ class TranscriptControllerTest {
 
             // Act & Assert
             mockMvc.perform(delete("/transcript")
+                    .with(user(userPrincipal))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isBadRequest());
 
-            verify(transcriptService, never()).deleteTranscripts(any());
+            verify(transcriptService, never()).deleteTranscripts(any(), any());
         }
 
         @Test
@@ -131,11 +149,27 @@ class TranscriptControllerTest {
 
             // Act & Assert
             mockMvc.perform(delete("/transcript")
+                    .with(user(userPrincipal))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isBadRequest());
 
-            verify(transcriptService, never()).deleteTranscripts(any());
+            verify(transcriptService, never()).deleteTranscripts(any(), any());
+        }
+
+        @Test
+        @DisplayName("Should return bad request for null transcript ID entry")
+        void deleteTranscripts_WithNullIdEntry_ReturnsBadRequest() throws Exception {
+            DeleteTranscriptsRequest request = new DeleteTranscriptsRequest();
+            request.setTranscriptIds(Arrays.asList(transcriptId1, null));
+
+            mockMvc.perform(delete("/transcript")
+                    .with(user(userPrincipal))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest());
+
+            verify(transcriptService, never()).deleteTranscripts(any(), any());
         }
 
         @Test
@@ -143,11 +177,12 @@ class TranscriptControllerTest {
         void deleteTranscripts_WithEmptyRequestBody_ReturnsBadRequest() throws Exception {
             // Act & Assert
             mockMvc.perform(delete("/transcript")
+                    .with(user(userPrincipal))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{}"))
                     .andExpect(status().isBadRequest());
 
-            verify(transcriptService, never()).deleteTranscripts(any());
+            verify(transcriptService, never()).deleteTranscripts(any(), any());
         }
 
         @Test
@@ -155,11 +190,12 @@ class TranscriptControllerTest {
         void deleteTranscripts_WithInvalidJson_ReturnsInternalServerError() throws Exception {
             // Act & Assert - JSON parsing errors result in 500 from global exception handler
             mockMvc.perform(delete("/transcript")
+                    .with(user(userPrincipal))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("invalid"))
                     .andExpect(status().isInternalServerError());
 
-            verify(transcriptService, never()).deleteTranscripts(any());
+            verify(transcriptService, never()).deleteTranscripts(any(), any());
         }
 
         @Test
@@ -169,7 +205,7 @@ class TranscriptControllerTest {
             mockMvc.perform(delete("/transcript"))
                     .andExpect(status().isInternalServerError());
 
-            verify(transcriptService, never()).deleteTranscripts(any());
+            verify(transcriptService, never()).deleteTranscripts(any(), any());
         }
 
         @Test
@@ -180,17 +216,18 @@ class TranscriptControllerTest {
             request.setTranscriptIds(Arrays.asList(transcriptId1, transcriptId2));
 
             doThrow(new TranscriptNotFoundException("Transcript not found", Collections.singletonList(transcriptId2)))
-                    .when(transcriptService).deleteTranscripts(any());
+                    .when(transcriptService).deleteTranscripts(eq(userId), any());
 
             // Act & Assert
             mockMvc.perform(delete("/transcript")
+                    .with(user(userPrincipal))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.message").value("Transcript not found"))
                     .andExpect(jsonPath("$.status").value(404));
 
-            verify(transcriptService).deleteTranscripts(Arrays.asList(transcriptId1, transcriptId2));
+            verify(transcriptService).deleteTranscripts(userId, Arrays.asList(transcriptId1, transcriptId2));
         }
 
         @Test
@@ -201,17 +238,34 @@ class TranscriptControllerTest {
             request.setTranscriptIds(Arrays.asList(transcriptId1, transcriptId2));
 
             doThrow(new IllegalArgumentException("Invalid request"))
-                    .when(transcriptService).deleteTranscripts(any());
+                    .when(transcriptService).deleteTranscripts(eq(userId), any());
 
             // Act & Assert
             mockMvc.perform(delete("/transcript")
+                    .with(user(userPrincipal))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.message").value("Invalid request"))
                     .andExpect(jsonPath("$.status").value(400));
 
-            verify(transcriptService).deleteTranscripts(Arrays.asList(transcriptId1, transcriptId2));
+            verify(transcriptService).deleteTranscripts(userId, Arrays.asList(transcriptId1, transcriptId2));
+        }
+
+        @Test
+        @DisplayName("Should return bad request when user is not authenticated")
+        void deleteTranscripts_WithoutAuthenticatedUser_ReturnsBadRequest() throws Exception {
+            DeleteTranscriptsRequest request = new DeleteTranscriptsRequest();
+            request.setTranscriptIds(Arrays.asList(transcriptId1, transcriptId2));
+
+            mockMvc.perform(delete("/transcript")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value("User not authenticated"))
+                    .andExpect(jsonPath("$.status").value(400));
+
+            verify(transcriptService, never()).deleteTranscripts(any(), any());
         }
     }
 }

@@ -5,7 +5,6 @@ import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.data.entity.BaseTranscriptEntity;
 import com.app.categorise.data.entity.CategoryEntity;
 import com.app.categorise.data.entity.UserTranscriptEntity;
-import com.app.categorise.data.repository.BaseTranscriptRepository;
 import com.app.categorise.data.repository.UserTranscriptRepository;
 import com.app.categorise.exception.TranscriptDeletionException;
 import com.app.categorise.exception.TranscriptNotFoundException;
@@ -188,7 +187,7 @@ class TranscriptServiceTest {
 
         @Test
         @DisplayName("Should delete multiple user transcripts successfully")
-        void deleteTranscripts_WithValidIds_CallsRepositoryDeleteAllById() {
+        void deleteTranscripts_WithValidIds_CallsRepositoryDeleteAll() {
             // Arrange
             List<UUID> userTranscriptIds = Arrays.asList(userTranscriptId1, userTranscriptId2);
             List<UserTranscriptEntity> existingEntities = Arrays.asList(
@@ -196,31 +195,31 @@ class TranscriptServiceTest {
                     createMockUserTranscriptEntity(userTranscriptId2)
             );
 
-            when(userTranscriptRepository.findAllById(userTranscriptIds)).thenReturn(existingEntities);
+            when(userTranscriptRepository.findAllByIdInAndUserId(userTranscriptIds, userId)).thenReturn(existingEntities);
 
             // Act
-            transcriptService.deleteTranscripts(userTranscriptIds);
+            transcriptService.deleteTranscripts(userId, userTranscriptIds);
 
             // Assert
-            verify(userTranscriptRepository).findAllById(userTranscriptIds);
-            verify(userTranscriptRepository).deleteAllById(userTranscriptIds);
+            verify(userTranscriptRepository).findAllByIdInAndUserId(userTranscriptIds, userId);
+            verify(userTranscriptRepository).deleteAll(existingEntities);
         }
 
         @Test
         @DisplayName("Should delete single user transcript successfully")
-        void deleteTranscripts_WithSingleId_CallsRepositoryDeleteAllById() {
+        void deleteTranscripts_WithSingleId_CallsRepositoryDeleteAll() {
             // Arrange
             List<UUID> userTranscriptIds = Collections.singletonList(userTranscriptId1);
             List<UserTranscriptEntity> existingEntities = Collections.singletonList(createMockUserTranscriptEntity(userTranscriptId1));
 
-            when(userTranscriptRepository.findAllById(userTranscriptIds)).thenReturn(existingEntities);
+            when(userTranscriptRepository.findAllByIdInAndUserId(userTranscriptIds, userId)).thenReturn(existingEntities);
 
             // Act
-            transcriptService.deleteTranscripts(userTranscriptIds);
+            transcriptService.deleteTranscripts(userId, userTranscriptIds);
 
             // Assert
-            verify(userTranscriptRepository).findAllById(userTranscriptIds);
-            verify(userTranscriptRepository).deleteAllById(userTranscriptIds);
+            verify(userTranscriptRepository).findAllByIdInAndUserId(userTranscriptIds, userId);
+            verify(userTranscriptRepository).deleteAll(existingEntities);
         }
 
         @Test
@@ -231,12 +230,12 @@ class TranscriptServiceTest {
 
             // Act & Assert
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-                transcriptService.deleteTranscripts(userTranscriptIds);
+                transcriptService.deleteTranscripts(userId, userTranscriptIds);
             });
 
             assertEquals("User transcript IDs list cannot be null or empty", exception.getMessage());
-            verify(userTranscriptRepository, never()).findAllById(any());
-            verify(userTranscriptRepository, never()).deleteAllById(any());
+            verify(userTranscriptRepository, never()).findAllByIdInAndUserId(any(), any());
+            verify(userTranscriptRepository, never()).deleteAll(any());
         }
 
         @Test
@@ -244,33 +243,46 @@ class TranscriptServiceTest {
         void deleteTranscripts_WithNullList_ThrowsIllegalArgumentException() {
             // Act & Assert
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-                transcriptService.deleteTranscripts(null);
+                transcriptService.deleteTranscripts(userId, null);
             });
 
             assertEquals("User transcript IDs list cannot be null or empty", exception.getMessage());
-            verify(userTranscriptRepository, never()).findAllById(any());
-            verify(userTranscriptRepository, never()).deleteAllById(any());
+            verify(userTranscriptRepository, never()).findAllByIdInAndUserId(any(), any());
+            verify(userTranscriptRepository, never()).deleteAll(any());
         }
 
         @Test
-        @DisplayName("Should throw exception when some user transcripts don't exist")
-        void deleteTranscripts_WithNonExistentIds_ThrowsTranscriptNotFoundException() {
+        @DisplayName("Should throw exception for null user ID")
+        void deleteTranscripts_WithNullUserId_ThrowsIllegalArgumentException() {
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+                transcriptService.deleteTranscripts(null, Collections.singletonList(userTranscriptId1));
+            });
+
+            assertEquals("User ID cannot be null", exception.getMessage());
+            verify(userTranscriptRepository, never()).findAllByIdInAndUserId(any(), any());
+            verify(userTranscriptRepository, never()).deleteAll(any());
+        }
+
+        @Test
+        @DisplayName("Should throw exception when some user transcripts are missing for the user")
+        void deleteTranscripts_WithIdsOutsideUserOwnership_ThrowsTranscriptNotFoundException() {
             // Arrange
             List<UUID> userTranscriptIds = Arrays.asList(userTranscriptId1, userTranscriptId2);
             List<UserTranscriptEntity> existingEntities = Collections.singletonList(createMockUserTranscriptEntity(userTranscriptId1));
 
-            when(userTranscriptRepository.findAllById(userTranscriptIds)).thenReturn(existingEntities);
+            when(userTranscriptRepository.findAllByIdInAndUserId(userTranscriptIds, userId)).thenReturn(existingEntities);
 
             // Act & Assert
             TranscriptNotFoundException exception = assertThrows(TranscriptNotFoundException.class, () -> {
-                transcriptService.deleteTranscripts(userTranscriptIds);
+                transcriptService.deleteTranscripts(userId, userTranscriptIds);
             });
 
             assertTrue(exception.getMessage().contains("not found"));
+            assertTrue(exception.getMessage().contains(userId.toString()));
             assertTrue(exception.getMessage().contains(userTranscriptId2.toString()));
             assertEquals(Collections.singletonList(userTranscriptId2), exception.getNotFoundIds());
-            verify(userTranscriptRepository).findAllById(userTranscriptIds);
-            verify(userTranscriptRepository, never()).deleteAllById(any());
+            verify(userTranscriptRepository).findAllByIdInAndUserId(userTranscriptIds, userId);
+            verify(userTranscriptRepository, never()).deleteAll(any());
         }
 
         @Test
@@ -283,18 +295,18 @@ class TranscriptServiceTest {
                     createMockUserTranscriptEntity(userTranscriptId2)
             );
 
-            when(userTranscriptRepository.findAllById(userTranscriptIds)).thenReturn(existingEntities);
-            doThrow(new RuntimeException("Unexpected error")).when(userTranscriptRepository).deleteAllById(userTranscriptIds);
+            when(userTranscriptRepository.findAllByIdInAndUserId(userTranscriptIds, userId)).thenReturn(existingEntities);
+            doThrow(new RuntimeException("Unexpected error")).when(userTranscriptRepository).deleteAll(existingEntities);
 
             // Act & Assert
             TranscriptDeletionException exception = assertThrows(TranscriptDeletionException.class, () -> {
-                transcriptService.deleteTranscripts(userTranscriptIds);
+                transcriptService.deleteTranscripts(userId, userTranscriptIds);
             });
 
             assertTrue(exception.getMessage().contains("Unexpected error"));
             assertEquals(userTranscriptIds, exception.getFailedIds());
-            verify(userTranscriptRepository).findAllById(userTranscriptIds);
-            verify(userTranscriptRepository).deleteAllById(userTranscriptIds);
+            verify(userTranscriptRepository).findAllByIdInAndUserId(userTranscriptIds, userId);
+            verify(userTranscriptRepository).deleteAll(existingEntities);
         }
     }
 

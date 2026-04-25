@@ -97,44 +97,25 @@ public class TranscriptController {
     /**
      * Delete multiple user transcripts by their IDs.
      * @param request The request containing the list of user transcript IDs to delete
+     * @param principal The authenticated user principal
      * @return ResponseEntity with no content on successful deletion
      */
     @DeleteMapping
-    public ResponseEntity<Void> deleteTranscripts(@Valid @RequestBody DeleteTranscriptsRequest request) {
+    public ResponseEntity<Void> deleteTranscripts(
+        @Valid @RequestBody DeleteTranscriptsRequest request,
+        @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        if (principal == null) {
+            throw new IllegalArgumentException("User not authenticated");
+        }
+
+        UUID userId = principal.getId();
         logger.info("Received request to delete user transcripts: {}", request.getTranscriptIds());
-        
-        validateDeleteTranscriptsRequest(request);
-        
-        logger.info("Deleting {} user transcripts", request.getTranscriptIds().size());
-        transcriptService.deleteTranscripts(request.getTranscriptIds());
-        
-        logger.info("Successfully deleted {} user transcripts", request.getTranscriptIds().size());
+
+        logger.info("Deleting {} user transcripts for user {}", request.getTranscriptIds().size(), userId);
+        transcriptService.deleteTranscripts(userId, request.getTranscriptIds());
+
+        logger.info("Successfully deleted {} user transcripts for user {}", request.getTranscriptIds().size(), userId);
         return ResponseEntity.noContent().build();
     }
-
-    private void validateDeleteTranscriptsRequest(DeleteTranscriptsRequest request) {
-        // Validate request
-        if (request == null) {
-            logger.warn("Delete user transcripts request is null");
-            throw new IllegalArgumentException("Request body cannot be null");
-        }
-        
-        if (request.getTranscriptIds() == null || request.getTranscriptIds().isEmpty()) {
-            logger.warn("Delete user transcripts request contains null or empty transcript IDs list");
-            throw new IllegalArgumentException("User transcript IDs list cannot be null or empty");
-        }
-
-        // Validate individual IDs
-        if (request.getTranscriptIds().stream().anyMatch(id -> id == null)) {
-            logger.warn("Delete user transcripts request contains null transcript ID");
-            throw new IllegalArgumentException("User transcript IDs cannot contain null values");
-        }
-
-        // Check for reasonable batch size (prevent potential DoS)
-        if (request.getTranscriptIds().size() > 100) {
-            logger.warn("Delete user transcripts request contains too many IDs: {}", request.getTranscriptIds().size());
-            throw new IllegalArgumentException("Cannot delete more than 100 user transcripts at once");
-        }
-    }
 }
-

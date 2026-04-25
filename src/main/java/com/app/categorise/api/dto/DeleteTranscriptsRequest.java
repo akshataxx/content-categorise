@@ -15,7 +15,7 @@ public class DeleteTranscriptsRequest {
     @NotEmpty(message = "Transcript IDs list cannot be empty")
     @Size(max = 100, message = "Cannot delete more than 100 transcripts at once")
     @Schema(description = "List of transcript IDs to delete", example = "[\"550e8400-e29b-41d4-a716-446655440001\", \"550e8400-e29b-41d4-a716-446655440002\"]")
-    private List<UUID> transcriptIds;
+    private List<@NotNull(message = "Transcript IDs cannot contain null values") UUID> transcriptIds;
 
     public DeleteTranscriptsRequest() {
     }

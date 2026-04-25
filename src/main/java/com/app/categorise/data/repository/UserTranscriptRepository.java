@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -66,4 +67,10 @@ public interface UserTranscriptRepository extends JpaRepository<UserTranscriptEn
      * @return The user transcript if found and owned by the user
      */
     Optional<UserTranscriptEntity> findByIdAndUserId(UUID id, UUID userId);
+
+    /**
+     * Find user transcripts by IDs scoped to a single owner.
+     * Used by bulk delete to prevent cross-user deletion.
+     */
+    List<UserTranscriptEntity> findAllByIdInAndUserId(Collection<UUID> ids, UUID userId);
 }

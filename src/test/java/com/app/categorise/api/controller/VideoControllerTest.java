@@ -70,7 +70,9 @@ class VideoControllerTest {
                 Instant.now(),               // createdAt
                 null,                        // notes
                 null,                        // platform
-                null                         // generatedTitle
+                null,                        // generatedTitle
+                null,                        // subcategoryId
+                null                         // subcategory
         );
     }
 

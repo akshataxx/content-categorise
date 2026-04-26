@@ -130,7 +130,9 @@ class VideoServiceTest {
                 Instant.now(),
                 null, // notes
                 null, // platform
-                null  // generatedTitle
+                null, // generatedTitle
+                null, // subcategoryId
+                null  // subcategory
         );
     }
 

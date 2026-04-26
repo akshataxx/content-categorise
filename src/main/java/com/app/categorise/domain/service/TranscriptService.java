@@ -2,9 +2,12 @@ package com.app.categorise.domain.service;
 
 import com.app.categorise.application.mapper.VideoMapper;
 import com.app.categorise.data.entity.BaseTranscriptEntity;
+import com.app.categorise.data.entity.UserSubcategoryEntity;
 import com.app.categorise.data.entity.UserTranscriptEntity;
 import com.app.categorise.data.repository.UserTranscriptRepository;
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
+import com.app.categorise.exception.SubcategoryNotFoundException;
+import com.app.categorise.exception.SubcategoryParentMismatchException;
 import com.app.categorise.exception.TranscriptDeletionException;
 import com.app.categorise.exception.TranscriptNotFoundException;
 import org.slf4j.Logger;
@@ -30,13 +33,16 @@ public class TranscriptService {
     private static final Logger logger = LoggerFactory.getLogger(TranscriptService.class);
 
     private final UserTranscriptRepository userTranscriptRepository;
+    private final UserSubcategoryService userSubcategoryService;
     private final VideoMapper videoMapper;
 
     public TranscriptService(
         UserTranscriptRepository userTranscriptRepository,
+        UserSubcategoryService userSubcategoryService,
         VideoMapper videoMapper
     ) {
         this.userTranscriptRepository = userTranscriptRepository;
+        this.userSubcategoryService = userSubcategoryService;
         this.videoMapper = videoMapper;
     }
 
@@ -54,8 +60,12 @@ public class TranscriptService {
     }
 
     public List<TranscriptDtoWithAliases> allFilteredTranscripts(UUID userId, List<UUID> categories, String account, Instant from, Instant to) {
+        return allFilteredTranscripts(userId, categories, null, account, from, to);
+    }
+
+    public List<TranscriptDtoWithAliases> allFilteredTranscripts(UUID userId, List<UUID> categories, List<UUID> subcategories, String account, Instant from, Instant to) {
         // Use the custom repository method for efficient database filtering
-        List<UserTranscriptEntity> userTranscripts = userTranscriptRepository.filterByUser(userId, categories, account, from, to);
+        List<UserTranscriptEntity> userTranscripts = userTranscriptRepository.filterByUser(userId, categories, subcategories, account, from, to);
         
         return userTranscripts.stream()
             .filter(ut -> isValidTranscript(ut.getBaseTranscript()))
@@ -97,6 +107,34 @@ public class TranscriptService {
      * @param userTranscriptId The user transcript ID to update
      * @param notes The new notes content (null to clear)
      */
+    @Transactional
+    public TranscriptDtoWithAliases setSubcategory(UUID userId, UUID userTranscriptId, UUID subcategoryId) {
+        UserTranscriptEntity transcript = userTranscriptRepository
+            .findByIdAndUserId(userTranscriptId, userId)
+            .orElseThrow(() -> new TranscriptNotFoundException("Transcript not found: " + userTranscriptId));
+
+        if (subcategoryId == null) {
+            transcript.setUserSubcategory(null);
+            UserTranscriptEntity saved = userTranscriptRepository.save(transcript);
+            return videoMapper.buildResponse(saved.getBaseTranscript(), saved);
+        }
+
+        UserSubcategoryEntity subcategory = userSubcategoryService.getOwnedSubcategory(userId, subcategoryId)
+            .orElseThrow(() -> new SubcategoryNotFoundException("Subcategory not found: " + subcategoryId));
+
+        if (transcript.getCategory() == null || transcript.getCategoryId() == null) {
+            throw new SubcategoryParentMismatchException("Transcript has no parent category");
+        }
+
+        if (!subcategory.getParentId().equals(transcript.getCategoryId())) {
+            throw new SubcategoryParentMismatchException("Subcategory parent does not match transcript category");
+        }
+
+        transcript.setUserSubcategory(subcategory);
+        UserTranscriptEntity saved = userTranscriptRepository.save(transcript);
+        return videoMapper.buildResponse(saved.getBaseTranscript(), saved);
+    }
+
     @Transactional
     public void updateNotes(UUID userId, UUID userTranscriptId, String notes) {
         UserTranscriptEntity entity = userTranscriptRepository

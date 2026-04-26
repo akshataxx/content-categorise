@@ -33,9 +33,8 @@ public class CategorisationService {
      */
     public TranscriptCategorisationResult classifyAndSuggestAlias(String transcript, String title, String description) {
         // Fetch all predefined categories not created by the user
-        List<String> categoryNames = categoryService.getAllCategoryNamesCreatedBySystem();
+        List<String> categoryNames = categoryService.getAllRootCategoryNames();
 
         return openAIClient.classifyAndSuggestAlias(transcript, title, description, categoryNames);
     }
 }
-

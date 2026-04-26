@@ -4,8 +4,11 @@ import com.app.categorise.application.mapper.VideoMapper;
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.data.entity.BaseTranscriptEntity;
 import com.app.categorise.data.entity.CategoryEntity;
+import com.app.categorise.data.entity.UserSubcategoryEntity;
 import com.app.categorise.data.entity.UserTranscriptEntity;
 import com.app.categorise.data.repository.UserTranscriptRepository;
+import com.app.categorise.exception.SubcategoryNotFoundException;
+import com.app.categorise.exception.SubcategoryParentMismatchException;
 import com.app.categorise.exception.TranscriptDeletionException;
 import com.app.categorise.exception.TranscriptNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,6 +36,9 @@ class TranscriptServiceTest {
 
     @Mock
     private UserTranscriptRepository userTranscriptRepository;
+
+    @Mock
+    private UserSubcategoryService userSubcategoryService;
 
     @Mock
     private VideoMapper videoMapper;
@@ -146,7 +152,7 @@ class TranscriptServiceTest {
             zeroDuration.getBaseTranscript().setDuration(0.0);
             zeroDuration.getBaseTranscript().setUploadedAt(Instant.ofEpochSecond(1700000000L));
 
-            when(userTranscriptRepository.filterByUser(userId, null, null, null, null))
+            when(userTranscriptRepository.filterByUser(userId, null, null, null, null, null))
                     .thenReturn(List.of(valid, noTitle, zeroDuration));
 
             TranscriptDtoWithAliases dto = mock(TranscriptDtoWithAliases.class);
@@ -170,7 +176,7 @@ class TranscriptServiceTest {
             e2.getBaseTranscript().setDuration(90.0);
             e2.getBaseTranscript().setUploadedAt(Instant.ofEpochSecond(1700000000L));
 
-            when(userTranscriptRepository.filterByUser(userId, null, null, null, null))
+            when(userTranscriptRepository.filterByUser(userId, null, null, null, null, null))
                     .thenReturn(List.of(e1, e2));
             when(videoMapper.buildResponse(any(BaseTranscriptEntity.class), any(UserTranscriptEntity.class)))
                     .thenReturn(mock(TranscriptDtoWithAliases.class));
@@ -178,6 +184,78 @@ class TranscriptServiceTest {
             List<TranscriptDtoWithAliases> results = transcriptService.allFilteredTranscripts(userId, null, null, null, null);
 
             assertEquals(2, results.size());
+        }
+    }
+
+    @Nested
+    @DisplayName("Set Subcategory")
+    class SetSubcategoryTests {
+
+        @Test
+        @DisplayName("Assigns a subcategory when owned by user and parent matches transcript category")
+        void setSubcategory_WithMatchingParent_AssignsSubcategory() {
+            UUID subcategoryId = UUID.randomUUID();
+            UserTranscriptEntity entity = createMockUserTranscriptEntity(userTranscriptId1);
+            UserSubcategoryEntity subcategory = createSubcategory(subcategoryId, categoryId, userId);
+            TranscriptDtoWithAliases expectedDto = mock(TranscriptDtoWithAliases.class);
+
+            when(userTranscriptRepository.findByIdAndUserId(userTranscriptId1, userId)).thenReturn(Optional.of(entity));
+            when(userSubcategoryService.getOwnedSubcategory(userId, subcategoryId)).thenReturn(Optional.of(subcategory));
+            when(userTranscriptRepository.save(entity)).thenReturn(entity);
+            when(videoMapper.buildResponse(entity.getBaseTranscript(), entity)).thenReturn(expectedDto);
+
+            TranscriptDtoWithAliases result = transcriptService.setSubcategory(userId, userTranscriptId1, subcategoryId);
+
+            assertEquals(expectedDto, result);
+            assertEquals(subcategory, entity.getUserSubcategory());
+            verify(userTranscriptRepository).save(entity);
+        }
+
+        @Test
+        @DisplayName("Clears subcategory when request value is null")
+        void setSubcategory_WithNull_ClearsSubcategory() {
+            UserTranscriptEntity entity = createMockUserTranscriptEntity(userTranscriptId1);
+            entity.setUserSubcategory(createSubcategory(UUID.randomUUID(), categoryId, userId));
+            TranscriptDtoWithAliases expectedDto = mock(TranscriptDtoWithAliases.class);
+
+            when(userTranscriptRepository.findByIdAndUserId(userTranscriptId1, userId)).thenReturn(Optional.of(entity));
+            when(userTranscriptRepository.save(entity)).thenReturn(entity);
+            when(videoMapper.buildResponse(entity.getBaseTranscript(), entity)).thenReturn(expectedDto);
+
+            TranscriptDtoWithAliases result = transcriptService.setSubcategory(userId, userTranscriptId1, null);
+
+            assertEquals(expectedDto, result);
+            assertNull(entity.getUserSubcategory());
+            verifyNoInteractions(userSubcategoryService);
+        }
+
+        @Test
+        @DisplayName("Rejects subcategory owned by another user")
+        void setSubcategory_WithDifferentOwner_ThrowsNotFound() {
+            UUID subcategoryId = UUID.randomUUID();
+            UserTranscriptEntity entity = createMockUserTranscriptEntity(userTranscriptId1);
+
+            when(userTranscriptRepository.findByIdAndUserId(userTranscriptId1, userId)).thenReturn(Optional.of(entity));
+            when(userSubcategoryService.getOwnedSubcategory(userId, subcategoryId)).thenReturn(Optional.empty());
+
+            assertThrows(SubcategoryNotFoundException.class,
+                () -> transcriptService.setSubcategory(userId, userTranscriptId1, subcategoryId));
+            verify(userTranscriptRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Rejects subcategory under a different parent category")
+        void setSubcategory_WithDifferentParent_ThrowsMismatch() {
+            UUID subcategoryId = UUID.randomUUID();
+            UserTranscriptEntity entity = createMockUserTranscriptEntity(userTranscriptId1);
+            UserSubcategoryEntity subcategory = createSubcategory(subcategoryId, UUID.randomUUID(), userId);
+
+            when(userTranscriptRepository.findByIdAndUserId(userTranscriptId1, userId)).thenReturn(Optional.of(entity));
+            when(userSubcategoryService.getOwnedSubcategory(userId, subcategoryId)).thenReturn(Optional.of(subcategory));
+
+            assertThrows(SubcategoryParentMismatchException.class,
+                () -> transcriptService.setSubcategory(userId, userTranscriptId1, subcategoryId));
+            verify(userTranscriptRepository, never()).save(any());
         }
     }
 
@@ -335,5 +413,19 @@ class TranscriptServiceTest {
         entity.setLastAccessedAt(Instant.now());
         
         return entity;
+    }
+
+    private UserSubcategoryEntity createSubcategory(UUID id, UUID parentId, UUID ownerId) {
+        CategoryEntity parent = new CategoryEntity();
+        parent.setId(parentId);
+        parent.setName("Parent Category");
+
+        UserSubcategoryEntity subcategory = new UserSubcategoryEntity();
+        subcategory.setId(id);
+        subcategory.setUserId(ownerId);
+        subcategory.setParent(parent);
+        subcategory.setName("Subcategory");
+        subcategory.setCreatedAt(Instant.now());
+        return subcategory;
     }
 }

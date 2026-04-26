@@ -15,7 +15,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -24,7 +28,6 @@ import java.util.UUID;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -81,7 +84,7 @@ class TranscriptControllerTest {
 
             // Act & Assert
             mockMvc.perform(delete("/transcript")
-                    .with(user(userPrincipal))
+                    .with(authenticatedUser())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isNoContent());
@@ -98,7 +101,7 @@ class TranscriptControllerTest {
 
             // Act & Assert
             mockMvc.perform(delete("/transcript")
-                    .with(user(userPrincipal))
+                    .with(authenticatedUser())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isNoContent());
@@ -115,7 +118,7 @@ class TranscriptControllerTest {
 
             // Act & Assert
             mockMvc.perform(delete("/transcript")
-                    .with(user(userPrincipal))
+                    .with(authenticatedUser())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isBadRequest());
@@ -132,7 +135,7 @@ class TranscriptControllerTest {
 
             // Act & Assert
             mockMvc.perform(delete("/transcript")
-                    .with(user(userPrincipal))
+                    .with(authenticatedUser())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isBadRequest());
@@ -149,7 +152,7 @@ class TranscriptControllerTest {
 
             // Act & Assert
             mockMvc.perform(delete("/transcript")
-                    .with(user(userPrincipal))
+                    .with(authenticatedUser())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isBadRequest());
@@ -164,7 +167,7 @@ class TranscriptControllerTest {
             request.setTranscriptIds(Arrays.asList(transcriptId1, null));
 
             mockMvc.perform(delete("/transcript")
-                    .with(user(userPrincipal))
+                    .with(authenticatedUser())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isBadRequest());
@@ -177,7 +180,7 @@ class TranscriptControllerTest {
         void deleteTranscripts_WithEmptyRequestBody_ReturnsBadRequest() throws Exception {
             // Act & Assert
             mockMvc.perform(delete("/transcript")
-                    .with(user(userPrincipal))
+                    .with(authenticatedUser())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("{}"))
                     .andExpect(status().isBadRequest());
@@ -190,7 +193,7 @@ class TranscriptControllerTest {
         void deleteTranscripts_WithInvalidJson_ReturnsInternalServerError() throws Exception {
             // Act & Assert - JSON parsing errors result in 500 from global exception handler
             mockMvc.perform(delete("/transcript")
-                    .with(user(userPrincipal))
+                    .with(authenticatedUser())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("invalid"))
                     .andExpect(status().isInternalServerError());
@@ -220,7 +223,7 @@ class TranscriptControllerTest {
 
             // Act & Assert
             mockMvc.perform(delete("/transcript")
-                    .with(user(userPrincipal))
+                    .with(authenticatedUser())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isNotFound())
@@ -242,7 +245,7 @@ class TranscriptControllerTest {
 
             // Act & Assert
             mockMvc.perform(delete("/transcript")
-                    .with(user(userPrincipal))
+                    .with(authenticatedUser())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(request)))
                     .andExpect(status().isBadRequest())
@@ -267,5 +270,20 @@ class TranscriptControllerTest {
 
             verify(transcriptService, never()).deleteTranscripts(any(), any());
         }
+    }
+
+    private RequestPostProcessor authenticatedUser() {
+        return request -> {
+            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                userPrincipal,
+                null,
+                userPrincipal.getAuthorities()
+            );
+            SecurityContext context = SecurityContextHolder.createEmptyContext();
+            context.setAuthentication(authentication);
+            SecurityContextHolder.setContext(context);
+            request.setUserPrincipal(authentication);
+            return request;
+        };
     }
 }

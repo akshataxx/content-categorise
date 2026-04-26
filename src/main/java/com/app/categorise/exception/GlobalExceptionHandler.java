@@ -36,6 +36,18 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.NOT_FOUND, ex, request);
     }
 
+    @ExceptionHandler(SubcategoryNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleSubcategoryNotFound(SubcategoryNotFoundException ex, WebRequest request) {
+        logger.warn("Subcategory not found: {}", ex.getMessage());
+        return buildErrorResponse(HttpStatus.NOT_FOUND, ex, request);
+    }
+
+    @ExceptionHandler(SubcategoryParentMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleSubcategoryParentMismatch(SubcategoryParentMismatchException ex, WebRequest request) {
+        logger.warn("Subcategory parent mismatch: {}", ex.getMessage());
+        return buildErrorResponse(HttpStatus.CONFLICT, ex, request);
+    }
+
     @ExceptionHandler(TranscriptDeletionException.class)
     public ResponseEntity<ErrorResponse> handleTranscriptDeletion(TranscriptDeletionException ex, WebRequest request) {
         logger.error("Transcript deletion failed: {}", ex.getMessage(), ex);
@@ -106,4 +118,3 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(status).body(error);
     }
 }
-

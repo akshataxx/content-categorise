@@ -1,13 +1,13 @@
 package com.app.categorise.api.controller;
 
 import com.app.categorise.api.dto.DeleteTranscriptsRequest;
+import com.app.categorise.api.dto.SetSubcategoryRequest;
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.api.dto.UpdateNotesRequest;
 import com.app.categorise.domain.service.TranscriptService;
 import com.app.categorise.security.UserPrincipal;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,9 +16,10 @@ import jakarta.validation.Valid;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.security.core.Authentication;
 
 @RestController
-@RequestMapping("/transcript")
+@RequestMapping({"/transcript", "/api/v1/transcripts"})
 public class TranscriptController {
 
     private static final Logger logger = LoggerFactory.getLogger(TranscriptController.class);
@@ -43,17 +44,18 @@ public class TranscriptController {
     @GetMapping
     public ResponseEntity<List<TranscriptDtoWithAliases>>  findTranscripts(
         @RequestParam(required = false) List<UUID> categoryIds,
+        @RequestParam(required = false) List<UUID> subcategoryIds,
         @RequestParam(required = false) String account,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
-        @AuthenticationPrincipal UserPrincipal principal
+        Authentication authentication
     ) {
-        UUID userId = principal.getId();
-        System.out.printf("Finding all transcripts with filters: categoryIds=%s, account=%s, from=%s, to=%s, userId=%s%n",
-            categoryIds, account, from, to, userId
+        UUID userId = requireUser(authentication);
+        System.out.printf("Finding all transcripts with filters: categoryIds=%s, subcategoryIds=%s, account=%s, from=%s, to=%s, userId=%s%n",
+            categoryIds, subcategoryIds, account, from, to, userId
         );
 
-        List<TranscriptDtoWithAliases> results = transcriptService.allFilteredTranscripts(userId, categoryIds, account, from, to);
+        List<TranscriptDtoWithAliases> results = transcriptService.allFilteredTranscripts(userId, categoryIds, subcategoryIds, account, from, to);
 
         return ResponseEntity.ok(results);
     }
@@ -67,9 +69,9 @@ public class TranscriptController {
     @GetMapping("/{userTranscriptId}")
     public ResponseEntity<TranscriptDtoWithAliases> findTranscript(
         @PathVariable UUID userTranscriptId,
-        @AuthenticationPrincipal UserPrincipal principal
+        Authentication authentication
     ) {
-        UUID userId = principal.getId();
+        UUID userId = requireUser(authentication);
         return transcriptService.findTranscript(userTranscriptId, userId)
             .map(ResponseEntity::ok)
             .orElseGet(() -> ResponseEntity.notFound().build());
@@ -86,12 +88,27 @@ public class TranscriptController {
     public ResponseEntity<Void> updateNotes(
         @PathVariable UUID userTranscriptId,
         @RequestBody @Valid UpdateNotesRequest request,
-        @AuthenticationPrincipal UserPrincipal principal
+        Authentication authentication
     ) {
-        UUID userId = principal.getId();
+        UUID userId = requireUser(authentication);
         logger.info("Updating notes for user transcript: {}", userTranscriptId);
         transcriptService.updateNotes(userId, userTranscriptId, request.notes());
         return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{userTranscriptId}/subcategory")
+    public ResponseEntity<TranscriptDtoWithAliases> setSubcategory(
+        @PathVariable UUID userTranscriptId,
+        @RequestBody SetSubcategoryRequest request,
+        Authentication authentication
+    ) {
+        UUID userId = requireUser(authentication);
+        TranscriptDtoWithAliases updated = transcriptService.setSubcategory(
+            userId,
+            userTranscriptId,
+            request.subcategoryId()
+        );
+        return ResponseEntity.ok(updated);
     }
 
     /**
@@ -103,13 +120,9 @@ public class TranscriptController {
     @DeleteMapping
     public ResponseEntity<Void> deleteTranscripts(
         @Valid @RequestBody DeleteTranscriptsRequest request,
-        @AuthenticationPrincipal UserPrincipal principal
+        Authentication authentication
     ) {
-        if (principal == null) {
-            throw new IllegalArgumentException("User not authenticated");
-        }
-
-        UUID userId = principal.getId();
+        UUID userId = requireUser(authentication);
         logger.info("Received request to delete user transcripts: {}", request.getTranscriptIds());
 
         logger.info("Deleting {} user transcripts for user {}", request.getTranscriptIds().size(), userId);
@@ -117,5 +130,15 @@ public class TranscriptController {
 
         logger.info("Successfully deleted {} user transcripts for user {}", request.getTranscriptIds().size(), userId);
         return ResponseEntity.noContent().build();
+    }
+
+    private UUID requireUser(Authentication authentication) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof UserPrincipal principal)) {
+            throw new IllegalArgumentException("User not authenticated");
+        }
+        if (principal == null || principal.getId() == null) {
+            throw new IllegalArgumentException("User not authenticated");
+        }
+        return principal.getId();
     }
 }

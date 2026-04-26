@@ -22,6 +22,11 @@ public class UserTranscriptRepositoryImpl implements CustomUserTranscriptReposit
 
     @Override
     public List<UserTranscriptEntity> filterByUser(UUID userId, List<UUID> categories, String account, Instant from, Instant to) {
+        return filterByUser(userId, categories, null, account, from, to);
+    }
+
+    @Override
+    public List<UserTranscriptEntity> filterByUser(UUID userId, List<UUID> categories, List<UUID> subcategories, String account, Instant from, Instant to) {
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
         CriteriaQuery<UserTranscriptEntity> query = cb.createQuery(UserTranscriptEntity.class);
         Root<UserTranscriptEntity> root = query.from(UserTranscriptEntity.class);
@@ -35,6 +40,10 @@ public class UserTranscriptRepositoryImpl implements CustomUserTranscriptReposit
 
         if (categories != null && !categories.isEmpty()) {
             predicates.add(root.get("category").get("id").in(categories));
+        }
+
+        if (subcategories != null && !subcategories.isEmpty()) {
+            predicates.add(root.get("userSubcategory").get("id").in(subcategories));
         }
 
         if (account != null && !account.isBlank()) {
@@ -53,5 +62,4 @@ public class UserTranscriptRepositoryImpl implements CustomUserTranscriptReposit
         return entityManager.createQuery(query).getResultList();
     }
 }
-
 

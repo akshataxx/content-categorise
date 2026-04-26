@@ -32,6 +32,10 @@ public class CategoryService {
         return categoryRepository.findById(id);
     }
 
+    public List<CategoryEntity> getAllRootCategories() {
+        return categoryRepository.findAllByCreatedByIsNull();
+    }
+
     public CategoryEntity saveCategory(String name, String description, UUID createdBy) {
         return categoryRepository.save(new CategoryEntity(name, description, createdBy));
     }
@@ -45,13 +49,14 @@ public class CategoryService {
     }
 
     // Get all categories created by the system
-    public List<String> getAllCategoryNamesCreatedBySystem() {
-        return categoryRepository.findAllByCreatedByIsNull().stream()
+    public List<String> getAllRootCategoryNames() {
+        return getAllRootCategories().stream()
             .map(CategoryEntity::getName)
             .collect(Collectors.toList());
     }
 
+    public List<String> getAllCategoryNamesCreatedBySystem() {
+        return getAllRootCategoryNames();
+    }
 
 }
-
-

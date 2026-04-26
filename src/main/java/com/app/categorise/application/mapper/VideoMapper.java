@@ -70,6 +70,13 @@ public class VideoMapper {
      */
     public TranscriptDtoWithAliases buildResponse(BaseTranscriptEntity baseTranscript, UserTranscriptEntity userTranscript,
                                                   String categoryName, String alias) {
+        UUID subcategoryId = userTranscript.getUserSubcategory() == null
+            ? null
+            : userTranscript.getUserSubcategory().getId();
+        String subcategoryName = userTranscript.getUserSubcategory() == null
+            ? null
+            : userTranscript.getUserSubcategory().getName();
+
         return new TranscriptDtoWithAliases(
             userTranscript.getId(),
             baseTranscript.getVideoUrl(),
@@ -89,7 +96,9 @@ public class VideoMapper {
             userTranscript.getCreatedAt(),
             userTranscript.getNotes(),
             baseTranscript.getPlatform(),
-            baseTranscript.getGeneratedTitle()
+            baseTranscript.getGeneratedTitle(),
+            subcategoryId,
+            subcategoryName
         );
     }
 

@@ -91,7 +91,9 @@ class VideoControllerRateLimitIntegrationTest {
                     "Test Identifier", "Test Alias", UUID.randomUUID(), "Test Category", Instant.now(),
                     null, // notes
                     null, // platform
-                    null  // generatedTitle
+                    null, // generatedTitle
+                    null, // subcategoryId
+                    null  // subcategory
             );
             when(videoService.processVideoAndCreateTranscript(eq(videoUrl), eq(userId)))
                     .thenReturn(CompletableFuture.completedFuture(mockResponse));

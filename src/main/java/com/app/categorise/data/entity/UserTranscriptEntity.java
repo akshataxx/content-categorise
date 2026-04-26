@@ -38,6 +38,11 @@ public class UserTranscriptEntity {
     @JoinColumn(name = "category_id")
     private CategoryEntity category;
 
+    @ManyToOne(fetch = FetchType.EAGER)
+    @Fetch(FetchMode.JOIN)
+    @JoinColumn(name = "user_subcategory_id")
+    private UserSubcategoryEntity userSubcategory;
+
     public UserTranscriptEntity() {}
 
     public UserTranscriptEntity(UUID userId, BaseTranscriptEntity baseTranscript, CategoryEntity category) {
@@ -118,6 +123,14 @@ public class UserTranscriptEntity {
 
     public void setCategory(CategoryEntity category) {
         this.category = category;
+    }
+
+    public UserSubcategoryEntity getUserSubcategory() {
+        return userSubcategory;
+    }
+
+    public void setUserSubcategory(UserSubcategoryEntity userSubcategory) {
+        this.userSubcategory = userSubcategory;
     }
 
     public String getNotes() {

@@ -33,5 +33,7 @@ public record TranscriptDtoWithAliases(
     String notes,
     String platform,
     /** AI-generated title capturing the video's tone and main point. Null for older transcripts. */
-    String generatedTitle
+    String generatedTitle,
+    UUID subcategoryId,
+    String subcategory
 ) {}

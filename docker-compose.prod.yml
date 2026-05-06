@@ -20,7 +20,7 @@ services:
       - app-network
 
   app:
-    image: gcr.io/content-categorisation/content-app:latest
+    image: ${APP_IMAGE:-gcr.io/content-categorisation/content-app:latest}
     container_name: content-app
     restart: unless-stopped
     depends_on:
@@ -57,15 +57,16 @@ services:
       - app-network
 
   # Caddy reverse proxy for HTTPS
-  # Uses sslip.io for free SSL - your URL will be https://<your-ip>.sslip.io
-  # Example: https://34-151-189-90.sslip.io
-  # Replace dots in your IP with dashes!
+  # Uses sslip.io for free SSL - your URL can be https://<your-ip>.sslip.io
+  # Set DOMAIN in .env, replacing dots in your IP with dashes.
   caddy:
     image: caddy:2-alpine
     container_name: caddy
     restart: unless-stopped
     depends_on:
       - app
+    environment:
+      DOMAIN: ${DOMAIN}
     ports:
       - "80:80"
       - "443:443"

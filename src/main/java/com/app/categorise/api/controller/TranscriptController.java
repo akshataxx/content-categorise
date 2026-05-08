@@ -132,6 +132,18 @@ public class TranscriptController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/search")
+    public ResponseEntity<List<TranscriptDtoWithAliases>> searchTranscripts(
+        @RequestParam String q,
+        @RequestParam(defaultValue = "10") int limit,
+        Authentication authentication
+    ) {
+        UUID userId = requireUser(authentication);
+        int clampedLimit = Math.min(Math.max(limit, 1), 50);
+        List<TranscriptDtoWithAliases> results = transcriptService.semanticSearch(userId, q, clampedLimit);
+        return ResponseEntity.ok(results);
+    }
+
     private UUID requireUser(Authentication authentication) {
         if (authentication == null || !(authentication.getPrincipal() instanceof UserPrincipal principal)) {
             throw new IllegalArgumentException("User not authenticated");

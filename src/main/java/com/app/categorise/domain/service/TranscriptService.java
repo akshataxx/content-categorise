@@ -1,6 +1,7 @@
 package com.app.categorise.domain.service;
 
 import com.app.categorise.application.mapper.VideoMapper;
+import com.app.categorise.data.client.openai.EmbeddingClient;
 import com.app.categorise.data.entity.BaseTranscriptEntity;
 import com.app.categorise.data.entity.UserSubcategoryEntity;
 import com.app.categorise.data.entity.UserTranscriptEntity;
@@ -35,15 +36,18 @@ public class TranscriptService {
     private final UserTranscriptRepository userTranscriptRepository;
     private final UserSubcategoryService userSubcategoryService;
     private final VideoMapper videoMapper;
+    private final EmbeddingClient embeddingClient;
 
     public TranscriptService(
         UserTranscriptRepository userTranscriptRepository,
         UserSubcategoryService userSubcategoryService,
-        VideoMapper videoMapper
+        VideoMapper videoMapper,
+        EmbeddingClient embeddingClient
     ) {
         this.userTranscriptRepository = userTranscriptRepository;
         this.userSubcategoryService = userSubcategoryService;
         this.videoMapper = videoMapper;
+        this.embeddingClient = embeddingClient;
     }
 
     public Optional<TranscriptDtoWithAliases> findTranscript(UUID userTranscriptId, UUID userId) {
@@ -57,6 +61,15 @@ public class TranscriptService {
             }
         }
         return Optional.empty();
+    }
+
+    public List<TranscriptDtoWithAliases> semanticSearch(UUID userId, String query, int limit) {
+        float[] queryEmbedding = embeddingClient.embed(query);
+        List<UserTranscriptEntity> results = userTranscriptRepository.searchByEmbedding(userId, queryEmbedding, limit);
+        return results.stream()
+            .filter(ut -> isValidTranscript(ut.getBaseTranscript()))
+            .map(ut -> videoMapper.buildResponse(ut.getBaseTranscript(), ut))
+            .toList();
     }
 
     public List<TranscriptDtoWithAliases> allFilteredTranscripts(UUID userId, List<UUID> categories, String account, Instant from, Instant to) {

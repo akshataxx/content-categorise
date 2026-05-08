@@ -5,6 +5,7 @@ import com.app.categorise.domain.model.VideoPlatform;
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.application.internal.ProcessedVideoFiles;
 import com.app.categorise.application.mapper.VideoMapper;
+import com.app.categorise.data.client.openai.EmbeddingClient;
 import com.app.categorise.data.client.openai.OpenAIClient;
 import com.app.categorise.data.client.whisper.WhisperClient;
 import com.app.categorise.data.entity.CategoryAliasEntity;
@@ -23,6 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Qualifier;
 
@@ -72,6 +74,10 @@ public class VideoService {
 
     private final OpenAIClient openAIClient;
 
+    private final EmbeddingClient embeddingClient;
+
+    private final JdbcTemplate jdbcTemplate;
+
     private final ObjectMapper objectMapper;
 
     private final Executor mediaExecutor;
@@ -101,6 +107,8 @@ public class VideoService {
         CategoryAliasService categoryAliasService,
         CategorisationService categorisationService,
         CategoryService categoryService,
+        EmbeddingClient embeddingClient,
+        JdbcTemplate jdbcTemplate,
         ObjectMapper objectMapper,
         OpenAIClient openAIClient,
         ProcessExecutor processExecutor,
@@ -118,6 +126,8 @@ public class VideoService {
         this.categoryAliasService = categoryAliasService;
         this.categorisationService = categorisationService;
         this.categoryService = categoryService;
+        this.embeddingClient = embeddingClient;
+        this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
         this.openAIClient = openAIClient;
         this.processExecutor = processExecutor;
@@ -383,6 +393,8 @@ public class VideoService {
             baseTranscriptRepository.save(baseTranscript);
         }
 
+        generateAndStoreEmbeddingIfAbsent(baseTranscript);
+
         // Resolve the alias, use the pre-existing one if it exists, saving the mapping to a category it doesn't exist
         String alias = resolveAlias(userId, category.getId(), categorisationResult.suggestedAlias());
 
@@ -517,6 +529,47 @@ public class VideoService {
                 LogSanitizer.sanitize(videoUrl), platform, videoId, e);
             throw e;
         }
+    }
+
+    private void generateAndStoreEmbeddingIfAbsent(BaseTranscriptEntity baseTranscript) {
+        try {
+            Boolean hasEmbedding = jdbcTemplate.queryForObject(
+                "SELECT EXISTS(SELECT 1 FROM base_transcripts WHERE id = ? AND embedding IS NOT NULL)",
+                Boolean.class,
+                baseTranscript.getId()
+            );
+            if (Boolean.TRUE.equals(hasEmbedding)) return;
+
+            String input = buildEmbeddingInput(baseTranscript);
+            float[] embedding = embeddingClient.embed(input);
+            String vectorStr = toVectorString(embedding);
+            jdbcTemplate.update(
+                "UPDATE base_transcripts SET embedding = ?::vector WHERE id = ?",
+                vectorStr, baseTranscript.getId()
+            );
+            log.info("[embedding] stored base_transcript_id={} dims={}", baseTranscript.getId(), embedding.length);
+        } catch (Exception e) {
+            log.error("[embedding] failed base_transcript_id={}", baseTranscript.getId(), e);
+        }
+    }
+
+    private String buildEmbeddingInput(BaseTranscriptEntity entity) {
+        String title = entity.getGeneratedTitle() != null ? entity.getGeneratedTitle()
+            : (entity.getTitle() != null ? entity.getTitle() : "");
+        String desc = entity.getDescription() != null ? entity.getDescription() : "";
+        String transcript = entity.getTranscript() != null ? entity.getTranscript() : "";
+        String combined = title + "\n" + desc + "\n" + transcript;
+        return combined.length() > 6000 ? combined.substring(0, 6000) : combined;
+    }
+
+    private static String toVectorString(float[] embedding) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < embedding.length; i++) {
+            if (i > 0) sb.append(',');
+            sb.append(embedding[i]);
+        }
+        sb.append(']');
+        return sb.toString();
     }
 
     private boolean isFfmpegLocationValid() {

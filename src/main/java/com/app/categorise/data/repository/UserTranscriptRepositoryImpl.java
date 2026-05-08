@@ -9,7 +9,10 @@ import org.springframework.stereotype.Repository;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Repository
 public class UserTranscriptRepositoryImpl implements CustomUserTranscriptRepository {
@@ -60,6 +63,56 @@ public class UserTranscriptRepositoryImpl implements CustomUserTranscriptReposit
 
         query.where(cb.and(predicates.toArray(new Predicate[0])));
         return entityManager.createQuery(query).getResultList();
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public List<UserTranscriptEntity> searchByEmbedding(UUID userId, float[] queryEmbedding, int limit) {
+        String vectorStr = toVectorString(queryEmbedding);
+
+        List<UUID> orderedIds = entityManager.createNativeQuery("""
+                SELECT ut.id::text
+                FROM user_transcripts ut
+                JOIN base_transcripts bt ON ut.base_transcript_id = bt.id
+                WHERE ut.user_id = CAST(:userId AS uuid)
+                  AND bt.embedding IS NOT NULL
+                ORDER BY bt.embedding <=> CAST(:queryVector AS vector)
+                LIMIT :limit
+                """)
+            .setParameter("userId", userId.toString())
+            .setParameter("queryVector", vectorStr)
+            .setParameter("limit", limit)
+            .getResultList()
+            .stream()
+            .map(r -> UUID.fromString(r.toString()))
+            .toList();
+
+        if (orderedIds.isEmpty()) return List.of();
+
+        Map<UUID, UserTranscriptEntity> byId = entityManager
+            .createQuery(
+                "SELECT ut FROM UserTranscriptEntity ut WHERE ut.id IN :ids AND ut.userId = :userId",
+                UserTranscriptEntity.class)
+            .setParameter("ids", orderedIds)
+            .setParameter("userId", userId)
+            .getResultList()
+            .stream()
+            .collect(Collectors.toMap(UserTranscriptEntity::getId, ut -> ut));
+
+        return orderedIds.stream()
+            .map(byId::get)
+            .filter(Objects::nonNull)
+            .toList();
+    }
+
+    private static String toVectorString(float[] embedding) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < embedding.length; i++) {
+            if (i > 0) sb.append(',');
+            sb.append(embedding[i]);
+        }
+        sb.append(']');
+        return sb.toString();
     }
 }
 

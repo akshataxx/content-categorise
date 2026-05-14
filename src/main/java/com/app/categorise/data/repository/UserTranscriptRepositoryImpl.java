@@ -65,6 +65,8 @@ public class UserTranscriptRepositoryImpl implements CustomUserTranscriptReposit
         return entityManager.createQuery(query).getResultList();
     }
 
+    private static final double SIMILARITY_THRESHOLD = 0.5;
+
     @Override
     @SuppressWarnings("unchecked")
     public List<UserTranscriptEntity> searchByEmbedding(UUID userId, float[] queryEmbedding, int limit) {
@@ -76,11 +78,13 @@ public class UserTranscriptRepositoryImpl implements CustomUserTranscriptReposit
                 JOIN base_transcripts bt ON ut.base_transcript_id = bt.id
                 WHERE ut.user_id = CAST(:userId AS uuid)
                   AND bt.embedding IS NOT NULL
+                  AND (bt.embedding <=> CAST(:queryVector AS vector)) < :threshold
                 ORDER BY bt.embedding <=> CAST(:queryVector AS vector)
                 LIMIT :limit
                 """)
             .setParameter("userId", userId.toString())
             .setParameter("queryVector", vectorStr)
+            .setParameter("threshold", SIMILARITY_THRESHOLD)
             .setParameter("limit", limit)
             .getResultList()
             .stream()

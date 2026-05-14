@@ -69,23 +69,32 @@ public class UserTranscriptRepositoryImpl implements CustomUserTranscriptReposit
 
     @Override
     @SuppressWarnings("unchecked")
-    public List<UserTranscriptEntity> searchByEmbedding(UUID userId, float[] queryEmbedding, int limit) {
+    public List<UserTranscriptEntity> searchByEmbedding(UUID userId, float[] queryEmbedding, int limit, UUID categoryId) {
         String vectorStr = toVectorString(queryEmbedding);
 
-        List<UUID> orderedIds = entityManager.createNativeQuery("""
+        String sql = """
                 SELECT ut.id::text
                 FROM user_transcripts ut
                 JOIN base_transcripts bt ON ut.base_transcript_id = bt.id
                 WHERE ut.user_id = CAST(:userId AS uuid)
                   AND bt.embedding IS NOT NULL
                   AND (bt.embedding <=> CAST(:queryVector AS vector)) < :threshold
+                """ + (categoryId != null ? "  AND ut.category_id = CAST(:categoryId AS uuid)\n" : "") + """
                 ORDER BY bt.embedding <=> CAST(:queryVector AS vector)
                 LIMIT :limit
-                """)
+                """;
+
+        var query = entityManager.createNativeQuery(sql)
             .setParameter("userId", userId.toString())
             .setParameter("queryVector", vectorStr)
             .setParameter("threshold", SIMILARITY_THRESHOLD)
-            .setParameter("limit", limit)
+            .setParameter("limit", limit);
+
+        if (categoryId != null) {
+            query.setParameter("categoryId", categoryId.toString());
+        }
+
+        List<UUID> orderedIds = query
             .getResultList()
             .stream()
             .map(r -> UUID.fromString(r.toString()))

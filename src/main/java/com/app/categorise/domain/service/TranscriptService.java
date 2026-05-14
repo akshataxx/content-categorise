@@ -63,9 +63,9 @@ public class TranscriptService {
         return Optional.empty();
     }
 
-    public List<TranscriptDtoWithAliases> semanticSearch(UUID userId, String query, int limit) {
+    public List<TranscriptDtoWithAliases> semanticSearch(UUID userId, String query, int limit, UUID categoryId) {
         float[] queryEmbedding = embeddingClient.embed(query);
-        List<UserTranscriptEntity> results = userTranscriptRepository.searchByEmbedding(userId, queryEmbedding, limit);
+        List<UserTranscriptEntity> results = userTranscriptRepository.searchByEmbedding(userId, queryEmbedding, limit, categoryId);
         return results.stream()
             .filter(ut -> isValidTranscript(ut.getBaseTranscript()))
             .map(ut -> videoMapper.buildResponse(ut.getBaseTranscript(), ut))

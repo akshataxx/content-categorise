@@ -136,11 +136,12 @@ public class TranscriptController {
     public ResponseEntity<List<TranscriptDtoWithAliases>> searchTranscripts(
         @RequestParam String q,
         @RequestParam(defaultValue = "10") int limit,
+        @RequestParam(required = false) UUID categoryId,
         Authentication authentication
     ) {
         UUID userId = requireUser(authentication);
         int clampedLimit = Math.min(Math.max(limit, 1), 50);
-        List<TranscriptDtoWithAliases> results = transcriptService.semanticSearch(userId, q, clampedLimit);
+        List<TranscriptDtoWithAliases> results = transcriptService.semanticSearch(userId, q, clampedLimit, categoryId);
         return ResponseEntity.ok(results);
     }
 

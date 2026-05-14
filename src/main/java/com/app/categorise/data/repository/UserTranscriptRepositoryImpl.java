@@ -65,7 +65,7 @@ public class UserTranscriptRepositoryImpl implements CustomUserTranscriptReposit
         return entityManager.createQuery(query).getResultList();
     }
 
-    private static final double SIMILARITY_THRESHOLD = 0.7;
+    private static final double SIMILARITY_THRESHOLD = 0.75;
 
     @Override
     @SuppressWarnings("unchecked")

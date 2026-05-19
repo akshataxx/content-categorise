@@ -65,20 +65,22 @@ public class UserTranscriptRepositoryImpl implements CustomUserTranscriptReposit
         return entityManager.createQuery(query).getResultList();
     }
 
-    private static final double SIMILARITY_THRESHOLD = 0.75;
+    // Cosine distance threshold (lower = more similar)
+    // distance < 0.5 means similarity > 0.5 (50%)
+    private static final double SIMILARITY_THRESHOLD = 0.5;
 
     @Override
     @SuppressWarnings("unchecked")
     public List<UserTranscriptEntity> searchByEmbedding(UUID userId, float[] queryEmbedding, int limit, UUID categoryId) {
         String vectorStr = toVectorString(queryEmbedding);
 
+        // TEMPORARY: Removed threshold filter to debug - returns all results ordered by similarity
         String sql = """
                 SELECT ut.id::text
                 FROM user_transcripts ut
                 JOIN base_transcripts bt ON ut.base_transcript_id = bt.id
                 WHERE ut.user_id = CAST(:userId AS uuid)
                   AND bt.embedding IS NOT NULL
-                  AND (bt.embedding <=> CAST(:queryVector AS vector)) < :threshold
                 """ + (categoryId != null ? "  AND ut.category_id = CAST(:categoryId AS uuid)\n" : "") + """
                 ORDER BY bt.embedding <=> CAST(:queryVector AS vector)
                 LIMIT :limit
@@ -87,7 +89,6 @@ public class UserTranscriptRepositoryImpl implements CustomUserTranscriptReposit
         var query = entityManager.createNativeQuery(sql)
             .setParameter("userId", userId.toString())
             .setParameter("queryVector", vectorStr)
-            .setParameter("threshold", SIMILARITY_THRESHOLD)
             .setParameter("limit", limit);
 
         if (categoryId != null) {

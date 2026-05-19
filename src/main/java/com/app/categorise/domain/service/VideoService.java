@@ -557,8 +557,9 @@ public class VideoService {
         String title = entity.getGeneratedTitle() != null ? entity.getGeneratedTitle()
             : (entity.getTitle() != null ? entity.getTitle() : "");
         String desc = entity.getDescription() != null ? entity.getDescription() : "";
-        String transcript = entity.getTranscript() != null ? entity.getTranscript() : "";
-        String combined = title + "\n" + desc + "\n" + transcript;
+        String content = entity.getStructuredContent() != null ? entity.getStructuredContent()
+            : (entity.getTranscript() != null ? entity.getTranscript() : "");
+        String combined = title + "\n" + desc + "\n" + content;
         return combined.length() > 6000 ? combined.substring(0, 6000) : combined;
     }
 

@@ -4,6 +4,7 @@ import com.app.categorise.data.entity.BaseTranscriptEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -29,4 +30,6 @@ public interface BaseTranscriptRepository extends JpaRepository<BaseTranscriptEn
      * {@code youtube.com/shorts/X}).
      */
     Optional<BaseTranscriptEntity> findByPlatformAndPlatformVideoId(String platform, String platformVideoId);
+
+    List<BaseTranscriptEntity> findAllByStructuredContentIsNotNull();
 }

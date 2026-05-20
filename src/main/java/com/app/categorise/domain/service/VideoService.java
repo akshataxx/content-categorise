@@ -539,18 +539,40 @@ public class VideoService {
                 baseTranscript.getId()
             );
             if (Boolean.TRUE.equals(hasEmbedding)) return;
-
-            String input = buildEmbeddingInput(baseTranscript);
-            float[] embedding = embeddingClient.embed(input);
-            String vectorStr = toVectorString(embedding);
-            jdbcTemplate.update(
-                "UPDATE base_transcripts SET embedding = ?::vector WHERE id = ?",
-                vectorStr, baseTranscript.getId()
-            );
-            log.info("[embedding] stored base_transcript_id={} dims={}", baseTranscript.getId(), embedding.length);
+            generateAndStoreEmbedding(baseTranscript);
         } catch (Exception e) {
             log.error("[embedding] failed base_transcript_id={}", baseTranscript.getId(), e);
         }
+    }
+
+    private void generateAndStoreEmbedding(BaseTranscriptEntity baseTranscript) {
+        String input = buildEmbeddingInput(baseTranscript);
+        float[] embedding = embeddingClient.embed(input);
+        String vectorStr = toVectorString(embedding);
+        jdbcTemplate.update(
+            "UPDATE base_transcripts SET embedding = ?::vector WHERE id = ?",
+            vectorStr, baseTranscript.getId()
+        );
+        log.info("[embedding] stored base_transcript_id={} dims={}", baseTranscript.getId(), embedding.length);
+    }
+
+    public CompletableFuture<int[]> backfillEmbeddings() {
+        return CompletableFuture.supplyAsync(() -> {
+            List<BaseTranscriptEntity> transcripts = baseTranscriptRepository.findAllByStructuredContentIsNotNull();
+            log.info("[embedding_backfill] starting count={}", transcripts.size());
+            int success = 0, failed = 0;
+            for (BaseTranscriptEntity transcript : transcripts) {
+                try {
+                    generateAndStoreEmbedding(transcript);
+                    success++;
+                } catch (Exception e) {
+                    log.error("[embedding_backfill] failed base_transcript_id={}", transcript.getId(), e);
+                    failed++;
+                }
+            }
+            log.info("[embedding_backfill] done success={} failed={}", success, failed);
+            return new int[]{success, failed};
+        }, mediaExecutor);
     }
 
     private String buildEmbeddingInput(BaseTranscriptEntity entity) {

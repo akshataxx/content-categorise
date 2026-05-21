@@ -35,4 +35,15 @@ public class AdminController {
                 "failed", counts[1]
             )));
     }
+
+    @Operation(summary = "Re-extract and re-embed", description = "Re-extracts structured content using updated prompts then regenerates embeddings for all base transcripts")
+    @PostMapping("/reextract-and-reembed")
+    public CompletableFuture<ResponseEntity<Map<String, Object>>> reextractAndReembed() {
+        log.info("POST /api/admin/reextract-and-reembed triggered");
+        return videoService.reextractAndReembedAll()
+            .thenApply(counts -> ResponseEntity.ok(Map.of(
+                "success", counts[0],
+                "failed", counts[1]
+            )));
+    }
 }

@@ -32,4 +32,6 @@ public interface BaseTranscriptRepository extends JpaRepository<BaseTranscriptEn
     Optional<BaseTranscriptEntity> findByPlatformAndPlatformVideoId(String platform, String platformVideoId);
 
     List<BaseTranscriptEntity> findAllByStructuredContentIsNotNull();
+
+    List<BaseTranscriptEntity> findAllByTranscriptIsNotNull();
 }

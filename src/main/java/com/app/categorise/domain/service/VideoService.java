@@ -575,6 +575,46 @@ public class VideoService {
         }, mediaExecutor);
     }
 
+    public CompletableFuture<int[]> reextractAndReembedAll() {
+        return CompletableFuture.supplyAsync(() -> {
+            List<BaseTranscriptEntity> transcripts = baseTranscriptRepository.findAllByTranscriptIsNotNull();
+            log.info("[reextract] starting count={}", transcripts.size());
+            int success = 0, failed = 0;
+            for (BaseTranscriptEntity transcript : transcripts) {
+                try {
+                    String categoryName = resolveCategoryName(transcript);
+                    String structuredContent = openAIClient.extractStructuredContent(
+                        transcript.getTranscript(),
+                        transcript.getTitle(),
+                        categoryName,
+                        transcript.getDescription()
+                    );
+                    transcript.setStructuredContent(structuredContent);
+                    baseTranscriptRepository.save(transcript);
+                    generateAndStoreEmbedding(transcript);
+                    success++;
+                } catch (Exception e) {
+                    log.error("[reextract] failed base_transcript_id={}", transcript.getId(), e);
+                    failed++;
+                }
+            }
+            log.info("[reextract] done success={} failed={}", success, failed);
+            return new int[]{success, failed};
+        }, mediaExecutor);
+    }
+
+    private String resolveCategoryName(BaseTranscriptEntity transcript) {
+        try {
+            return jdbcTemplate.queryForObject(
+                "SELECT c.name FROM categories c JOIN user_transcripts ut ON ut.category_id = c.id WHERE ut.base_transcript_id = ? LIMIT 1",
+                String.class,
+                transcript.getId()
+            );
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     private String buildEmbeddingInput(BaseTranscriptEntity entity) {
         String title = entity.getGeneratedTitle() != null ? entity.getGeneratedTitle()
             : (entity.getTitle() != null ? entity.getTitle() : "");

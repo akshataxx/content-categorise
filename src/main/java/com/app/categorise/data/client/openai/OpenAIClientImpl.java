@@ -231,4 +231,14 @@ public class OpenAIClientImpl implements OpenAIClient {
         }
         return response.trim();
     }
+
+    @Override
+    public String expandSearchQuery(String query) {
+        String prompt = "Expand this short search query into a descriptive phrase for semantic search. " +
+            "Return only the expanded phrase, no explanation, no punctuation at the end.\n\nQuery: " + query;
+        return callOpenAI(
+            "You expand short search queries into richer descriptive phrases to improve semantic search accuracy.",
+            prompt
+        ).trim();
+    }
 }

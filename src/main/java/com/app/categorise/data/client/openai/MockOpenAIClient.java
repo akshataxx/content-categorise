@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 @Component
-@Profile("dev")
+@Profile("disabled")
 public class MockOpenAIClient implements OpenAIClient {
 
     @Override
@@ -40,5 +40,10 @@ public class MockOpenAIClient implements OpenAIClient {
         } else {
             return "{\"type\":\"general\",\"keyPoints\":[\"Main topic discussed in video\",\"Key takeaway number one\",\"Important tip mentioned\",\"Final conclusion\"]}";
         }
+    }
+
+    @Override
+    public String expandSearchQuery(String query) {
+        return query;
     }
 }

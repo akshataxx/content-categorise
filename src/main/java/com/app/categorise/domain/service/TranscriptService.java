@@ -2,6 +2,7 @@ package com.app.categorise.domain.service;
 
 import com.app.categorise.application.mapper.VideoMapper;
 import com.app.categorise.data.client.openai.EmbeddingClient;
+import com.app.categorise.data.client.openai.OpenAIClient;
 import com.app.categorise.data.entity.BaseTranscriptEntity;
 import com.app.categorise.data.entity.UserSubcategoryEntity;
 import com.app.categorise.data.entity.UserTranscriptEntity;
@@ -37,17 +38,20 @@ public class TranscriptService {
     private final UserSubcategoryService userSubcategoryService;
     private final VideoMapper videoMapper;
     private final EmbeddingClient embeddingClient;
+    private final OpenAIClient openAIClient;
 
     public TranscriptService(
         UserTranscriptRepository userTranscriptRepository,
         UserSubcategoryService userSubcategoryService,
         VideoMapper videoMapper,
-        EmbeddingClient embeddingClient
+        EmbeddingClient embeddingClient,
+        OpenAIClient openAIClient
     ) {
         this.userTranscriptRepository = userTranscriptRepository;
         this.userSubcategoryService = userSubcategoryService;
         this.videoMapper = videoMapper;
         this.embeddingClient = embeddingClient;
+        this.openAIClient = openAIClient;
     }
 
     public Optional<TranscriptDtoWithAliases> findTranscript(UUID userTranscriptId, UUID userId) {
@@ -64,7 +68,9 @@ public class TranscriptService {
     }
 
     public List<TranscriptDtoWithAliases> semanticSearch(UUID userId, String query, int limit, UUID categoryId) {
-        float[] queryEmbedding = embeddingClient.embed(query);
+        String expandedQuery = openAIClient.expandSearchQuery(query);
+        logger.debug("[search] query_expansion original='{}' expanded='{}'", query, expandedQuery);
+        float[] queryEmbedding = embeddingClient.embed(expandedQuery);
         List<UserTranscriptEntity> results = userTranscriptRepository.searchByEmbedding(userId, queryEmbedding, limit, categoryId);
         return results.stream()
             .filter(ut -> isValidTranscript(ut.getBaseTranscript()))

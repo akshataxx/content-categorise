@@ -437,9 +437,46 @@ public class OpenAIClientImpl implements OpenAIClient {
         String prompt = "Expand this short search query into a descriptive phrase for finding video content. " +
             "Be specific about the topic, category, and context. " +
             "Return only the expanded phrase, no explanation, no punctuation at the end.\n\nQuery: " + query;
-        return callOpenAI(
+        return callOpenAIFast(
             "You expand short search queries into richer, domain-specific descriptive phrases to improve semantic video search accuracy.",
             prompt
         ).trim();
+    }
+
+    private String callOpenAIFast(String developerPrompt, String prompt) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(apiKey);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        ObjectNode developerMessage = objectMapper.createObjectNode();
+        developerMessage.put("role", "developer");
+        developerMessage.put("content", developerPrompt);
+
+        ObjectNode userMessage = objectMapper.createObjectNode();
+        userMessage.put("role", "user");
+        userMessage.put("content", prompt);
+
+        ArrayNode messages = objectMapper.createArrayNode();
+        messages.add(developerMessage);
+        messages.add(userMessage);
+
+        ObjectNode requestBody = objectMapper.createObjectNode();
+        requestBody.put("model", "gpt-4o-mini");
+        requestBody.set("messages", messages);
+        requestBody.put("temperature", 0.3);
+
+        try {
+            String response = restClient.post()
+                .uri(apiUrl + "/v1/chat/completions")
+                .headers(h -> h.addAll(headers))
+                .body(requestBody)
+                .retrieve()
+                .body(String.class);
+
+            JsonNode root = objectMapper.readTree(response);
+            return root.path("choices").get(0).path("message").path("content").asText();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to call OpenAI API", e);
+        }
     }
 }

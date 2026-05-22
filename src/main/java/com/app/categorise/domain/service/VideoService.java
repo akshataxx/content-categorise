@@ -372,6 +372,7 @@ public class VideoService {
         // Set the AI-generated title if not already present
         if (baseTranscript.getGeneratedTitle() == null && categorisationResult.generatedTitle() != null) {
             baseTranscript.setGeneratedTitle(categorisationResult.generatedTitle());
+            baseTranscriptRepository.save(baseTranscript);
         }
 
         // Determine the category and save it if it doesn't exist
@@ -393,7 +394,7 @@ public class VideoService {
             baseTranscriptRepository.save(baseTranscript);
         }
 
-        generateAndStoreEmbeddingIfAbsent(baseTranscript);
+        generateAndStoreEmbeddingIfAbsent(baseTranscript, categoryName);
 
         // Resolve the alias, use the pre-existing one if it exists, saving the mapping to a category it doesn't exist
         String alias = resolveAlias(userId, category.getId(), categorisationResult.suggestedAlias());
@@ -531,7 +532,7 @@ public class VideoService {
         }
     }
 
-    private void generateAndStoreEmbeddingIfAbsent(BaseTranscriptEntity baseTranscript) {
+    private void generateAndStoreEmbeddingIfAbsent(BaseTranscriptEntity baseTranscript, String categoryName) {
         try {
             Boolean hasEmbedding = jdbcTemplate.queryForObject(
                 "SELECT EXISTS(SELECT 1 FROM base_transcripts WHERE id = ? AND embedding IS NOT NULL)",
@@ -539,14 +540,14 @@ public class VideoService {
                 baseTranscript.getId()
             );
             if (Boolean.TRUE.equals(hasEmbedding)) return;
-            generateAndStoreEmbedding(baseTranscript);
+            generateAndStoreEmbedding(baseTranscript, categoryName);
         } catch (Exception e) {
             log.error("[embedding] failed base_transcript_id={}", baseTranscript.getId(), e);
         }
     }
 
-    private void generateAndStoreEmbedding(BaseTranscriptEntity baseTranscript) {
-        String input = buildEmbeddingInput(baseTranscript);
+    private void generateAndStoreEmbedding(BaseTranscriptEntity baseTranscript, String categoryName) {
+        String input = buildEmbeddingInput(baseTranscript, categoryName);
         float[] embedding = embeddingClient.embed(input);
         String vectorStr = toVectorString(embedding);
         jdbcTemplate.update(
@@ -563,7 +564,7 @@ public class VideoService {
             int success = 0, failed = 0;
             for (BaseTranscriptEntity transcript : transcripts) {
                 try {
-                    generateAndStoreEmbedding(transcript);
+                    generateAndStoreEmbedding(transcript, resolveCategoryName(transcript));
                     success++;
                 } catch (Exception e) {
                     log.error("[embedding_backfill] failed base_transcript_id={}", transcript.getId(), e);
@@ -591,7 +592,7 @@ public class VideoService {
                     );
                     transcript.setStructuredContent(structuredContent);
                     baseTranscriptRepository.save(transcript);
-                    generateAndStoreEmbedding(transcript);
+                    generateAndStoreEmbedding(transcript, categoryName);
                     success++;
                 } catch (Exception e) {
                     log.error("[reextract] failed base_transcript_id={}", transcript.getId(), e);
@@ -615,14 +616,35 @@ public class VideoService {
         }
     }
 
-    private String buildEmbeddingInput(BaseTranscriptEntity entity) {
+    private String buildEmbeddingInput(BaseTranscriptEntity entity, String categoryName) {
         String title = entity.getGeneratedTitle() != null ? entity.getGeneratedTitle()
             : (entity.getTitle() != null ? entity.getTitle() : "");
         String desc = entity.getDescription() != null ? entity.getDescription() : "";
         String content = entity.getStructuredContent() != null ? entity.getStructuredContent()
             : (entity.getTranscript() != null ? entity.getTranscript() : "");
-        String combined = title + "\n" + desc + "\n" + content;
+        String transcript = entity.getTranscript() != null ? entity.getTranscript() : "";
+
+        StringBuilder searchDocument = new StringBuilder();
+        appendSearchField(searchDocument, "Title", title);
+        appendSearchField(searchDocument, "Original title", entity.getTitle());
+        appendSearchField(searchDocument, "Category", categoryName);
+        appendSearchField(searchDocument, "Creator", entity.getAccount());
+        appendSearchField(searchDocument, "Description", desc);
+        appendSearchField(searchDocument, "Structured metadata, tags, topics, entities and key points", content);
+        appendSearchField(searchDocument, "Transcript excerpt", truncate(transcript, 2500));
+
+        String combined = searchDocument.toString();
         return combined.length() > 6000 ? combined.substring(0, 6000) : combined;
+    }
+
+    private static void appendSearchField(StringBuilder builder, String label, String value) {
+        if (value == null || value.isBlank()) return;
+        builder.append(label).append(": ").append(value.trim()).append('\n');
+    }
+
+    private static String truncate(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) return value;
+        return value.substring(0, maxLength);
     }
 
     private static String toVectorString(float[] embedding) {

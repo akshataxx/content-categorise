@@ -18,7 +18,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -68,20 +70,47 @@ public class TranscriptService {
     }
 
     public List<TranscriptDtoWithAliases> semanticSearch(UUID userId, String query, int limit, UUID categoryId) {
+        if (query == null || query.isBlank()) {
+            return List.of();
+        }
+
+        String normalizedQuery = query.trim();
+        int candidateLimit = Math.min(Math.max(limit * 3, 25), 150);
+        Map<UUID, UserTranscriptEntity> mergedResults = new LinkedHashMap<>();
+
+        searchCandidates(userId, normalizedQuery, normalizedQuery, candidateLimit, categoryId)
+            .forEach(result -> mergedResults.putIfAbsent(result.getId(), result));
+
         String expandedQuery;
         try {
-            expandedQuery = openAIClient.expandSearchQuery(query);
-            logger.debug("[search] query_expansion original='{}' expanded='{}'", query, expandedQuery);
+            expandedQuery = openAIClient.expandSearchQuery(normalizedQuery).trim();
+            logger.debug("[search] query_expansion original='{}' expanded='{}'", normalizedQuery, expandedQuery);
         } catch (Exception e) {
-            logger.warn("[search] query_expansion failed, using original query='{}' error={}", query, e.getMessage());
-            expandedQuery = query;
+            logger.warn("[search] query_expansion failed, using original query='{}' error={}", normalizedQuery, e.getMessage());
+            expandedQuery = normalizedQuery;
         }
-        float[] queryEmbedding = embeddingClient.embed(expandedQuery);
-        List<UserTranscriptEntity> results = userTranscriptRepository.searchByEmbedding(userId, queryEmbedding, limit, categoryId);
-        return results.stream()
+
+        if (!expandedQuery.isBlank() && !expandedQuery.equalsIgnoreCase(normalizedQuery)) {
+            searchCandidates(userId, expandedQuery, normalizedQuery, candidateLimit, categoryId)
+                .forEach(result -> mergedResults.putIfAbsent(result.getId(), result));
+        }
+
+        return mergedResults.values().stream()
             .filter(ut -> isValidTranscript(ut.getBaseTranscript()))
+            .limit(limit)
             .map(ut -> videoMapper.buildResponse(ut.getBaseTranscript(), ut))
             .toList();
+    }
+
+    private List<UserTranscriptEntity> searchCandidates(
+        UUID userId,
+        String embeddingQuery,
+        String textQuery,
+        int limit,
+        UUID categoryId
+    ) {
+        float[] queryEmbedding = embeddingClient.embed(embeddingQuery);
+        return userTranscriptRepository.searchByEmbedding(userId, queryEmbedding, textQuery, limit, categoryId);
     }
 
     public List<TranscriptDtoWithAliases> allFilteredTranscripts(UUID userId, List<UUID> categories, String account, Instant from, Instant to) {

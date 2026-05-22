@@ -65,31 +65,83 @@ public class UserTranscriptRepositoryImpl implements CustomUserTranscriptReposit
         return entityManager.createQuery(query).getResultList();
     }
 
-    // Cosine distance threshold (lower = more similar)
-    // distance < 0.5 means similarity > 0.5 (50%)
-    private static final double SIMILARITY_THRESHOLD = 0.5;
-
     @Override
     @SuppressWarnings("unchecked")
-    public List<UserTranscriptEntity> searchByEmbedding(UUID userId, float[] queryEmbedding, int limit, UUID categoryId) {
+    public List<UserTranscriptEntity> searchByEmbedding(UUID userId, float[] queryEmbedding, String queryText, int limit, UUID categoryId) {
         String vectorStr = toVectorString(queryEmbedding);
 
         String sql = """
-                SELECT ut.id::text
-                FROM user_transcripts ut
-                JOIN base_transcripts bt ON ut.base_transcript_id = bt.id
-                WHERE ut.user_id = CAST(:userId AS uuid)
-                  AND bt.embedding IS NOT NULL
-                  AND (bt.embedding <=> CAST(:queryVector AS vector)) < :threshold
-                """ + (categoryId != null ? "  AND ut.category_id = CAST(:categoryId AS uuid)\n" : "") + """
-                ORDER BY bt.embedding <=> CAST(:queryVector AS vector)
+                WITH search_query AS (
+                    SELECT
+                        CAST(:queryVector AS vector) AS query_vector,
+                        websearch_to_tsquery('english', :queryText) AS text_query
+                ),
+                ranked AS (
+                    SELECT
+                        ut.id,
+                        CASE
+                            WHEN bt.embedding IS NOT NULL THEN bt.embedding <=> search_query.query_vector
+                            ELSE 2.0
+                        END AS vector_distance,
+                        ts_rank_cd(
+                            to_tsvector(
+                                'english',
+                                concat_ws(
+                                    ' ',
+                                    bt.title,
+                                    bt.generated_title,
+                                    bt.description,
+                                    bt.structured_content::text,
+                                    bt.transcript
+                                )
+                            ),
+                            search_query.text_query
+                        ) AS text_rank,
+                        CASE
+                            WHEN concat_ws(
+                                ' ',
+                                bt.title,
+                                bt.generated_title,
+                                bt.description,
+                                bt.structured_content::text,
+                                bt.transcript,
+                                c.name
+                            ) ILIKE '%' || :queryText || '%' THEN 0.15
+                            ELSE 0.0
+                        END AS exact_match_boost
+                    FROM user_transcripts ut
+                    JOIN base_transcripts bt ON ut.base_transcript_id = bt.id
+                    LEFT JOIN categories c ON ut.category_id = c.id
+                    CROSS JOIN search_query
+                    WHERE ut.user_id = CAST(:userId AS uuid)
+                      AND (
+                          bt.embedding IS NOT NULL
+                          OR to_tsvector(
+                              'english',
+                              concat_ws(
+                                  ' ',
+                                  bt.title,
+                                  bt.generated_title,
+                                  bt.description,
+                                  bt.structured_content::text,
+                                  bt.transcript
+                              )
+                          ) @@ search_query.text_query
+                      )
+                """ + (categoryId != null ? "      AND ut.category_id = CAST(:categoryId AS uuid)\n" : "") + """
+                )
+                SELECT id::text
+                FROM ranked
+                ORDER BY
+                    vector_distance - LEAST(text_rank * 0.25, 0.35) - exact_match_boost,
+                    vector_distance
                 LIMIT :limit
                 """;
 
         var query = entityManager.createNativeQuery(sql)
             .setParameter("userId", userId.toString())
             .setParameter("queryVector", vectorStr)
-            .setParameter("threshold", SIMILARITY_THRESHOLD)
+            .setParameter("queryText", queryText)
             .setParameter("limit", limit);
 
         if (categoryId != null) {
@@ -130,4 +182,3 @@ public class UserTranscriptRepositoryImpl implements CustomUserTranscriptReposit
         return sb.toString();
     }
 }
-

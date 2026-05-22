@@ -68,8 +68,14 @@ public class TranscriptService {
     }
 
     public List<TranscriptDtoWithAliases> semanticSearch(UUID userId, String query, int limit, UUID categoryId) {
-        String expandedQuery = openAIClient.expandSearchQuery(query);
-        logger.debug("[search] query_expansion original='{}' expanded='{}'", query, expandedQuery);
+        String expandedQuery;
+        try {
+            expandedQuery = openAIClient.expandSearchQuery(query);
+            logger.debug("[search] query_expansion original='{}' expanded='{}'", query, expandedQuery);
+        } catch (Exception e) {
+            logger.warn("[search] query_expansion failed, using original query='{}' error={}", query, e.getMessage());
+            expandedQuery = query;
+        }
         float[] queryEmbedding = embeddingClient.embed(expandedQuery);
         List<UserTranscriptEntity> results = userTranscriptRepository.searchByEmbedding(userId, queryEmbedding, limit, categoryId);
         return results.stream()

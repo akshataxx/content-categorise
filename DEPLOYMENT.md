@@ -118,13 +118,13 @@ docker-compose -f docker-compose.prod.yml logs caddy
 docker ps
 
 # View app logs
-docker-compose -f docker-compose.prod.yml logs -f app
+docker compose -f docker-compose.prod.yml logs -f app
 
 # View Caddy logs (SSL issues)
-docker-compose -f docker-compose.prod.yml logs -f caddy
+docker compose -f docker-compose.prod.yml logs -f caddy
 
 # View database logs
-docker-compose -f docker-compose.prod.yml logs -f postgres
+docker compose -f docker-compose.prod.yml logs -f postgres
 
 # Restart everything
 docker-compose -f docker-compose.prod.yml restart

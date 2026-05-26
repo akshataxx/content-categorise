@@ -57,13 +57,8 @@ public class CategorySeeder implements CommandLineRunner {
             new CategoryEntity("Politics", "Tax the rich")
         );
 
-        int seeded = 0;
         for (CategoryEntity c : categories) {
-            if (categoryService.findCategoryByName(c.getName()).isEmpty()) {
-                categoryService.saveCategory(c.getName(), c.getDescription(), null);
-                seeded++;
-            }
+            categoryService.seedCategory(c.getName(), c.getDescription());
         }
-        System.out.println("Seeded " + seeded + " categories into the database.");
     }
 } 

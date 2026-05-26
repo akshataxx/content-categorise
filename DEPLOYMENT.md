@@ -9,8 +9,8 @@ Internet (HTTPS:443) → Caddy → App (8081) → Postgres
                    Let's Encrypt
 ```
 
-- **URL:** `https://149-28-175-245.sslip.io`
-- Uses **sslip.io** for free DNS (maps `149-28-175-245.sslip.io` → `149.28.175.245`)
+- **URL:** `https://scoopbackend.duckdns.org`
+- Uses **duckdns.org** for free DNS (maps ` scoopbackend.duckdns.org` → `149.28.175.245`)
 - **Caddy** handles HTTPS termination with auto-renewing Let's Encrypt certificates
 - **Container image:** `ghcr.io/akshataxx/content-app:latest` (GitHub Container Registry)
 

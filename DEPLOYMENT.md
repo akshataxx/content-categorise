@@ -9,77 +9,54 @@ Internet (HTTPS:443) → Caddy → App (8081) → Postgres
                    Let's Encrypt
 ```
 
-- **URL:** `https://34-151-189-90.sslip.io`
-- Uses **sslip.io** for free DNS (maps `34-151-189-90.sslip.io` → `34.151.189.90`)
+- **URL:** `https://149-28-175-245.sslip.io`
+- Uses **sslip.io** for free DNS (maps `149-28-175-245.sslip.io` → `149.28.175.245`)
 - **Caddy** handles HTTPS termination with auto-renewing Let's Encrypt certificates
+- **Container image:** `ghcr.io/akshataxx/content-app:latest` (GitHub Container Registry)
 
 ---
 
-## Files to Deploy
+## Files on the VM
 
-Copy these files to your VM's home directory (`~`):
+All deployment files live in `~/content-backend/` on the VM:
 
 | File | Purpose |
 |------|---------|
 | `docker-compose.prod.yml` | Container orchestration |
 | `Caddyfile` | Caddy reverse proxy config |
-| `.env` | Environment variables (secrets) |
+| `config/` | App config directory |
+| `~/.env` | Environment variables (secrets, one level up) |
 
 ---
 
-## Initial Setup
-
-### 1. GCP Firewall Rules
-
-Ensure ports 80 and 443 are open:
-- GCP Console → VPC Network → Firewall → Create rule
-- Allow TCP ports `80` and `443` from `0.0.0.0/0`
-
-### 2. Copy Files to VM
+## SSH into the VM
 
 ```bash
-# From your local machine
-gcloud compute scp docker-compose.prod.yml Caddyfile .env content-backend-vm:~ --zone=australia-southeast1-b
-```
-
-### 3. Start Services
-
-```bash
-# SSH into VM
-gcloud compute ssh content-backend-vm --zone=australia-southeast1-b
-
-# Start all services
-docker-compose -f docker-compose.prod.yml up -d
-
-# Verify Caddy got the SSL certificate
-docker logs caddy
-```
-
-### 4. Test HTTPS
-
-```bash
-curl https://34-151-189-90.sslip.io/actuator/health
+ssh root@149.28.175.245
 ```
 
 ---
 
-## How to Update the Instance with New Code
+## How to Update the Backend with New Code
 
 ### Step 1: Build and Push New Docker Image (Local Machine)
 
 ```bash
-docker buildx build --platform linux/amd64 -t gcr.io/content-categorisation/content-app:prod --push .
+docker buildx build --platform linux/amd64 -t ghcr.io/akshataxx/content-app:latest --push .
 ```
 
-### Step 2: SSH into GCE Instance
+> Requires `docker login ghcr.io` with a GitHub personal access token (write:packages scope) if not already authenticated.
+
+### Step 2: SSH into the VM
 
 ```bash
-gcloud compute ssh content-backend-vm --zone=australia-southeast1-b
+ssh root@149.28.175.245
 ```
 
-### Step 3: Pull Latest Image and Restart
+### Step 3: Pull Latest Image and Restart App
 
 ```bash
+cd ~/content-backend
 docker-compose -f docker-compose.prod.yml pull app
 docker-compose -f docker-compose.prod.yml up -d app
 ```
@@ -95,7 +72,41 @@ Press `Ctrl+C` once you see "Started ContentApplication"
 ### Step 5: Test from Outside
 
 ```bash
-curl https://34-151-189-90.sslip.io/actuator/health
+curl https://149-28-175-245.sslip.io/actuator/health
+```
+
+---
+
+## Initial Setup (First Time on a New VM)
+
+### 1. DigitalOcean Firewall
+
+Ensure ports 80, 443, and 22 are open on the droplet (DigitalOcean Console → Networking → Firewalls).
+
+### 2. Copy Files to VM
+
+```bash
+scp docker-compose.prod.yml Caddyfile .env root@149.28.175.245:~/content-backend/
+```
+
+### 3. Authenticate with GitHub Container Registry
+
+```bash
+# On the VM
+echo YOUR_GITHUB_PAT | docker login ghcr.io -u akshataxx --password-stdin
+```
+
+### 4. Start Services
+
+```bash
+cd ~/content-backend
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+### 5. Verify Caddy got the SSL certificate
+
+```bash
+docker-compose -f docker-compose.prod.yml logs caddy
 ```
 
 ---
@@ -104,7 +115,7 @@ curl https://34-151-189-90.sslip.io/actuator/health
 
 ```bash
 # View all containers
-docker-compose -f docker-compose.prod.yml ps
+docker ps
 
 # View app logs
 docker-compose -f docker-compose.prod.yml logs -f app
@@ -118,6 +129,9 @@ docker-compose -f docker-compose.prod.yml logs -f postgres
 # Restart everything
 docker-compose -f docker-compose.prod.yml restart
 
+# Restart a single service
+docker-compose -f docker-compose.prod.yml restart app
+
 # Stop everything
 docker-compose -f docker-compose.prod.yml down
 
@@ -127,23 +141,32 @@ docker image prune -a
 
 ---
 
-## Using a Custom Domain (Optional)
+## Environment Variables
 
-When you get a domain:
+To update environment variables:
 
-1. Point your domain's DNS A record to `34.151.189.90`
-2. Update `Caddyfile`:
-   ```
-   api.yourdomain.com {
-       reverse_proxy app:8081
-   }
-   ```
-3. Restart Caddy:
-   ```bash
-   docker-compose -f docker-compose.prod.yml restart caddy
-   ```
+```bash
+# SSH into VM
+ssh root@149.28.175.245
 
-Caddy will automatically get a new certificate for your domain.
+# Edit .env file
+nano ~/.env
+
+# Restart containers to pick up changes
+cd ~/content-backend
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+Key variables:
+
+| Variable | Description |
+|----------|-------------|
+| `DOMAIN` | sslip.io domain — must match VM IP with dashes: `149-28-175-245.sslip.io` |
+| `APP_IMAGE` | Docker image — `ghcr.io/akshataxx/content-app:latest` |
+| `POSTGRES_PASSWORD` | Database password |
+| `JWT_SECRET` | JWT signing secret |
+| `OPENAI_API_KEY` | OpenAI API key |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
 
 ---
 
@@ -156,29 +179,13 @@ Flyway migrations run automatically on app startup:
 
 ---
 
-## Environment Variables
-
-To update environment variables:
-
-```bash
-# SSH into VM
-gcloud compute ssh content-backend-vm --zone=australia-southeast1-b
-
-# Edit .env file
-nano ~/.env
-
-# Restart containers to pick up changes
-docker-compose -f docker-compose.prod.yml up -d
-```
-
----
-
 ## Troubleshooting
 
 ### SSL Certificate Issues
 ```bash
 docker-compose -f docker-compose.prod.yml logs caddy
-# Check that ports 80/443 are open in GCP firewall
+# Check that ports 80/443 are open in DigitalOcean firewall
+# Check that DOMAIN in .env matches the VM's IP with dashes
 ```
 
 ### App Won't Start
@@ -208,25 +215,13 @@ docker-compose -f docker-compose.prod.yml up -d
 
 ---
 
-## Important Files on GCE Instance
-
-| File | Purpose |
-|------|---------|
-| `~/docker-compose.prod.yml` | Container orchestration |
-| `~/Caddyfile` | Caddy reverse proxy config |
-| `~/.env` | Environment variables and secrets |
-| Docker volume `pgdata` | PostgreSQL data (persistent) |
-| Docker volume `caddy_data` | SSL certificates |
-
----
-
-## GCP Project Details
+## VM Details
 
 | Setting | Value |
 |---------|-------|
-| Project ID | `content-categorisation` |
-| Instance Name | `content-backend-vm` |
-| Zone | `australia-southeast1-b` |
-| External IP | `34.151.189.90` |
-| HTTPS URL | `https://34-151-189-90.sslip.io` |
-| Container Registry | `gcr.io/content-categorisation/content-app:prod` |
+| Provider | DigitalOcean |
+| Hostname | content-backend-vm |
+| External IP | `149.28.175.245` |
+| HTTPS URL | `https://149-28-175-245.sslip.io` |
+| Container Registry | `ghcr.io/akshataxx/content-app:latest` |
+| Deployment Dir | `~/content-backend/` |

@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 
 @RestController
 @Tag(name = "Admin", description = "Administrative operations")
@@ -27,23 +26,17 @@ public class AdminController {
 
     @Operation(summary = "Backfill embeddings", description = "Regenerates embeddings for all base transcripts using structured content")
     @PostMapping("/backfill-embeddings")
-    public CompletableFuture<ResponseEntity<Map<String, Object>>> backfillEmbeddings() {
+    public ResponseEntity<Map<String, Object>> backfillEmbeddings() {
         log.info("POST /api/admin/backfill-embeddings triggered");
-        return videoService.backfillEmbeddings()
-            .thenApply(counts -> ResponseEntity.ok(Map.of(
-                "success", counts[0],
-                "failed", counts[1]
-            )));
+        videoService.backfillEmbeddings();
+        return ResponseEntity.accepted().body(Map.of("status", "started"));
     }
 
     @Operation(summary = "Re-extract and re-embed", description = "Re-extracts structured content using updated prompts then regenerates embeddings for all base transcripts")
     @PostMapping("/reextract-and-reembed")
-    public CompletableFuture<ResponseEntity<Map<String, Object>>> reextractAndReembed() {
+    public ResponseEntity<Map<String, Object>> reextractAndReembed() {
         log.info("POST /api/admin/reextract-and-reembed triggered");
-        return videoService.reextractAndReembedAll()
-            .thenApply(counts -> ResponseEntity.ok(Map.of(
-                "success", counts[0],
-                "failed", counts[1]
-            )));
+        videoService.reextractAndReembedAll();
+        return ResponseEntity.accepted().body(Map.of("status", "started"));
     }
 }

@@ -111,7 +111,7 @@ public class UserTranscriptRepositoryImpl implements CustomUserTranscriptReposit
                         END AS exact_match_boost
                     FROM user_transcripts ut
                     JOIN base_transcripts bt ON ut.base_transcript_id = bt.id
-                    LEFT JOIN categories c ON ut.category_id = c.id
+                    LEFT JOIN category c ON ut.category_id = c.id
                     CROSS JOIN search_query
                     WHERE ut.user_id = CAST(:userId AS uuid)
                       AND (

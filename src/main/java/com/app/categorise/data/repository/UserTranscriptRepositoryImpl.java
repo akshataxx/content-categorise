@@ -115,7 +115,7 @@ public class UserTranscriptRepositoryImpl implements CustomUserTranscriptReposit
                     CROSS JOIN search_query
                     WHERE ut.user_id = CAST(:userId AS uuid)
                       AND (
-                          bt.embedding IS NOT NULL
+                          (bt.embedding IS NOT NULL AND bt.embedding <=> search_query.query_vector < 0.55)
                           OR to_tsvector(
                               'english',
                               concat_ws(

@@ -1,6 +1,8 @@
 package com.app.categorise.domain.service;
 
 import com.app.categorise.application.mapper.VideoMapper;
+import com.app.categorise.data.client.openai.EmbeddingClient;
+import com.app.categorise.data.client.openai.OpenAIClient;
 import com.app.categorise.data.entity.BaseTranscriptEntity;
 import com.app.categorise.data.entity.UserSubcategoryEntity;
 import com.app.categorise.data.entity.UserTranscriptEntity;
@@ -16,7 +18,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -35,15 +39,21 @@ public class TranscriptService {
     private final UserTranscriptRepository userTranscriptRepository;
     private final UserSubcategoryService userSubcategoryService;
     private final VideoMapper videoMapper;
+    private final EmbeddingClient embeddingClient;
+    private final OpenAIClient openAIClient;
 
     public TranscriptService(
         UserTranscriptRepository userTranscriptRepository,
         UserSubcategoryService userSubcategoryService,
-        VideoMapper videoMapper
+        VideoMapper videoMapper,
+        EmbeddingClient embeddingClient,
+        OpenAIClient openAIClient
     ) {
         this.userTranscriptRepository = userTranscriptRepository;
         this.userSubcategoryService = userSubcategoryService;
         this.videoMapper = videoMapper;
+        this.embeddingClient = embeddingClient;
+        this.openAIClient = openAIClient;
     }
 
     public Optional<TranscriptDtoWithAliases> findTranscript(UUID userTranscriptId, UUID userId) {
@@ -57,6 +67,50 @@ public class TranscriptService {
             }
         }
         return Optional.empty();
+    }
+
+    public List<TranscriptDtoWithAliases> semanticSearch(UUID userId, String query, int limit, UUID categoryId) {
+        if (query == null || query.isBlank()) {
+            return List.of();
+        }
+
+        String normalizedQuery = query.trim();
+        int candidateLimit = Math.min(Math.max(limit * 3, 25), 150);
+        Map<UUID, UserTranscriptEntity> mergedResults = new LinkedHashMap<>();
+
+        searchCandidates(userId, normalizedQuery, normalizedQuery, candidateLimit, categoryId)
+            .forEach(result -> mergedResults.putIfAbsent(result.getId(), result));
+
+        String expandedQuery;
+        try {
+            expandedQuery = openAIClient.expandSearchQuery(normalizedQuery).trim();
+            logger.debug("[search] query_expansion original='{}' expanded='{}'", normalizedQuery, expandedQuery);
+        } catch (Exception e) {
+            logger.warn("[search] query_expansion failed, using original query='{}' error={}", normalizedQuery, e.getMessage());
+            expandedQuery = normalizedQuery;
+        }
+
+        if (!expandedQuery.isBlank() && !expandedQuery.equalsIgnoreCase(normalizedQuery)) {
+            searchCandidates(userId, expandedQuery, normalizedQuery, candidateLimit, categoryId)
+                .forEach(result -> mergedResults.putIfAbsent(result.getId(), result));
+        }
+
+        return mergedResults.values().stream()
+            .filter(ut -> isValidTranscript(ut.getBaseTranscript()))
+            .limit(limit)
+            .map(ut -> videoMapper.buildResponse(ut.getBaseTranscript(), ut))
+            .toList();
+    }
+
+    private List<UserTranscriptEntity> searchCandidates(
+        UUID userId,
+        String embeddingQuery,
+        String textQuery,
+        int limit,
+        UUID categoryId
+    ) {
+        float[] queryEmbedding = embeddingClient.embed(embeddingQuery);
+        return userTranscriptRepository.searchByEmbedding(userId, queryEmbedding, textQuery, limit, categoryId);
     }
 
     public List<TranscriptDtoWithAliases> allFilteredTranscripts(UUID userId, List<UUID> categories, String account, Instant from, Instant to) {

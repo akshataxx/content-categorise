@@ -44,7 +44,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // Allow ASYNC and ERROR dispatches without authentication (auth was done on initial request)
                 .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
-                .requestMatchers("/api/auth/**", "/").permitAll()
+                .requestMatchers("/api/auth/**", "/api/admin/**", "/").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
                 .anyRequest().authenticated()
             );

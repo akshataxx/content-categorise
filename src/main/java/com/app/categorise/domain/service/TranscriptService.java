@@ -8,6 +8,7 @@ import com.app.categorise.data.entity.UserSubcategoryEntity;
 import com.app.categorise.data.entity.UserTranscriptEntity;
 import com.app.categorise.data.repository.UserTranscriptRepository;
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
+import com.app.categorise.api.dto.TranscriptPageResponse;
 import com.app.categorise.exception.SubcategoryNotFoundException;
 import com.app.categorise.exception.SubcategoryParentMismatchException;
 import com.app.categorise.exception.TranscriptDeletionException;
@@ -125,6 +126,33 @@ public class TranscriptService {
             .filter(ut -> isValidTranscript(ut.getBaseTranscript()))
             .map(ut -> videoMapper.buildResponse(ut.getBaseTranscript(), ut))
             .toList();
+    }
+
+    public TranscriptPageResponse pagedFilteredTranscripts(
+        UUID userId,
+        List<UUID> categories,
+        List<UUID> subcategories,
+        String account,
+        Instant from,
+        Instant to,
+        int page,
+        int size
+    ) {
+        var pageResult = userTranscriptRepository.filterByUser(userId, categories, subcategories, account, from, to, page, size);
+        List<TranscriptDtoWithAliases> items = pageResult.items().stream()
+            .filter(ut -> isValidTranscript(ut.getBaseTranscript()))
+            .map(ut -> videoMapper.buildResponse(ut.getBaseTranscript(), ut))
+            .toList();
+
+        int totalPages = size <= 0 ? 0 : (int) Math.ceil((double) pageResult.totalItems() / size);
+        return new TranscriptPageResponse(
+            items,
+            page,
+            size,
+            pageResult.totalItems(),
+            totalPages,
+            page + 1 < totalPages
+        );
     }
 
     private boolean isValidTranscript(BaseTranscriptEntity base) {

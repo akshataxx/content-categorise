@@ -3,6 +3,7 @@ package com.app.categorise.api.controller;
 import com.app.categorise.api.dto.DeleteTranscriptsRequest;
 import com.app.categorise.api.dto.SetSubcategoryRequest;
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
+import com.app.categorise.api.dto.TranscriptPageResponse;
 import com.app.categorise.api.dto.UpdateNotesRequest;
 import com.app.categorise.domain.service.TranscriptService;
 import com.app.categorise.security.UserPrincipal;
@@ -58,6 +59,31 @@ public class TranscriptController {
         List<TranscriptDtoWithAliases> results = transcriptService.allFilteredTranscripts(userId, categoryIds, subcategoryIds, account, from, to);
 
         return ResponseEntity.ok(results);
+    }
+
+    @GetMapping("/page")
+    public ResponseEntity<TranscriptPageResponse> findTranscriptPage(
+        @RequestParam(required = false) List<UUID> categoryIds,
+        @RequestParam(required = false) List<UUID> subcategoryIds,
+        @RequestParam(required = false) String account,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "50") int size,
+        Authentication authentication
+    ) {
+        UUID userId = requireUser(authentication);
+        TranscriptPageResponse response = transcriptService.pagedFilteredTranscripts(
+            userId,
+            categoryIds,
+            subcategoryIds,
+            account,
+            from,
+            to,
+            Math.max(page, 0),
+            Math.min(Math.max(size, 1), 100)
+        );
+        return ResponseEntity.ok(response);
     }
 
     /**

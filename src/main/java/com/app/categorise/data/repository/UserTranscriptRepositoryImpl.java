@@ -30,6 +30,25 @@ public class UserTranscriptRepositoryImpl implements CustomUserTranscriptReposit
 
     @Override
     public List<UserTranscriptEntity> filterByUser(UUID userId, List<UUID> categories, List<UUID> subcategories, String account, Instant from, Instant to) {
+        return buildFilterQuery(userId, categories, subcategories, account, from, to)
+            .setMaxResults(Integer.MAX_VALUE)
+            .getResultList();
+    }
+
+    @Override
+    public UserTranscriptPage filterByUser(UUID userId, List<UUID> categories, List<UUID> subcategories, String account, Instant from, Instant to, int page, int size) {
+        List<UserTranscriptEntity> items = buildFilterQuery(userId, categories, subcategories, account, from, to)
+            .setFirstResult(page * size)
+            .setMaxResults(size)
+            .getResultList();
+
+        Long total = buildFilterCountQuery(userId, categories, subcategories, account, from, to)
+            .getSingleResult();
+
+        return new UserTranscriptPage(items, total);
+    }
+
+    private jakarta.persistence.TypedQuery<UserTranscriptEntity> buildFilterQuery(UUID userId, List<UUID> categories, List<UUID> subcategories, String account, Instant from, Instant to) {
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
         CriteriaQuery<UserTranscriptEntity> query = cb.createQuery(UserTranscriptEntity.class);
         Root<UserTranscriptEntity> root = query.from(UserTranscriptEntity.class);
@@ -37,6 +56,35 @@ public class UserTranscriptRepositoryImpl implements CustomUserTranscriptReposit
         // Join baseTranscript for filtering on its fields (eager loading handles data fetching)
         Join<UserTranscriptEntity, BaseTranscriptEntity> baseTranscriptJoin = root.join("baseTranscript", JoinType.INNER);
 
+        List<Predicate> predicates = filterPredicates(cb, root, baseTranscriptJoin, userId, categories, subcategories, account, from, to);
+        query.where(cb.and(predicates.toArray(new Predicate[0])));
+        query.orderBy(cb.desc(root.get("createdAt")));
+        return entityManager.createQuery(query);
+    }
+
+    private jakarta.persistence.TypedQuery<Long> buildFilterCountQuery(UUID userId, List<UUID> categories, List<UUID> subcategories, String account, Instant from, Instant to) {
+        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Long> query = cb.createQuery(Long.class);
+        Root<UserTranscriptEntity> root = query.from(UserTranscriptEntity.class);
+        Join<UserTranscriptEntity, BaseTranscriptEntity> baseTranscriptJoin = root.join("baseTranscript", JoinType.INNER);
+
+        List<Predicate> predicates = filterPredicates(cb, root, baseTranscriptJoin, userId, categories, subcategories, account, from, to);
+        query.select(cb.count(root));
+        query.where(cb.and(predicates.toArray(new Predicate[0])));
+        return entityManager.createQuery(query);
+    }
+
+    private List<Predicate> filterPredicates(
+        CriteriaBuilder cb,
+        Root<UserTranscriptEntity> root,
+        Join<UserTranscriptEntity, BaseTranscriptEntity> baseTranscriptJoin,
+        UUID userId,
+        List<UUID> categories,
+        List<UUID> subcategories,
+        String account,
+        Instant from,
+        Instant to
+    ) {
         List<Predicate> predicates = new ArrayList<>();
 
         predicates.add(cb.equal(root.get("userId"), userId));
@@ -61,8 +109,7 @@ public class UserTranscriptRepositoryImpl implements CustomUserTranscriptReposit
             predicates.add(cb.lessThanOrEqualTo(baseTranscriptJoin.get("uploadedAt"), to));
         }
 
-        query.where(cb.and(predicates.toArray(new Predicate[0])));
-        return entityManager.createQuery(query).getResultList();
+        return predicates;
     }
 
     @Override

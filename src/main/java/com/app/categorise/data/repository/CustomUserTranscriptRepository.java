@@ -9,5 +9,8 @@ import java.util.UUID;
 public interface CustomUserTranscriptRepository {
     List<UserTranscriptEntity> filterByUser(UUID userId, List<UUID> categories, String account, Instant from, Instant to);
     List<UserTranscriptEntity> filterByUser(UUID userId, List<UUID> categories, List<UUID> subcategories, String account, Instant from, Instant to);
+    UserTranscriptPage filterByUser(UUID userId, List<UUID> categories, List<UUID> subcategories, String account, Instant from, Instant to, int page, int size);
     List<UserTranscriptEntity> searchByEmbedding(UUID userId, float[] queryEmbedding, String queryText, int limit, UUID categoryId);
+
+    record UserTranscriptPage(List<UserTranscriptEntity> items, long totalItems) { }
 }

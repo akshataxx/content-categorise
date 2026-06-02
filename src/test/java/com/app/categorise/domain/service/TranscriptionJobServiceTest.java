@@ -170,6 +170,126 @@ class TranscriptionJobServiceTest {
         }
     }
 
+    @Nested
+    @DisplayName("handleFailure")
+    class HandleFailure {
+
+        @Test
+        @DisplayName("marks job as FAILED immediately for permanent 'login required' error")
+        void loginRequired_permanentFailure() {
+            TranscriptionJobEntity job = jobWithStatus(JobStatus.PROCESSING);
+            job.setRetryCount(0);
+
+            RuntimeException cause = new RuntimeException(
+                    "Command failed with exit code: 1. Output: ERROR: [Instagram] DT0-sHxk-pd: "
+                    + "Requested content is not available, rate-limit reached or login required.");
+            Exception ex = new RuntimeException("Could not process video URL — please check the link and try again.", cause);
+
+            service.handleFailure(job, ex);
+
+            assertThat(job.getStatus()).isEqualTo(JobStatus.FAILED);
+            verify(jobRepository).save(job);
+        }
+
+        @Test
+        @DisplayName("marks job as FAILED immediately for 'login required' even when deeply wrapped")
+        void loginRequired_deeplyWrapped_permanentFailure() {
+            TranscriptionJobEntity job = jobWithStatus(JobStatus.PROCESSING);
+            job.setRetryCount(0);
+
+            RuntimeException root = new RuntimeException("login required for this content");
+            RuntimeException middle = new RuntimeException("metadata fetch failed", root);
+            Exception outer = new RuntimeException("Could not process video URL", middle);
+
+            service.handleFailure(job, outer);
+
+            assertThat(job.getStatus()).isEqualTo(JobStatus.FAILED);
+        }
+
+        @Test
+        @DisplayName("marks job as FAILED immediately for 'unsupported url' in cause chain")
+        void unsupportedUrl_inCauseChain_permanentFailure() {
+            TranscriptionJobEntity job = jobWithStatus(JobStatus.PROCESSING);
+            job.setRetryCount(0);
+
+            RuntimeException cause = new RuntimeException("ERROR: Unsupported URL: https://example.com");
+            Exception ex = new RuntimeException("Could not process video URL", cause);
+
+            service.handleFailure(job, ex);
+
+            assertThat(job.getStatus()).isEqualTo(JobStatus.FAILED);
+        }
+
+        @Test
+        @DisplayName("marks job as FAILED immediately for 'video is too long' error")
+        void videoTooLong_permanentFailure() {
+            TranscriptionJobEntity job = jobWithStatus(JobStatus.PROCESSING);
+            job.setRetryCount(0);
+
+            Exception ex = new RuntimeException("Video is too long (45 min). Maximum supported duration is 30 minutes.");
+
+            service.handleFailure(job, ex);
+
+            assertThat(job.getStatus()).isEqualTo(JobStatus.FAILED);
+        }
+
+        @Test
+        @DisplayName("retries transient failure (timeout) with exponential backoff")
+        void timeout_retriesWithBackoff() {
+            TranscriptionJobEntity job = jobWithStatus(JobStatus.PROCESSING);
+            job.setRetryCount(0);
+
+            Exception ex = new RuntimeException("Connection timeout while downloading");
+
+            service.handleFailure(job, ex);
+
+            assertThat(job.getStatus()).isEqualTo(JobStatus.PENDING);
+            assertThat(job.getRetryCount()).isEqualTo(1);
+            assertThat(job.getNextRetryAt()).isNotNull();
+        }
+
+        @Test
+        @DisplayName("marks as FAILED after max retries exhausted for transient error")
+        void maxRetriesExhausted_permanentFailure() {
+            TranscriptionJobEntity job = jobWithStatus(JobStatus.PROCESSING);
+            job.setRetryCount(3); // already at max
+
+            Exception ex = new RuntimeException("Connection timeout while downloading");
+
+            service.handleFailure(job, ex);
+
+            assertThat(job.getStatus()).isEqualTo(JobStatus.FAILED);
+        }
+
+        @Test
+        @DisplayName("retries generic unknown errors (default to transient)")
+        void unknownError_treatedAsTransient() {
+            TranscriptionJobEntity job = jobWithStatus(JobStatus.PROCESSING);
+            job.setRetryCount(0);
+
+            Exception ex = new RuntimeException("Something unexpected happened");
+
+            service.handleFailure(job, ex);
+
+            assertThat(job.getStatus()).isEqualTo(JobStatus.PENDING);
+            assertThat(job.getRetryCount()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("handles null exception message without NPE")
+        void nullMessage_doesNotThrowNPE() {
+            TranscriptionJobEntity job = jobWithStatus(JobStatus.PROCESSING);
+            job.setRetryCount(0);
+
+            Exception ex = new RuntimeException((String) null);
+
+            service.handleFailure(job, ex);
+
+            // Should default to transient (retry)
+            assertThat(job.getStatus()).isEqualTo(JobStatus.PENDING);
+        }
+    }
+
     // --- Helpers ---
 
     private TranscriptionJobEntity jobWithStatus(JobStatus status) {

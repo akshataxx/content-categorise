@@ -27,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Qualifier;
 
 import java.io.File;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -135,6 +136,7 @@ public class VideoService {
      * @throws VideoProcessingException if yt-dlp fails or the output cannot be parsed.
      */
     public VideoMetadata fetchMetadata(String videoUrl) {
+        validateYtDlpUrl(videoUrl);
         long startMs = System.currentTimeMillis();
         List<String> command = new ArrayList<>();
         command.add(ytDlpLocation);
@@ -193,6 +195,7 @@ public class VideoService {
      * @throws Exception If the download or extraction process fails.
      */
     public ProcessedVideoFiles downloadAudio(String videoUrl) throws Exception {
+        validateYtDlpUrl(videoUrl);
         Path tempDir = Files.createTempDirectory("media-" + UUID.randomUUID());
         long startMs = System.currentTimeMillis();
         try {
@@ -281,6 +284,7 @@ public class VideoService {
     }
 
     private TranscriptDtoWithAliases _processVideoAndCreateTranscript(String videoUrl, UUID userId) throws Exception {
+        validateYtDlpUrl(videoUrl);
         long pipelineStartMs = System.currentTimeMillis();
         log.info("[transcription] starting url={} user={}", LogSanitizer.sanitize(videoUrl), userId);
 
@@ -523,6 +527,40 @@ public class VideoService {
         return ffmpegLocation != null
             && !ffmpegLocation.isBlank()
             && new File(ffmpegLocation).exists();
+    }
+
+    private void validateYtDlpUrl(String videoUrl) {
+        if (videoUrl == null || videoUrl.isBlank()) {
+            rejectUnsafeVideoUrl(videoUrl);
+        }
+
+        try {
+            URI uri = URI.create(videoUrl);
+            String scheme = uri.getScheme();
+            String host = uri.getHost();
+
+            if (!"https".equalsIgnoreCase(scheme)
+                    || host == null
+                    || isIpLiteral(host)
+                    || VideoPlatform.fromUrl(videoUrl) == VideoPlatform.UNKNOWN) {
+                rejectUnsafeVideoUrl(videoUrl);
+            }
+        } catch (IllegalArgumentException e) {
+            rejectUnsafeVideoUrl(videoUrl);
+        }
+    }
+
+    private boolean isIpLiteral(String host) {
+        String normalized = host;
+        if (normalized.startsWith("[") && normalized.endsWith("]")) {
+            normalized = normalized.substring(1, normalized.length() - 1);
+        }
+        return normalized.contains(":") || normalized.matches("\\d{1,3}(\\.\\d{1,3}){3}");
+    }
+
+    private void rejectUnsafeVideoUrl(String videoUrl) {
+        log.warn("[transcription] rejected_unsafe_url url={}", LogSanitizer.sanitize(videoUrl));
+        throw new VideoProcessingException(USER_FACING_FETCH_ERROR);
     }
 
 

@@ -15,7 +15,7 @@ import java.io.File;
 import java.io.IOException;
 
 @Component
-@Profile("prod")
+@Profile("prod | openai-real")
 public class WhisperClientImpl implements WhisperClient {
 
     private final RestClient restClient;

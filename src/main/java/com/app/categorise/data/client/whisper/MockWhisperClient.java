@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 import java.io.File;
 
 @Component
-@Profile("dev")
+@Profile("(dev | test) & !openai-real")
 public class MockWhisperClient implements WhisperClient {
 
     @Override

@@ -23,17 +23,15 @@ public enum VideoPlatform {
         try {
             String host = URI.create(url).getHost();
             if (host == null) return UNKNOWN;
-            host = host.toLowerCase();
+            host = normalizeHost(host);
 
-            if (host.contains("youtube.com") || host.contains("youtu.be")) return YOUTUBE;
-            if (host.contains("tiktok.com")) return TIKTOK;
-            if (host.contains("instagram.com")) return INSTAGRAM;
-            if (host.contains("vimeo.com")) return VIMEO;
-            if (host.contains("twitter.com") || host.contains("x.com")) return TWITTER;
-            if (host.contains("facebook.com") || host.contains("fb.watch")) return FACEBOOK;
-            if (host.contains("reddit.com")) return REDDIT;
-            if (host.contains("twitch.tv")) return TWITCH;
-            if (host.contains("dailymotion.com")) return DAILYMOTION;
+            if (matchesHost(host, "youtube.com")
+                    || matchesHost(host, "youtu.be")
+                    || matchesHost(host, "youtube-nocookie.com")) {
+                return YOUTUBE;
+            }
+            if (matchesHost(host, "tiktok.com")) return TIKTOK;
+            if (matchesHost(host, "instagram.com")) return INSTAGRAM;
 
             return UNKNOWN;
         } catch (Exception e) {
@@ -52,13 +50,19 @@ public enum VideoPlatform {
         if (lower.contains("youtube")) return YOUTUBE;
         if (lower.contains("tiktok")) return TIKTOK;
         if (lower.contains("instagram")) return INSTAGRAM;
-        if (lower.contains("vimeo")) return VIMEO;
-        if (lower.contains("twitter") || lower.contains("x.com")) return TWITTER;
-        if (lower.contains("facebook") || lower.contains("fb")) return FACEBOOK;
-        if (lower.contains("reddit")) return REDDIT;
-        if (lower.contains("twitch")) return TWITCH;
-        if (lower.contains("dailymotion")) return DAILYMOTION;
 
         return UNKNOWN;
+    }
+
+    private static String normalizeHost(String host) {
+        String normalized = host.toLowerCase();
+        if (normalized.endsWith(".")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        return normalized;
+    }
+
+    private static boolean matchesHost(String host, String root) {
+        return host.equals(root) || host.endsWith("." + root);
     }
 }

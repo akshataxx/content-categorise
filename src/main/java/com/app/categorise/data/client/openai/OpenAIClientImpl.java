@@ -16,7 +16,7 @@ import org.springframework.web.client.RestClient;
 import java.util.List;
 
 @Component
-@Profile("prod")
+@Profile("prod | openai-real")
 public class OpenAIClientImpl implements OpenAIClient {
 
     private final RestClient restClient;

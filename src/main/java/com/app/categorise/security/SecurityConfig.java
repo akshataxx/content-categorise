@@ -24,6 +24,9 @@ public class SecurityConfig {
     @Autowired
     private JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
+    @Autowired
+    private AdminSecretFilter adminSecretFilter;
+
     @Bean
     public JwtAuthenticationFilter jwtAuthenticationFilter() {
         return new JwtAuthenticationFilter();
@@ -44,11 +47,12 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // Allow ASYNC and ERROR dispatches without authentication (auth was done on initial request)
                 .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
-                .requestMatchers("/api/auth/**", "/api/admin/**", "/").permitAll()
+                .requestMatchers("/api/auth/**", "/").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
                 .anyRequest().authenticated()
             );
         http.addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
+        http.addFilterBefore(adminSecretFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

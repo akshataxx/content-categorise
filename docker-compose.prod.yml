@@ -37,6 +37,7 @@ services:
       # Pass through environment variables from .env file
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       JWT_SECRET: ${JWT_SECRET}
+      ADMIN_SECRET: ${ADMIN_SECRET:?ADMIN_SECRET must be set in .env}
       JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-604800000}
       JWT_REFRESH_EXPIRATION_MS: ${JWT_REFRESH_EXPIRATION_MS:-864000000}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}

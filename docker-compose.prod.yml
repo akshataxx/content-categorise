@@ -58,6 +58,7 @@ services:
       FIREBASE_SERVICE_ACCOUNT_PATH: /app/secrets/firebase-service-account.json
     volumes:
       - ${FIREBASE_SERVICE_ACCOUNT_HOST_PATH:-/dev/null}:/app/secrets/firebase-service-account.json:ro
+      - ${APPLE_PRIVATE_KEY_HOST_PATH:-/dev/null}:${APPLE_PRIVATE_KEY_PATH:-/app/secrets/apple-app-store-key.p8}:ro
     # App only exposed internally to Caddy reverse proxy
     expose:
       - "8081"

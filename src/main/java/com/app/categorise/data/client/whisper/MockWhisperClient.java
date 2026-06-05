@@ -1,12 +1,12 @@
 package com.app.categorise.data.client.whisper;
 
-import org.springframework.context.annotation.Profile;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
 
 @Component
-@Profile("dev")
+@ConditionalOnProperty(name = "app.openai.mode", havingValue = "mock", matchIfMissing = true)
 public class MockWhisperClient implements WhisperClient {
 
     @Override

@@ -145,6 +145,14 @@ public class SubscriptionServiceImpl implements SubscriptionService {
                                              Instant expirationDate) {
         logger.info("Upgrading user {} to premium via App Store", userId);
 
+        subscriptionRepository.findByAppleOriginalTransactionId(originalTransactionId)
+                .filter(existing -> !existing.getUserId().equals(userId))
+                .ifPresent(existing -> {
+                    logger.warn("Rejected App Store transaction replay: originalTransactionId={} existingUser={} requestedUser={}",
+                            originalTransactionId, existing.getUserId(), userId);
+                    throw new IllegalStateException("App Store transaction is already associated with another user");
+                });
+
         // Find existing subscription or create new one
         UserSubscriptionEntity entity = subscriptionRepository.findByUserId(userId)
                 .orElseGet(() -> {

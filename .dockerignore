@@ -18,3 +18,5 @@
 
 # Local logs directory (not needed in build context)
 logs/
+
+.app/

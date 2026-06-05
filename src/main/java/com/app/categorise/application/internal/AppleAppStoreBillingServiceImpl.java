@@ -12,6 +12,8 @@ import io.jsonwebtoken.SignatureAlgorithm;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -40,11 +42,17 @@ public class AppleAppStoreBillingServiceImpl implements AppleAppStoreBillingServ
     private final AppleAppStoreConfiguration config;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
+    private final Environment environment;
     private PrivateKey privateKey;
 
-    public AppleAppStoreBillingServiceImpl(AppleAppStoreConfiguration config, ObjectMapper objectMapper) {
+    public AppleAppStoreBillingServiceImpl(
+            AppleAppStoreConfiguration config,
+            ObjectMapper objectMapper,
+            Environment environment
+    ) {
         this.config = config;
         this.objectMapper = objectMapper;
+        this.environment = environment;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
@@ -52,8 +60,13 @@ public class AppleAppStoreBillingServiceImpl implements AppleAppStoreBillingServ
 
     @PostConstruct
     public void init() {
+        boolean prodProfile = environment.acceptsProfiles(Profiles.of("prod"));
         try {
             if ("xcode-testing".equalsIgnoreCase(config.getEnvironment())) {
+                if (prodProfile) {
+                    throw new IllegalStateException(
+                            "Apple App Store xcode-testing environment is not allowed with the prod profile");
+                }
                 logger.info("Apple App Store Billing service running in XCODE-TESTING mode. " +
                         "Private key not required — transactions will be verified locally.");
                 return;
@@ -63,10 +76,20 @@ public class AppleAppStoreBillingServiceImpl implements AppleAppStoreBillingServ
                 loadPrivateKey();
                 logger.info("Apple App Store Billing service initialized successfully");
             } else {
-                logger.warn("Apple App Store private key path not configured. " +
-                        "App Store purchase verification will not work until configured.");
+                String message = "Apple App Store private key path not configured. " +
+                        "App Store purchase verification will not work until configured.";
+                if (prodProfile) {
+                    throw new IllegalStateException(message);
+                }
+                logger.warn(message);
             }
         } catch (Exception e) {
+            if (prodProfile) {
+                if (e instanceof IllegalStateException illegalStateException) {
+                    throw illegalStateException;
+                }
+                throw new IllegalStateException("Failed to initialize Apple App Store Billing service", e);
+            }
             logger.error("Failed to initialize Apple App Store Billing service", e);
             // Don't throw - allow application to start without Apple billing
         }

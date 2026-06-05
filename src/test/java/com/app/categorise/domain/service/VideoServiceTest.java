@@ -105,7 +105,7 @@ class VideoServiceTest {
         categoryId = UUID.randomUUID();
         transcriptText = "This is a test transcript";
         userId = UUID.randomUUID();
-        videoUrl = "https://example.com/video";
+        videoUrl = "https://www.youtube.com/watch?v=abc123";
 
         baseTranscript = createBaseTranscriptEntity();
         category = createCategoryEntity();
@@ -209,6 +209,42 @@ class VideoServiceTest {
         }
 
         @Test
+        @DisplayName("Rejects unsupported hosts before invoking yt-dlp")
+        void fetchMetadata_rejectsUnsupportedHostBeforeYtDlp() {
+            VideoProcessingException ex = assertThrows(VideoProcessingException.class,
+                () -> videoService.fetchMetadata("https://example.com/video"));
+
+            assertEquals("Could not process video URL — please check the link and try again.",
+                ex.getMessage());
+            assertEquals(0, testProcessExecutor.calls(),
+                "Unsupported hosts must not be passed to yt-dlp");
+        }
+
+        @Test
+        @DisplayName("Rejects non-HTTPS URLs before invoking yt-dlp")
+        void fetchMetadata_rejectsNonHttpsBeforeYtDlp() {
+            VideoProcessingException ex = assertThrows(VideoProcessingException.class,
+                () -> videoService.fetchMetadata("http://www.youtube.com/watch?v=abc123"));
+
+            assertEquals("Could not process video URL — please check the link and try again.",
+                ex.getMessage());
+            assertEquals(0, testProcessExecutor.calls(),
+                "Non-HTTPS URLs must not be passed to yt-dlp");
+        }
+
+        @Test
+        @DisplayName("Rejects lookalike platform hosts before invoking yt-dlp")
+        void fetchMetadata_rejectsLookalikeHostBeforeYtDlp() {
+            VideoProcessingException ex = assertThrows(VideoProcessingException.class,
+                () -> videoService.fetchMetadata("https://youtube.com.attacker.example/watch?v=abc123"));
+
+            assertEquals("Could not process video URL — please check the link and try again.",
+                ex.getMessage());
+            assertEquals(0, testProcessExecutor.calls(),
+                "Lookalike hosts must not be passed to yt-dlp");
+        }
+
+        @Test
         @DisplayName("Adds TikTok extractor args for TikTok URLs")
         void fetchMetadata_addsTikTokExtractorArgs() {
             testProcessExecutor.setOutput(SAMPLE_YTDLP_JSON);
@@ -280,6 +316,18 @@ class VideoServiceTest {
             String testUrl = "https://www.youtube.com/watch?v=abc123";
             assertDoesNotThrow(() -> videoService.downloadAudio(testUrl));
             assertEquals(1, testProcessExecutor.calls());
+        }
+
+        @Test
+        @DisplayName("Rejects loopback URLs before invoking yt-dlp")
+        void downloadAudio_rejectsLoopbackUrlBeforeYtDlp() {
+            VideoProcessingException ex = assertThrows(VideoProcessingException.class,
+                () -> videoService.downloadAudio("https://127.0.0.1/internal"));
+
+            assertEquals("Could not process video URL — please check the link and try again.",
+                ex.getMessage());
+            assertEquals(0, testProcessExecutor.calls(),
+                "Loopback URLs must not be passed to yt-dlp");
         }
 
         @Test

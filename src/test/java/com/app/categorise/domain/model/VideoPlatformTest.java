@@ -31,6 +31,12 @@ class VideoPlatformTest {
         }
 
         @Test
+        @DisplayName("detects YouTube no-cookie embeds")
+        void detectsYoutubeNoCookie() {
+            assertThat(VideoPlatform.fromUrl("https://www.youtube-nocookie.com/embed/abc123")).isEqualTo(VideoPlatform.YOUTUBE);
+        }
+
+        @Test
         @DisplayName("detects TikTok")
         void detectsTikTok() {
             assertThat(VideoPlatform.fromUrl("https://www.tiktok.com/@user/video/123")).isEqualTo(VideoPlatform.TIKTOK);
@@ -49,28 +55,23 @@ class VideoPlatformTest {
         }
 
         @Test
-        @DisplayName("detects Vimeo")
-        void detectsVimeo() {
-            assertThat(VideoPlatform.fromUrl("https://vimeo.com/123456")).isEqualTo(VideoPlatform.VIMEO);
+        @DisplayName("returns UNKNOWN for formerly modeled but unsupported platforms")
+        void returnsUnknownForUnsupportedPlatforms() {
+            assertThat(VideoPlatform.fromUrl("https://vimeo.com/123456")).isEqualTo(VideoPlatform.UNKNOWN);
+            assertThat(VideoPlatform.fromUrl("https://x.com/user/status/123")).isEqualTo(VideoPlatform.UNKNOWN);
+            assertThat(VideoPlatform.fromUrl("https://twitter.com/user/status/123")).isEqualTo(VideoPlatform.UNKNOWN);
+            assertThat(VideoPlatform.fromUrl("https://www.facebook.com/watch?v=123")).isEqualTo(VideoPlatform.UNKNOWN);
+            assertThat(VideoPlatform.fromUrl("https://www.reddit.com/r/sub/comments/abc/title/")).isEqualTo(VideoPlatform.UNKNOWN);
+            assertThat(VideoPlatform.fromUrl("https://www.twitch.tv/videos/123")).isEqualTo(VideoPlatform.UNKNOWN);
+            assertThat(VideoPlatform.fromUrl("https://www.dailymotion.com/video/abc")).isEqualTo(VideoPlatform.UNKNOWN);
         }
 
         @Test
-        @DisplayName("detects Twitter/X")
-        void detectsTwitter() {
-            assertThat(VideoPlatform.fromUrl("https://x.com/user/status/123")).isEqualTo(VideoPlatform.TWITTER);
-            assertThat(VideoPlatform.fromUrl("https://twitter.com/user/status/123")).isEqualTo(VideoPlatform.TWITTER);
-        }
-
-        @Test
-        @DisplayName("detects Facebook")
-        void detectsFacebook() {
-            assertThat(VideoPlatform.fromUrl("https://www.facebook.com/watch?v=123")).isEqualTo(VideoPlatform.FACEBOOK);
-        }
-
-        @Test
-        @DisplayName("detects Reddit")
-        void detectsReddit() {
-            assertThat(VideoPlatform.fromUrl("https://www.reddit.com/r/sub/comments/abc/title/")).isEqualTo(VideoPlatform.REDDIT);
+        @DisplayName("does not match attacker-controlled lookalike host suffixes")
+        void rejectsLookalikeHostSuffixes() {
+            assertThat(VideoPlatform.fromUrl("https://notyoutube.com/watch?v=abc123")).isEqualTo(VideoPlatform.UNKNOWN);
+            assertThat(VideoPlatform.fromUrl("https://youtube.com.attacker.example/watch?v=abc123")).isEqualTo(VideoPlatform.UNKNOWN);
+            assertThat(VideoPlatform.fromUrl("https://evil-tiktok.com/@user/video/123")).isEqualTo(VideoPlatform.UNKNOWN);
         }
 
         @Test
@@ -102,7 +103,6 @@ class VideoPlatformTest {
             assertThat(VideoPlatform.fromExtractor("youtube")).isEqualTo(VideoPlatform.YOUTUBE);
             assertThat(VideoPlatform.fromExtractor("TikTok")).isEqualTo(VideoPlatform.TIKTOK);
             assertThat(VideoPlatform.fromExtractor("Instagram")).isEqualTo(VideoPlatform.INSTAGRAM);
-            assertThat(VideoPlatform.fromExtractor("vimeo")).isEqualTo(VideoPlatform.VIMEO);
         }
 
         @Test

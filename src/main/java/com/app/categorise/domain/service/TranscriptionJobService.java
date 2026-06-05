@@ -163,11 +163,16 @@ public class TranscriptionJobService {
     }
 
     private boolean isTransientFailure(Exception ex) {
-        String msg = ex.getMessage() != null ? ex.getMessage().toLowerCase() : "";
+        // Build a combined message from the full cause chain so we catch
+        // patterns hidden in wrapped exceptions (e.g. VideoProcessingException
+        // wrapping the original yt-dlp RuntimeException).
+        String msg = collectCauseMessages(ex).toLowerCase();
+
         // Permanent failures - do not retry
         if (msg.contains("unsupported url") || msg.contains("is not a valid url")) return false;
         if (msg.contains("private video") || msg.contains("login required")) return false;
         if (msg.contains("no space left on device")) return false;
+        if (msg.contains("video is too long")) return false;
         // Transient failures - retry
         if (ex instanceof java.net.SocketTimeoutException) return true;
         if (ex instanceof java.net.ConnectException) return true;
@@ -176,6 +181,24 @@ public class TranscriptionJobService {
         if (msg.contains("timeout")) return true;
         // Default: treat as transient (safer to retry than to lose)
         return true;
+    }
+
+    /**
+     * Walks the exception cause chain and concatenates all messages
+     * (separated by " | ") so that pattern matching in isTransientFailure
+     * can detect keywords buried in wrapped exceptions.
+     */
+    private String collectCauseMessages(Throwable ex) {
+        StringBuilder sb = new StringBuilder();
+        Throwable current = ex;
+        while (current != null) {
+            if (current.getMessage() != null) {
+                if (!sb.isEmpty()) sb.append(" | ");
+                sb.append(current.getMessage());
+            }
+            current = current.getCause();
+        }
+        return sb.toString();
     }
 
     // --- Crash recovery (on startup) ---

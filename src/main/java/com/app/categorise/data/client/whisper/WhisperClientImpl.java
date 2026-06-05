@@ -3,7 +3,7 @@ package com.app.categorise.data.client.whisper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Profile;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
@@ -15,7 +15,7 @@ import java.io.File;
 import java.io.IOException;
 
 @Component
-@Profile("prod | openai-real")
+@ConditionalOnProperty(name = "app.openai.mode", havingValue = "real")
 public class WhisperClientImpl implements WhisperClient {
 
     private final RestClient restClient;

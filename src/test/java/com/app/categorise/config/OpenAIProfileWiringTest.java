@@ -33,6 +33,7 @@ class OpenAIProfileWiringTest {
     void devProfileUsesMockOpenAIAndWhisperClients() {
         contextRunner
                 .withInitializer(context -> context.getEnvironment().setActiveProfiles("dev"))
+                .withPropertyValues("app.openai.mode=mock")
                 .run(context -> {
                     assertThat(context).hasSingleBean(OpenAIClient.class);
                     assertThat(context.getBean(OpenAIClient.class)).isInstanceOf(MockOpenAIClient.class);
@@ -54,9 +55,23 @@ class OpenAIProfileWiringTest {
     }
 
     @Test
-    void devOpenAIRealProfileUsesRealOpenAIAndWhisperClients() {
+    void devProfileCanUseRealOpenAIAndWhisperClients() {
         contextRunner
-                .withInitializer(context -> context.getEnvironment().setActiveProfiles("dev", "openai-real"))
+                .withInitializer(context -> context.getEnvironment().setActiveProfiles("dev"))
+                .withPropertyValues("app.openai.mode=real")
+                .run(context -> {
+                    assertThat(context).hasSingleBean(OpenAIClient.class);
+                    assertThat(context.getBean(OpenAIClient.class)).isInstanceOf(OpenAIClientImpl.class);
+                    assertThat(context).hasSingleBean(WhisperClient.class);
+                    assertThat(context.getBean(WhisperClient.class)).isInstanceOf(WhisperClientImpl.class);
+                });
+    }
+
+    @Test
+    void prodProfileUsesRealOpenAIAndWhisperClients() {
+        contextRunner
+                .withInitializer(context -> context.getEnvironment().setActiveProfiles("prod"))
+                .withPropertyValues("app.openai.mode=real")
                 .run(context -> {
                     assertThat(context).hasSingleBean(OpenAIClient.class);
                     assertThat(context.getBean(OpenAIClient.class)).isInstanceOf(OpenAIClientImpl.class);

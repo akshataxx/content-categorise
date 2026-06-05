@@ -7,7 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Profile;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -16,7 +16,7 @@ import org.springframework.web.client.RestClient;
 import java.util.List;
 
 @Component
-@Profile("prod | openai-real")
+@ConditionalOnProperty(name = "app.openai.mode", havingValue = "real")
 public class OpenAIClientImpl implements OpenAIClient {
 
     private final RestClient restClient;

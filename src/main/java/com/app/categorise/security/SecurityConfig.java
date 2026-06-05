@@ -24,6 +24,9 @@ public class SecurityConfig {
     @Autowired
     private JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
+    @Autowired
+    private AdminSecretFilter adminSecretFilter;
+
     @Bean
     public JwtAuthenticationFilter jwtAuthenticationFilter() {
         return new JwtAuthenticationFilter();
@@ -49,6 +52,7 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             );
         http.addFilterBefore(jwtAuthenticationFilter(), UsernamePasswordAuthenticationFilter.class);
+        http.addFilterBefore(adminSecretFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

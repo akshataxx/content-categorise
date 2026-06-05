@@ -5,6 +5,7 @@ import com.app.categorise.domain.model.VideoPlatform;
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.application.internal.ProcessedVideoFiles;
 import com.app.categorise.application.mapper.VideoMapper;
+import com.app.categorise.data.client.openai.EmbeddingClient;
 import com.app.categorise.data.client.openai.OpenAIClient;
 import com.app.categorise.data.client.whisper.WhisperClient;
 import com.app.categorise.data.entity.CategoryAliasEntity;
@@ -23,6 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Qualifier;
 
@@ -73,6 +75,10 @@ public class VideoService {
 
     private final OpenAIClient openAIClient;
 
+    private final EmbeddingClient embeddingClient;
+
+    private final JdbcTemplate jdbcTemplate;
+
     private final ObjectMapper objectMapper;
 
     private final Executor mediaExecutor;
@@ -102,6 +108,8 @@ public class VideoService {
         CategoryAliasService categoryAliasService,
         CategorisationService categorisationService,
         CategoryService categoryService,
+        EmbeddingClient embeddingClient,
+        JdbcTemplate jdbcTemplate,
         ObjectMapper objectMapper,
         OpenAIClient openAIClient,
         ProcessExecutor processExecutor,
@@ -119,6 +127,8 @@ public class VideoService {
         this.categoryAliasService = categoryAliasService;
         this.categorisationService = categorisationService;
         this.categoryService = categoryService;
+        this.embeddingClient = embeddingClient;
+        this.jdbcTemplate = jdbcTemplate;
         this.objectMapper = objectMapper;
         this.openAIClient = openAIClient;
         this.processExecutor = processExecutor;
@@ -366,6 +376,7 @@ public class VideoService {
         // Set the AI-generated title if not already present
         if (baseTranscript.getGeneratedTitle() == null && categorisationResult.generatedTitle() != null) {
             baseTranscript.setGeneratedTitle(categorisationResult.generatedTitle());
+            baseTranscriptRepository.save(baseTranscript);
         }
 
         // Determine the category and save it if it doesn't exist
@@ -386,6 +397,8 @@ public class VideoService {
             baseTranscript.setStructuredContent(structuredContent);
             baseTranscriptRepository.save(baseTranscript);
         }
+
+        generateAndStoreEmbeddingIfAbsent(baseTranscript, categoryName);
 
         // Resolve the alias, use the pre-existing one if it exists, saving the mapping to a category it doesn't exist
         String alias = resolveAlias(userId, category.getId(), categorisationResult.suggestedAlias());
@@ -521,6 +534,131 @@ public class VideoService {
                 LogSanitizer.sanitize(videoUrl), platform, videoId, e);
             throw e;
         }
+    }
+
+    private void generateAndStoreEmbeddingIfAbsent(BaseTranscriptEntity baseTranscript, String categoryName) {
+        try {
+            Boolean hasEmbedding = jdbcTemplate.queryForObject(
+                "SELECT EXISTS(SELECT 1 FROM base_transcripts WHERE id = ? AND embedding IS NOT NULL)",
+                Boolean.class,
+                baseTranscript.getId()
+            );
+            if (Boolean.TRUE.equals(hasEmbedding)) return;
+            generateAndStoreEmbedding(baseTranscript, categoryName);
+        } catch (Exception e) {
+            log.error("[embedding] failed base_transcript_id={}", baseTranscript.getId(), e);
+        }
+    }
+
+    private void generateAndStoreEmbedding(BaseTranscriptEntity baseTranscript, String categoryName) {
+        String input = buildEmbeddingInput(baseTranscript, categoryName);
+        float[] embedding = embeddingClient.embed(input);
+        String vectorStr = toVectorString(embedding);
+        jdbcTemplate.update(
+            "UPDATE base_transcripts SET embedding = ?::vector WHERE id = ?",
+            vectorStr, baseTranscript.getId()
+        );
+        log.info("[embedding] stored base_transcript_id={} dims={}", baseTranscript.getId(), embedding.length);
+    }
+
+    public CompletableFuture<int[]> backfillEmbeddings() {
+        return CompletableFuture.supplyAsync(() -> {
+            List<BaseTranscriptEntity> transcripts = baseTranscriptRepository.findAllByStructuredContentIsNotNull();
+            log.info("[embedding_backfill] starting count={}", transcripts.size());
+            int success = 0, failed = 0;
+            for (BaseTranscriptEntity transcript : transcripts) {
+                try {
+                    generateAndStoreEmbedding(transcript, resolveCategoryName(transcript));
+                    success++;
+                } catch (Exception e) {
+                    log.error("[embedding_backfill] failed base_transcript_id={}", transcript.getId(), e);
+                    failed++;
+                }
+            }
+            log.info("[embedding_backfill] done success={} failed={}", success, failed);
+            return new int[]{success, failed};
+        }, mediaExecutor);
+    }
+
+    public CompletableFuture<int[]> reextractAndReembedAll() {
+        return CompletableFuture.supplyAsync(() -> {
+            List<BaseTranscriptEntity> transcripts = baseTranscriptRepository.findAllByTranscriptIsNotNull();
+            log.info("[reextract] starting count={}", transcripts.size());
+            int success = 0, failed = 0;
+            for (BaseTranscriptEntity transcript : transcripts) {
+                try {
+                    String categoryName = resolveCategoryName(transcript);
+                    String structuredContent = openAIClient.extractStructuredContent(
+                        transcript.getTranscript(),
+                        transcript.getTitle(),
+                        categoryName,
+                        transcript.getDescription()
+                    );
+                    transcript.setStructuredContent(structuredContent);
+                    baseTranscriptRepository.save(transcript);
+                    generateAndStoreEmbedding(transcript, categoryName);
+                    success++;
+                } catch (Exception e) {
+                    log.error("[reextract] failed base_transcript_id={}", transcript.getId(), e);
+                    failed++;
+                }
+            }
+            log.info("[reextract] done success={} failed={}", success, failed);
+            return new int[]{success, failed};
+        }, mediaExecutor);
+    }
+
+    private String resolveCategoryName(BaseTranscriptEntity transcript) {
+        try {
+            return jdbcTemplate.queryForObject(
+                "SELECT c.name FROM categories c JOIN user_transcripts ut ON ut.category_id = c.id WHERE ut.base_transcript_id = ? LIMIT 1",
+                String.class,
+                transcript.getId()
+            );
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String buildEmbeddingInput(BaseTranscriptEntity entity, String categoryName) {
+        String title = entity.getGeneratedTitle() != null ? entity.getGeneratedTitle()
+            : (entity.getTitle() != null ? entity.getTitle() : "");
+        String desc = entity.getDescription() != null ? entity.getDescription() : "";
+        String content = entity.getStructuredContent() != null ? entity.getStructuredContent()
+            : (entity.getTranscript() != null ? entity.getTranscript() : "");
+        String transcript = entity.getTranscript() != null ? entity.getTranscript() : "";
+
+        StringBuilder searchDocument = new StringBuilder();
+        appendSearchField(searchDocument, "Title", title);
+        appendSearchField(searchDocument, "Original title", entity.getTitle());
+        appendSearchField(searchDocument, "Category", categoryName);
+        appendSearchField(searchDocument, "Creator", entity.getAccount());
+        appendSearchField(searchDocument, "Description", desc);
+        appendSearchField(searchDocument, "Structured metadata, tags, topics, entities and key points", content);
+        appendSearchField(searchDocument, "Transcript excerpt", truncate(transcript, 2500));
+
+        String combined = searchDocument.toString();
+        return combined.length() > 6000 ? combined.substring(0, 6000) : combined;
+    }
+
+    private static void appendSearchField(StringBuilder builder, String label, String value) {
+        if (value == null || value.isBlank()) return;
+        builder.append(label).append(": ").append(value.trim()).append('\n');
+    }
+
+    private static String truncate(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) return value;
+        return value.substring(0, maxLength);
+    }
+
+    private static String toVectorString(float[] embedding) {
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < embedding.length; i++) {
+            if (i > 0) sb.append(',');
+            sb.append(embedding[i]);
+        }
+        sb.append(']');
+        return sb.toString();
     }
 
     private boolean isFfmpegLocationValid() {

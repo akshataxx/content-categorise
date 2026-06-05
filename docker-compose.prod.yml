@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   postgres:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg15
     container_name: content-postgres
     restart: unless-stopped
     environment:
@@ -20,7 +20,7 @@ services:
       - app-network
 
   app:
-    image: gcr.io/content-categorisation/content-app:latest
+    image: ${APP_IMAGE:-gcr.io/content-categorisation/content-app:latest}
     container_name: content-app
     restart: unless-stopped
     depends_on:
@@ -37,6 +37,7 @@ services:
       # Pass through environment variables from .env file
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       JWT_SECRET: ${JWT_SECRET}
+      ADMIN_SECRET: ${ADMIN_SECRET:?ADMIN_SECRET must be set in .env}
       JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-604800000}
       JWT_REFRESH_EXPIRATION_MS: ${JWT_REFRESH_EXPIRATION_MS:-864000000}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
@@ -64,15 +65,16 @@ services:
       - app-network
 
   # Caddy reverse proxy for HTTPS
-  # Uses sslip.io for free SSL - your URL will be https://<your-ip>.sslip.io
-  # Example: https://34-151-189-90.sslip.io
-  # Replace dots in your IP with dashes!
+  # Uses sslip.io for free SSL - your URL can be https://<your-ip>.sslip.io
+  # Set DOMAIN in .env, replacing dots in your IP with dashes.
   caddy:
     image: caddy:2-alpine
     container_name: caddy
     restart: unless-stopped
     depends_on:
       - app
+    environment:
+      DOMAIN: ${DOMAIN}
     ports:
       - "80:80"
       - "443:443"

@@ -40,6 +40,10 @@ public class CategoryService {
         return categoryRepository.save(new CategoryEntity(name, description, createdBy));
     }
 
+    public void seedCategory(String name, String description) {
+        categoryRepository.insertIfNotExists(name, description);
+    }
+
     // Save a category if it doesn't exist, otherwise return the existing one. Uniqueness is determined by name
     public CategoryEntity saveIfNotExists(String name, String description, UUID createdBy) {
         Optional<CategoryEntity> existingCategory = categoryRepository.findByName(name);

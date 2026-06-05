@@ -2,6 +2,8 @@ package com.app.categorise.domain.service;
 
 import com.app.categorise.application.mapper.VideoMapper;
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
+import com.app.categorise.data.client.openai.EmbeddingClient;
+import com.app.categorise.data.client.openai.OpenAIClient;
 import com.app.categorise.data.entity.BaseTranscriptEntity;
 import com.app.categorise.data.entity.CategoryEntity;
 import com.app.categorise.data.entity.UserSubcategoryEntity;
@@ -42,6 +44,12 @@ class TranscriptServiceTest {
 
     @Mock
     private VideoMapper videoMapper;
+
+    @Mock
+    private EmbeddingClient embeddingClient;
+
+    @Mock
+    private OpenAIClient openAIClient;
 
     @InjectMocks
     private TranscriptService transcriptService;
@@ -127,6 +135,53 @@ class TranscriptServiceTest {
             // Assert
             assertTrue(result.isEmpty());
             verify(userTranscriptRepository, never()).findByIdAndUserId(any(), any());
+        }
+    }
+
+    @Nested
+    @DisplayName("Semantic Search")
+    class SemanticSearchTests {
+
+        @Test
+        @DisplayName("Searches original and expanded query then deduplicates results")
+        void semanticSearch_UsesOriginalAndExpandedQuery_DeduplicatesResults() {
+            UserTranscriptEntity first = createMockUserTranscriptEntity(userTranscriptId1);
+            first.getBaseTranscript().setDuration(60.0);
+            first.getBaseTranscript().setUploadedAt(Instant.ofEpochSecond(1700000000L));
+            UserTranscriptEntity second = createMockUserTranscriptEntity(userTranscriptId2);
+            second.getBaseTranscript().setDuration(60.0);
+            second.getBaseTranscript().setUploadedAt(Instant.ofEpochSecond(1700000000L));
+
+            float[] originalEmbedding = new float[]{0.1f, 0.2f};
+            float[] expandedEmbedding = new float[]{0.3f, 0.4f};
+            when(embeddingClient.embed("breakfast")).thenReturn(originalEmbedding);
+            when(openAIClient.expandSearchQuery("breakfast")).thenReturn("healthy quick breakfast recipe ideas");
+            when(embeddingClient.embed("healthy quick breakfast recipe ideas")).thenReturn(expandedEmbedding);
+            when(userTranscriptRepository.searchByEmbedding(userId, originalEmbedding, "breakfast", 25, null))
+                .thenReturn(List.of(first));
+            when(userTranscriptRepository.searchByEmbedding(userId, expandedEmbedding, "breakfast", 25, null))
+                .thenReturn(List.of(first, second));
+
+            TranscriptDtoWithAliases firstDto = mock(TranscriptDtoWithAliases.class);
+            TranscriptDtoWithAliases secondDto = mock(TranscriptDtoWithAliases.class);
+            when(videoMapper.buildResponse(first.getBaseTranscript(), first)).thenReturn(firstDto);
+            when(videoMapper.buildResponse(second.getBaseTranscript(), second)).thenReturn(secondDto);
+
+            List<TranscriptDtoWithAliases> results = transcriptService.semanticSearch(userId, " breakfast ", 10, null);
+
+            assertEquals(List.of(firstDto, secondDto), results);
+            verify(userTranscriptRepository).searchByEmbedding(userId, originalEmbedding, "breakfast", 25, null);
+            verify(userTranscriptRepository).searchByEmbedding(userId, expandedEmbedding, "breakfast", 25, null);
+        }
+
+        @Test
+        @DisplayName("Returns empty result for blank query")
+        void semanticSearch_WithBlankQuery_ReturnsEmpty() {
+            List<TranscriptDtoWithAliases> results = transcriptService.semanticSearch(userId, "   ", 10, null);
+
+            assertTrue(results.isEmpty());
+            verifyNoInteractions(embeddingClient, openAIClient);
+            verify(userTranscriptRepository, never()).searchByEmbedding(any(), any(), any(), anyInt(), any());
         }
     }
 
@@ -402,10 +457,7 @@ class TranscriptServiceTest {
         baseTranscript.setDescription("Test Description");
         baseTranscript.setCreatedAt(Instant.now());
         
-        // Create mock category
-        CategoryEntity category = new CategoryEntity();
-        category.setId(categoryId);
-        category.setName("Test Category");
+        CategoryEntity category = createCategory(categoryId, "Test Category");
         
         entity.setBaseTranscript(baseTranscript);
         entity.setCategory(category);
@@ -416,9 +468,7 @@ class TranscriptServiceTest {
     }
 
     private UserSubcategoryEntity createSubcategory(UUID id, UUID parentId, UUID ownerId) {
-        CategoryEntity parent = new CategoryEntity();
-        parent.setId(parentId);
-        parent.setName("Parent Category");
+        CategoryEntity parent = createCategory(parentId, "Parent Category");
 
         UserSubcategoryEntity subcategory = new UserSubcategoryEntity();
         subcategory.setId(id);
@@ -427,5 +477,21 @@ class TranscriptServiceTest {
         subcategory.setName("Subcategory");
         subcategory.setCreatedAt(Instant.now());
         return subcategory;
+    }
+
+    private CategoryEntity createCategory(UUID id, String name) {
+        CategoryEntity category = new CategoryEntity(name, "Test description");
+        setCategoryId(category, id);
+        return category;
+    }
+
+    private void setCategoryId(CategoryEntity category, UUID id) {
+        try {
+            var idField = CategoryEntity.class.getDeclaredField("id");
+            idField.setAccessible(true);
+            idField.set(category, id);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Could not set category id for test", e);
+        }
     }
 }

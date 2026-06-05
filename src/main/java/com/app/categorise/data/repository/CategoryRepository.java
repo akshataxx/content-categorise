@@ -2,8 +2,10 @@ package com.app.categorise.data.repository;
 
 import com.app.categorise.data.entity.CategoryEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -15,4 +17,9 @@ public interface CategoryRepository extends JpaRepository<CategoryEntity, UUID> 
 
     @Query("SELECT c FROM CategoryEntity c WHERE c.createdBy IS NULL")
     List<CategoryEntity> findAllByCreatedByIsNull();
+
+    @Modifying
+    @Transactional
+    @Query(value = "INSERT INTO category (id, name, description, created_by) VALUES (gen_random_uuid(), :name, :description, null) ON CONFLICT (name) DO NOTHING", nativeQuery = true)
+    void insertIfNotExists(String name, String description);
 }

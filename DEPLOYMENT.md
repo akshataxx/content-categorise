@@ -72,7 +72,7 @@ Press `Ctrl+C` once you see "Started ContentApplication"
 ### Step 5: Test from Outside
 
 ```bash
-curl https://149-28-175-245.sslip.io/actuator/health
+curl https://149-28-175-245.duckdns.org/actuator/health
 ```
 
 ---
@@ -159,14 +159,14 @@ docker-compose -f docker-compose.prod.yml up -d
 
 Key variables:
 
-| Variable | Description |
-|----------|-------------|
-| `DOMAIN` | sslip.io domain — must match VM IP with dashes: `149-28-175-245.sslip.io` |
-| `APP_IMAGE` | Docker image — `ghcr.io/akshataxx/content-app:latest` |
-| `POSTGRES_PASSWORD` | Database password |
-| `JWT_SECRET` | JWT signing secret |
-| `OPENAI_API_KEY` | OpenAI API key |
-| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
+| Variable | Description                                                                  |
+|----------|------------------------------------------------------------------------------|
+| `DOMAIN` | sslip.io domain — must match VM IP with dashes: `149-28-175-245.duckdns.org` |
+| `APP_IMAGE` | Docker image — `ghcr.io/akshataxx/content-app:latest`                        |
+| `POSTGRES_PASSWORD` | Database password                                                            |
+| `JWT_SECRET` | JWT signing secret                                                           |
+| `OPENAI_API_KEY` | OpenAI API key                                                               |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID                                                       |
 
 ---
 

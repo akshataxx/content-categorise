@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep *)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(find * | head *)",
+      "Bash(head *)",
+      "Bash(curl:*)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Grep",
+      "Glob",
+      "Read",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(git *)",
+      "Bash(xargs ls *)",
+      "mcp__plugin_claude-mem_mcp-search__smart_outline"
+    ]
+  }
+}

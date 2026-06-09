@@ -5,18 +5,18 @@ import com.app.categorise.api.dto.auth.JwtAuthResponse;
 import com.app.categorise.data.entity.UserEntity;
 import com.app.categorise.data.repository.UserRepository;
 import com.app.categorise.security.jwt.JwtTokenProvider;
-import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSVerifier;
 import com.nimbusds.jose.crypto.RSASSAVerifier;
 import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.SignedJWT;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.text.ParseException;
 import java.time.Instant;
 import java.util.Date;
 import java.util.List;
@@ -24,6 +24,8 @@ import java.util.Optional;
 
 @Service
 public class AppleAuthService {
+
+    private static final Logger log = LoggerFactory.getLogger(AppleAuthService.class);
 
     @Autowired
     private UserRepository userRepository;
@@ -40,7 +42,7 @@ public class AppleAuthService {
     @org.springframework.beans.factory.annotation.Value("${app.jwtRefreshExpirationInMs}")
     private long jwtRefreshExpirationInMs;
 
-    @org.springframework.beans.factory.annotation.Value("${apple.sign-in.audience:${apple.app-store.bundle-id:}}")
+    @org.springframework.beans.factory.annotation.Value("${apple.app-store.bundle-id}")
     private String appleSignInAudience;
 
     private static final String APPLE_PUBLIC_KEYS_URL = "https://appleid.apple.com/auth/keys";
@@ -95,6 +97,7 @@ public class AppleAuthService {
                 || appleSignInAudience.isBlank()
                 || audiences == null
                 || !audiences.contains(appleSignInAudience)) {
+            log.warn("Audience mismatch — token audiences={}, expected='{}'", audiences, appleSignInAudience);
             throw new SecurityException("Invalid token audience");
         }
 
@@ -157,7 +160,7 @@ public class AppleAuthService {
             // Find the matching public key
             JWK jwk = jwkSet.getKeyByKeyId(keyId);
             if (jwk == null) {
-                System.err.println("No matching key found for keyId: " + keyId);
+                log.error("No matching Apple public key for keyId: {}", keyId);
                 return false;
             }
 
@@ -169,8 +172,7 @@ public class AppleAuthService {
             return signedJWT.verify(verifier);
 
         } catch (Exception e) {
-            System.err.println("Error verifying Apple token: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Error verifying Apple token", e);
             return false;
         }
     }

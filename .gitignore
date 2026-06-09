@@ -54,3 +54,6 @@ logs/
 .metals/
 
 .app/*
+
+# Claude Code
+.claude/

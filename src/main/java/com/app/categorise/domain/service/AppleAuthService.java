@@ -19,6 +19,7 @@ import org.springframework.web.client.RestTemplate;
 import java.text.ParseException;
 import java.time.Instant;
 import java.util.Date;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -39,6 +40,9 @@ public class AppleAuthService {
     @org.springframework.beans.factory.annotation.Value("${app.jwtRefreshExpirationInMs}")
     private long jwtRefreshExpirationInMs;
 
+    @org.springframework.beans.factory.annotation.Value("${apple.sign-in.audience:${apple.app-store.bundle-id:}}")
+    private String appleSignInAudience;
+
     private static final String APPLE_PUBLIC_KEYS_URL = "https://appleid.apple.com/auth/keys";
     private static final String APPLE_ISSUER = "https://appleid.apple.com";
 
@@ -58,10 +62,24 @@ public class AppleAuthService {
             throw new SecurityException("Invalid Apple token signature");
         }
 
-        // 3. Verify token claims
+        return authenticateVerifiedAppleToken(request, signedJWT);
+    }
+
+    JwtAuthResponse authenticateVerifiedAppleToken(AppleAuthRequest request, SignedJWT signedJWT) throws Exception {
         String appleUserId = signedJWT.getJWTClaimsSet().getSubject();
         String issuer = signedJWT.getJWTClaimsSet().getIssuer();
         Date expirationTime = signedJWT.getJWTClaimsSet().getExpirationTime();
+        List<String> audiences = signedJWT.getJWTClaimsSet().getAudience();
+
+        if (appleUserId == null || appleUserId.isBlank()) {
+            throw new SecurityException("Missing Apple user identifier");
+        }
+
+        if (request.getUserIdentifier() == null
+                || request.getUserIdentifier().isBlank()
+                || !appleUserId.equals(request.getUserIdentifier())) {
+            throw new SecurityException("Apple user identifier mismatch");
+        }
 
         // Verify issuer
         if (!APPLE_ISSUER.equals(issuer)) {
@@ -69,15 +87,20 @@ public class AppleAuthService {
         }
 
         // Verify expiration
-        if (expirationTime.before(new Date())) {
+        if (expirationTime == null || expirationTime.before(new Date())) {
             throw new SecurityException("Token has expired");
         }
 
-        // 4. Get email from token (if available) or from request
-        String email = (String) signedJWT.getJWTClaimsSet().getClaim("email");
-        if (email == null || email.isEmpty()) {
-            email = request.getEmail();
+        if (appleSignInAudience == null
+                || appleSignInAudience.isBlank()
+                || audiences == null
+                || !audiences.contains(appleSignInAudience)) {
+            throw new SecurityException("Invalid token audience");
         }
+
+        // Use only verified token claims for account lookup/linking. The request
+        // email is client-controlled and must never be used to attach Apple IDs.
+        String email = normalizeEmail((String) signedJWT.getJWTClaimsSet().getClaim("email"));
 
         // 5. Find or create user
         UserEntity user = findOrCreateAppleUser(
@@ -109,6 +132,13 @@ public class AppleAuthService {
         );
 
         return new JwtAuthResponse(accessToken, refreshToken);
+    }
+
+    private String normalizeEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return null;
+        }
+        return email.trim();
     }
 
     /**

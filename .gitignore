@@ -33,7 +33,9 @@ build/
 
 # Local environment files
 .env
+.env.*
 !.env.example
+!.env.*.example
 
 # Google Play service account credentials
 config/google-play-service-account.json
@@ -50,3 +52,5 @@ logs/
 *.log.*
 
 .metals/
+
+.app/*

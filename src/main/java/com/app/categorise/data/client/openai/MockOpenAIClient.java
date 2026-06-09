@@ -1,13 +1,13 @@
 package com.app.categorise.data.client.openai;
 
 import com.app.categorise.data.dto.TranscriptCategorisationResult;
-import org.springframework.context.annotation.Profile;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 @Component
-@Profile("disabled")
+@ConditionalOnProperty(name = "app.openai.mode", havingValue = "mock")
 public class MockOpenAIClient implements OpenAIClient {
 
     @Override

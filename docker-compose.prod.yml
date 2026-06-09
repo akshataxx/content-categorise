@@ -46,11 +46,19 @@ services:
       GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_PATH: ${GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_PATH}
       GOOGLE_PLAY_PACKAGE_NAME: ${GOOGLE_PLAY_PACKAGE_NAME}
       GOOGLE_PLAY_PRODUCT_ID_MONTHLY: ${GOOGLE_PLAY_PRODUCT_ID_MONTHLY}
+      # Apple App Store Billing
+      APPLE_ENVIRONMENT: ${APPLE_ENVIRONMENT:-production}
+      APPLE_BUNDLE_ID: ${APPLE_BUNDLE_ID}
+      APPLE_ISSUER_ID: ${APPLE_ISSUER_ID}
+      APPLE_KEY_ID: ${APPLE_KEY_ID}
+      APPLE_PRIVATE_KEY_PATH: ${APPLE_PRIVATE_KEY_PATH}
+      APPLE_MONTHLY_PRODUCT_ID: ${APPLE_MONTHLY_PRODUCT_ID}
       # Push notifications
       FIREBASE_ENABLED: ${FIREBASE_ENABLED:-false}
       FIREBASE_SERVICE_ACCOUNT_PATH: /app/secrets/firebase-service-account.json
     volumes:
       - ${FIREBASE_SERVICE_ACCOUNT_HOST_PATH:-/dev/null}:/app/secrets/firebase-service-account.json:ro
+      - ${APPLE_PRIVATE_KEY_HOST_PATH:-/dev/null}:${APPLE_PRIVATE_KEY_PATH:-/app/secrets/apple-app-store-key.p8}:ro
     # App only exposed internally to Caddy reverse proxy
     expose:
       - "8081"

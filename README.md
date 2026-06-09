@@ -80,9 +80,11 @@ This project uses [Springdoc OpenAPI](https://springdoc.org/) to auto-generate A
 - Swagger UI: [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
 - OpenAPI JSON: [http://localhost:8080/v3/api-docs](http://localhost:8080/v3/api-docs)
 
-## 🧩 Development Mode (Mocking OpenAI API)
+## 🧩 Development Mode
 
 ```properties
-spring.profiles.active=dev   # ➜ enables mock client (returns dummy responses)
-spring.profiles.active=prod  # ➜ uses actual OpenAI API
+spring.profiles.active=dev   # ➜ local defaults, Apple xcode-testing
+app.openai.mode=real         # ➜ uses actual OpenAI/Whisper APIs
+app.openai.mode=mock         # ➜ uses mock clients
+spring.profiles.active=prod  # ➜ production defaults
 ```

@@ -167,7 +167,9 @@ public class TranscriptController {
     ) {
         UUID userId = requireUser(authentication);
         int clampedLimit = Math.min(Math.max(limit, 1), 100);
+        logger.info("Searching transcripts for user {} with query \"{}\" (categoryId: {})", userId, q, categoryId);
         List<TranscriptDtoWithAliases> results = transcriptService.semanticSearch(userId, q, clampedLimit, categoryId);
+        logger.info("Search query \"{}\" returned {} result(s)", q, results.size());
         return ResponseEntity.ok(results);
     }
 

@@ -10,7 +10,7 @@ Internet (HTTPS:443) → Caddy → App (8081) → Postgres
 ```
 
 - **URL:** `https://scoopbackend.duckdns.org`
-- Uses **duckdns.org** for free DNS (maps ` scoopbackend.duckdns.org` → `149.28.175.245`)
+- Uses **duckdns.org** for free DNS (maps ` scoopbackend.duckdns.org` → `149.28.175.245``)
 - **Caddy** handles HTTPS termination with auto-renewing Let's Encrypt certificates
 - **Container image:** `ghcr.io/akshataxx/content-app:latest` (GitHub Container Registry)
 
@@ -33,6 +33,8 @@ All deployment files live in `~/content-backend/` on the VM:
 
 ```bash
 ssh root@149.28.175.245
+ssh root@45.76.127.112
+
 ```
 
 ---
@@ -50,7 +52,7 @@ docker buildx build --platform linux/amd64 -t ghcr.io/akshataxx/content-app:late
 ### Step 2: SSH into the VM
 
 ```bash
-ssh root@149.28.175.245
+ssh root@45.76.127.112
 ```
 
 ### Step 3: Pull Latest Image and Restart App
@@ -72,7 +74,7 @@ Press `Ctrl+C` once you see "Started ContentApplication"
 ### Step 5: Test from Outside
 
 ```bash
-curl https://149-28-175-245.duckdns.org/actuator/health
+curl https://45-76-127-112.duckdns.org/actuator/health
 ```
 
 ---
@@ -147,7 +149,7 @@ To update environment variables:
 
 ```bash
 # SSH into VM
-ssh root@149.28.175.245
+ssh root@45.76.127.112
 
 # Edit .env file
 nano ~/.env
@@ -217,11 +219,11 @@ docker-compose -f docker-compose.prod.yml up -d
 
 ## VM Details
 
-| Setting | Value |
-|---------|-------|
-| Provider | DigitalOcean |
-| Hostname | content-backend-vm |
-| External IP | `149.28.175.245` |
-| HTTPS URL | `https://149-28-175-245.sslip.io` |
+| Setting | Value                                  |
+|---------|----------------------------------------|
+| Provider | Vultr                                  |
+| Hostname | backend-vm-small                       |
+| External IP | `45.76.127.112`                       |
+| HTTPS URL | `149-28-175-245.duckdns.org`      |
 | Container Registry | `ghcr.io/akshataxx/content-app:latest` |
-| Deployment Dir | `~/content-backend/` |
+| Deployment Dir | `~/content-backend/`                   |

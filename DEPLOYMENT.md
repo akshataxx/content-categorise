@@ -59,14 +59,14 @@ ssh root@45.76.127.112
 
 ```bash
 cd ~/content-backend
-docker-compose -f docker-compose.prod.yml pull app
-docker-compose -f docker-compose.prod.yml up -d app
+docker compose -f docker-compose.prod.yml pull app
+docker compose -f docker-compose.prod.yml up -d app
 ```
 
 ### Step 4: Verify Deployment
 
 ```bash
-docker-compose -f docker-compose.prod.yml logs -f app
+docker compose -f docker-compose.prod.yml logs -f app
 ```
 
 Press `Ctrl+C` once you see "Started ContentApplication"

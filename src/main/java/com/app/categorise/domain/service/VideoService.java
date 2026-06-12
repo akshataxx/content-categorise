@@ -93,6 +93,7 @@ public class VideoService {
 
     private final String ffmpegLocation;
     private final String ytDlpLocation;
+    private final String cookiesFile;
     private final int ytDlpTimeoutMinutes;
     private final int metadataTimeoutMinutes;
     private final int maxVideoDurationMinutes;
@@ -100,6 +101,7 @@ public class VideoService {
     public VideoService(
         @Value("${app.ffmpeg.location}") String ffmpegLocation,
         @Value("${app.ytdlp.location:}") String ytDlpLocation,
+        @Value("${app.ytdlp.cookies-file:}") String cookiesFile,
         @Value("${app.ytdlp.timeout-minutes}") int ytDlpTimeoutMinutes,
         @Value("${app.ytdlp.metadata-timeout-minutes:1}") int metadataTimeoutMinutes,
         @Value("${app.video.max-duration-minutes:10}") int maxVideoDurationMinutes,
@@ -119,6 +121,7 @@ public class VideoService {
     ){
         this.ffmpegLocation = ffmpegLocation;
         this.ytDlpLocation = (ytDlpLocation == null || ytDlpLocation.isBlank()) ? "yt-dlp" : ytDlpLocation;
+        this.cookiesFile = (cookiesFile == null || cookiesFile.isBlank()) ? null : cookiesFile;
         this.ytDlpTimeoutMinutes = ytDlpTimeoutMinutes;
         this.metadataTimeoutMinutes = metadataTimeoutMinutes;
         this.maxVideoDurationMinutes = maxVideoDurationMinutes;
@@ -159,6 +162,11 @@ public class VideoService {
         if (VideoPlatform.fromUrl(videoUrl) == VideoPlatform.TIKTOK) {
             command.add("--extractor-args");
             command.add("tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com");
+        }
+
+        if (cookiesFile != null && new File(cookiesFile).exists()) {
+            command.add("--cookies");
+            command.add(cookiesFile);
         }
 
         command.add("--");
@@ -229,6 +237,11 @@ public class VideoService {
             }
             command.add("--user-agent");
             command.add(USER_AGENT);
+
+            if (cookiesFile != null && new File(cookiesFile).exists()) {
+                command.add("--cookies");
+                command.add(cookiesFile);
+            }
 
             command.add("-f");
             command.add("worstaudio/worst");

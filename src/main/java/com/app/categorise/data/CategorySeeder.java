@@ -54,7 +54,8 @@ public class CategorySeeder implements CommandLineRunner {
             new CategoryEntity("Jewellery", "Bling"),
             new CategoryEntity("Cars", "Speeeed"),
             new CategoryEntity("AI", "The end is here"),
-            new CategoryEntity("Politics", "Tax the rich")
+            new CategoryEntity("Politics", "Tax the rich"),
+            new CategoryEntity("Places", "Lists of places to eat, visit, or explore in a city")
         );
 
         for (CategoryEntity c : categories) {

@@ -37,6 +37,8 @@ public class MockOpenAIClient implements OpenAIClient {
             return "{\"type\":\"recipe\",\"ingredients\":[\"2 cups flour\",\"1 egg\",\"1 cup milk\"],\"steps\":[\"Mix dry ingredients\",\"Add wet ingredients\",\"Bake at 350°F for 30 minutes\"]}";
         } else if (category != null && (category.equalsIgnoreCase("Skincare") || category.equalsIgnoreCase("Makeup"))) {
             return "{\"type\":\"beauty\",\"products\":[\"Cleanser - CeraVe\",\"Moisturizer - Cetaphil\",\"Sunscreen - La Roche-Posay\"],\"steps\":[\"Cleanse face\",\"Apply moisturizer\",\"Apply sunscreen\"]}";
+        } else if (category != null && category.equalsIgnoreCase("Places")) {
+            return "{\"type\":\"places\",\"city\":\"Sydney\",\"listType\":\"restaurants\",\"budget\":\"mid-range\",\"cuisine\":\"mixed\",\"tags\":[\"local favourite\",\"brunch\"],\"places\":[{\"name\":\"Mock Cafe\",\"type\":\"cafe\",\"description\":\"A cosy spot with great coffee\",\"address\":\"Surry Hills\"}]}";
         } else {
             return "{\"type\":\"general\",\"keyPoints\":[\"Main topic discussed in video\",\"Key takeaway number one\",\"Important tip mentioned\",\"Final conclusion\"]}";
         }

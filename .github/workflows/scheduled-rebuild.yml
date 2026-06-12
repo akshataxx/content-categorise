@@ -10,7 +10,11 @@ on:
   workflow_dispatch: # Allow manual trigger (always rebuilds)
 
 env:
-  IMAGE: gcr.io/content-categorisation/content-app
+  IMAGE: ghcr.io/${{ github.repository_owner }}/content-app
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   check-and-update:
@@ -26,34 +30,25 @@ jobs:
           echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
           echo "Latest yt-dlp on PyPI: $LATEST"
 
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v3
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-
-      - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v3
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check if this yt-dlp version is already deployed
         id: should_update
         run: |
           YTDLP_VERSION="${{ steps.version_check.outputs.latest }}"
-
-          EXISTING=$(gcloud container images list-tags ${{ env.IMAGE }} \
-            --filter="tags~^ytdlp-${YTDLP_VERSION}$" \
-            --format=json 2>/dev/null) || true
-
-          if [ "$EXISTING" = "[]" ] || [ -z "$EXISTING" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "update=true" >> "$GITHUB_OUTPUT"
-            echo "No image found for yt-dlp $YTDLP_VERSION or manual trigger — will update"
-          else
+          if docker manifest inspect ${{ env.IMAGE }}:ytdlp-${YTDLP_VERSION} > /dev/null 2>&1 \
+             && [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
             echo "update=false" >> "$GITHUB_OUTPUT"
             echo "Image for yt-dlp $YTDLP_VERSION already exists — skipping"
+          else
+            echo "update=true" >> "$GITHUB_OUTPUT"
+            echo "No image found for yt-dlp $YTDLP_VERSION or manual trigger — will update"
           fi
-
-      - name: Configure Docker for GCR
-        if: steps.should_update.outputs.update == 'true'
-        run: gcloud auth configure-docker --quiet
 
       - name: Pull currently deployed image
         if: steps.should_update.outputs.update == 'true'
@@ -92,24 +87,14 @@ jobs:
           docker push ${{ env.IMAGE }}:latest
           docker push ${{ env.IMAGE }}:ytdlp-${{ steps.version_check.outputs.latest }}
 
-      - name: Install NumPy for IAP tunnel performance
+      - name: Deploy to Vultr VM
         if: steps.should_update.outputs.update == 'true'
-        run: pip3 install numpy
-
-      - name: Create deploy script
-        if: steps.should_update.outputs.update == 'true'
-        run: |
-          cat > /tmp/deploy.sh <<'EOF'
-          docker pull gcr.io/content-categorisation/content-app:latest
-          docker compose -f docker-compose.prod.yml up -d app
-          EOF
-          chmod +x /tmp/deploy.sh
-
-      - name: Deploy to GCE
-        if: steps.should_update.outputs.update == 'true'
-        uses: google-github-actions/ssh-compute@v2
+        uses: appleboy/ssh-action@v1
         with:
-          instance_name: content-backend-vm
-          zone: australia-southeast1-b
-          ssh_private_key: ${{ secrets.GCE_SSH_PRIVATE_KEY }}
-          script: /tmp/deploy.sh
+          host: ${{ secrets.VULTR_SSH_HOST }}
+          username: ${{ secrets.VULTR_SSH_USER }}
+          key: ${{ secrets.VULTR_SSH_PRIVATE_KEY }}
+          script: |
+            docker pull ghcr.io/${{ github.repository_owner }}/content-app:latest
+            cd /root/content-backend
+            docker compose -f docker-compose.prod.yml up -d app

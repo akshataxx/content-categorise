@@ -5,7 +5,9 @@ import com.app.categorise.application.mapper.VideoMapper;
 import com.app.categorise.data.client.whisper.WhisperClient;
 import com.app.categorise.data.dto.VideoMetadata;
 import com.app.categorise.data.dto.TranscriptCategorisationResult;
+import com.app.categorise.data.client.openai.EmbeddingClient;
 import com.app.categorise.data.client.openai.OpenAIClient;
+import org.springframework.jdbc.core.JdbcTemplate;
 import com.app.categorise.data.entity.BaseTranscriptEntity;
 import com.app.categorise.data.entity.CategoryEntity;
 import com.app.categorise.data.entity.UserTranscriptEntity;
@@ -47,6 +49,8 @@ class VideoServiceTest {
     @Mock private BaseTranscriptRepository baseTranscriptRepository;
     @Mock private UserTranscriptRepository userTranscriptRepository;
     @Mock private OpenAIClient openAIClient;
+    @Mock private EmbeddingClient embeddingClient;
+    @Mock private JdbcTemplate jdbcTemplate;
 
     private TestProcessExecutor testProcessExecutor;
     private VideoService videoService;
@@ -85,6 +89,7 @@ class VideoServiceTest {
         videoService = new VideoService(
                 "/usr/bin/ffmpeg",
                 "", // ytDlpLocation: blank → fallback to "yt-dlp"
+                "", // cookiesFile: blank → no cookies
                 4,
                 1,
                 10, // maxVideoDurationMinutes
@@ -93,6 +98,8 @@ class VideoServiceTest {
                 categoryAliasService,
                 categorisationService,
                 categoryService,
+                embeddingClient,
+                jdbcTemplate,
                 new ObjectMapper(),
                 openAIClient,
                 testProcessExecutor,
@@ -162,10 +169,10 @@ class VideoServiceTest {
         @DisplayName("Uses configured yt-dlp location when set")
         void fetchMetadata_usesConfiguredYtDlpLocation() {
             VideoService configuredService = new VideoService(
-                "/usr/bin/ffmpeg", "/custom/path/yt-dlp", 4, 1, 10, Runnable::run,
+                "/usr/bin/ffmpeg", "/custom/path/yt-dlp", "", 4, 1, 10, Runnable::run,
                 baseTranscriptRepository, categoryAliasService, categorisationService,
-                categoryService, new ObjectMapper(), openAIClient, testProcessExecutor,
-                userTranscriptRepository, videoMapper, whisperClient
+                categoryService, embeddingClient, jdbcTemplate, new ObjectMapper(),
+                openAIClient, testProcessExecutor, userTranscriptRepository, videoMapper, whisperClient
             );
             testProcessExecutor.setOutput(SAMPLE_YTDLP_JSON);
 

@@ -4,11 +4,17 @@ import com.app.categorise.data.entity.DeviceEntity;
 import com.app.categorise.data.repository.DeviceRepository;
 import com.app.categorise.domain.service.NotificationService;
 import com.google.firebase.FirebaseApp;
-import com.google.firebase.messaging.*;
+import com.google.firebase.messaging.AndroidConfig;
+import com.google.firebase.messaging.ApnsConfig;
+import com.google.firebase.messaging.Aps;
+import com.google.firebase.messaging.FirebaseMessaging;
+import com.google.firebase.messaging.FirebaseMessagingException;
+import com.google.firebase.messaging.Message;
+import com.google.firebase.messaging.Notification;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.util.*;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * FCM push notification implementation.

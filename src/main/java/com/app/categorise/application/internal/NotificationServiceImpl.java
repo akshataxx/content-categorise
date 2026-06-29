@@ -12,7 +12,7 @@ import java.util.List;
 
 /**
  * FCM push notification implementation.
- * Sends silent notifications when transcription jobs complete.
+ * Sends a visible notification when transcription jobs complete.
  * Sends visible notifications when jobs fail.
  * Marks devices inactive when FCM reports invalid tokens.
  *
@@ -24,6 +24,11 @@ public class NotificationServiceImpl implements NotificationService {
 
     private final DeviceRepository deviceRepository;
 
+    /** Canonical notification type strings — must match the iOS NotificationType enum. */
+    static final String TYPE_TRANSCRIPT_COMPLETE = "TRANSCRIPT_COMPLETE";
+    static final String TYPE_TRANSCRIPT_FAILED = "TRANSCRIPT_FAILED";
+    private static final String DEFAULT_TITLE = "your video";
+
     public NotificationServiceImpl(DeviceRepository deviceRepository) {
         this.deviceRepository = deviceRepository;
     }
@@ -34,8 +39,8 @@ public class NotificationServiceImpl implements NotificationService {
             log.debug("Firebase not initialized, skipping notification for job {}", jobId);
             return;
         }
-        // Send silent notification immediately - iOS handles badge management
-        sendSilentNotification(userId, jobId, transcriptId);
+        // Single VISIBLE push carrying data so the user is informed AND the UI can deep-link/refresh.
+        sendCompletionNotification(userId, jobId, transcriptId, title);
     }
 
     @Override
@@ -48,26 +53,29 @@ public class NotificationServiceImpl implements NotificationService {
         sendFailedNotification(userId, jobId, errorMessage != null ? errorMessage : "Unknown error");
     }
 
-    private void sendSilentNotification(UUID userId, UUID jobId, UUID transcriptId) {
+    private void sendCompletionNotification(UUID userId, UUID jobId, UUID transcriptId, String title) {
         List<DeviceEntity> devices = deviceRepository.findByUserIdAndActiveTrue(userId);
         if (devices.isEmpty()) {
             log.debug("No active devices for user {}, skipping notification", userId);
             return;
         }
-        // Send SILENT notification - iOS will manage badge count locally
-        // No visible notification (no title/body), only background data delivery
+
+        String safeTitle = (title != null && !title.isBlank()) ? title : DEFAULT_TITLE;
+        String body = "\"" + safeTitle + "\" is ready to view";
+
+        // SINGLE visible push: notification block (user-facing) + data (deep-link / UI refresh).
         for (DeviceEntity device : devices) {
             Message message = Message.builder()
                     .setToken(device.getFcmToken())
-                    // NO .setNotification() - this makes it a silent notification
-                    .putData("type", "TRANSCRIPT_COMPLETE")
+                    .setNotification(Notification.builder()
+                            .setTitle("Transcript ready")
+                            .setBody(body)
+                            .build())
+                    .putData("type", TYPE_TRANSCRIPT_COMPLETE)
                     .putData("jobId", jobId.toString())
                     .putData("transcriptId", transcriptId.toString())
-                    .putData("silent", "true")
                     .setApnsConfig(ApnsConfig.builder()
-                            .setAps(Aps.builder()
-                                    .setContentAvailable(true)  // Wakes app in background
-                                    .build())
+                            .setAps(Aps.builder().setSound("default").build())
                             .build())
                     .setAndroidConfig(AndroidConfig.builder()
                             .setPriority(AndroidConfig.Priority.HIGH)
@@ -93,7 +101,7 @@ public class NotificationServiceImpl implements NotificationService {
                             .setTitle("Transcription Failed")
                             .setBody(body)
                             .build())
-                    .putData("type", "TRANSCRIPT_FAILED")
+                    .putData("type", TYPE_TRANSCRIPT_FAILED)
                     .putData("jobId", jobId.toString())
                     .setApnsConfig(ApnsConfig.builder()
                             .setAps(Aps.builder().setSound("default").build())

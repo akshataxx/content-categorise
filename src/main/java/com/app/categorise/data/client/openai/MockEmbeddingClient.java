@@ -4,7 +4,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile("disabled")
+@Profile({"disabled", "test"})
 public class MockEmbeddingClient implements EmbeddingClient {
 
     @Override

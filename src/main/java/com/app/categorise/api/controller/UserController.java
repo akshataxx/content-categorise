@@ -6,6 +6,7 @@
     import org.springframework.http.HttpStatus;
     import org.springframework.http.ResponseEntity;
     import org.springframework.security.core.annotation.AuthenticationPrincipal;
+    import org.springframework.web.bind.annotation.DeleteMapping;
     import org.springframework.web.bind.annotation.GetMapping;
     import org.springframework.web.bind.annotation.RequestMapping;
     import org.springframework.web.bind.annotation.RestController;
@@ -29,5 +30,16 @@
                 principal.getName(),
                 principal.getEmail()
             ));
+        }
+
+        /**
+         * Permanently delete the authenticated user's account and all associated
+         * data (App Store guideline 5.1.1(v)). This is irreversible.
+         */
+        @DeleteMapping
+        public ResponseEntity<Void> deleteCurrentUser(@AuthenticationPrincipal UserPrincipal principal) {
+            if (principal == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Not authenticated");
+            userService.deleteAccount(principal.getId());
+            return ResponseEntity.noContent().build();
         }
     }

@@ -2,9 +2,11 @@ package com.app.categorise.data.repository;
 
 import com.app.categorise.data.entity.UserTranscriptEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
 import java.util.List;
@@ -13,6 +15,14 @@ import java.util.UUID;
 
 @Repository
 public interface UserTranscriptRepository extends JpaRepository<UserTranscriptEntity, UUID>, CustomUserTranscriptRepository {
+
+    /**
+     * Delete all user-transcript associations belonging to a user (e.g. on
+     * account deletion). Does not delete shared base transcripts.
+     */
+    @Modifying
+    @Transactional
+    void deleteByUserId(UUID userId);
     
     /**
      * Find user transcript association by user ID and base transcript ID

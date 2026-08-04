@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 @Component
-@ConditionalOnProperty(name = "app.openai.mode", havingValue = "mock")
+@ConditionalOnProperty(name = "app.openai.mode", havingValue = "mock", matchIfMissing = true)
 public class MockOpenAIClient implements OpenAIClient {
 
     @Override

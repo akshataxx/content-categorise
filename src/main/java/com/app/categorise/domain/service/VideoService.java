@@ -214,6 +214,7 @@ public class VideoService {
      */
     public ProcessedVideoFiles downloadAudio(String videoUrl) throws Exception {
         validateYtDlpUrl(videoUrl);
+        VideoPlatform platform = VideoPlatform.fromUrl(videoUrl);
         Path tempDir = Files.createTempDirectory("media-" + UUID.randomUUID());
         long startMs = System.currentTimeMillis();
         try {
@@ -231,7 +232,7 @@ public class VideoService {
             }
 
             // TikTok-specific args for anti-bot measures (only needed for TikTok URLs)
-            if (VideoPlatform.fromUrl(videoUrl) == VideoPlatform.TIKTOK) {
+            if (platform == VideoPlatform.TIKTOK) {
                 command.add("--extractor-args");
                 command.add("tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com");
             }
@@ -244,7 +245,11 @@ public class VideoService {
             }
 
             command.add("-f");
-            command.add("worstaudio/worst");
+            // TikTok's bytevc1/H.265 renditions can be labelled as AAC but contain no
+            // audio stream. Prefer its combined H.264 rendition, verified with ffprobe.
+            command.add(platform == VideoPlatform.TIKTOK
+                ? "worst[vcodec^=h264][acodec!=none]"
+                : "worstaudio[acodec!=none]/worst[acodec!=none]");
             command.add("-x");
             command.add("--audio-format");
             command.add("mp3");

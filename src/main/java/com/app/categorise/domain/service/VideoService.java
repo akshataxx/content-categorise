@@ -244,7 +244,7 @@ public class VideoService {
             }
 
             command.add("-f");
-            command.add("worstaudio/worst");
+            command.add("worstaudio[acodec!=none]/worst[acodec!=none]");
             command.add("-x");
             command.add("--audio-format");
             command.add("mp3");

@@ -3,6 +3,7 @@ package com.app.categorise.domain.service;
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.application.mapper.VideoMapper;
 import com.app.categorise.data.client.whisper.WhisperClient;
+import com.app.categorise.data.client.openai.EmbeddingClient;
 import com.app.categorise.data.dto.VideoMetadata;
 import com.app.categorise.data.dto.TranscriptCategorisationResult;
 import com.app.categorise.data.client.openai.OpenAIClient;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.io.File;
 import java.time.Instant;
@@ -47,6 +49,8 @@ class VideoServiceTest {
     @Mock private BaseTranscriptRepository baseTranscriptRepository;
     @Mock private UserTranscriptRepository userTranscriptRepository;
     @Mock private OpenAIClient openAIClient;
+    @Mock private EmbeddingClient embeddingClient;
+    @Mock private JdbcTemplate jdbcTemplate;
 
     private TestProcessExecutor testProcessExecutor;
     private VideoService videoService;
@@ -85,6 +89,7 @@ class VideoServiceTest {
         videoService = new VideoService(
                 "/usr/bin/ffmpeg",
                 "", // ytDlpLocation: blank → fallback to "yt-dlp"
+                "", // cookiesFile
                 4,
                 1,
                 10, // maxVideoDurationMinutes
@@ -93,6 +98,8 @@ class VideoServiceTest {
                 categoryAliasService,
                 categorisationService,
                 categoryService,
+                embeddingClient,
+                jdbcTemplate,
                 new ObjectMapper(),
                 openAIClient,
                 testProcessExecutor,
@@ -162,9 +169,9 @@ class VideoServiceTest {
         @DisplayName("Uses configured yt-dlp location when set")
         void fetchMetadata_usesConfiguredYtDlpLocation() {
             VideoService configuredService = new VideoService(
-                "/usr/bin/ffmpeg", "/custom/path/yt-dlp", 4, 1, 10, Runnable::run,
+                "/usr/bin/ffmpeg", "/custom/path/yt-dlp", "", 4, 1, 10, Runnable::run,
                 baseTranscriptRepository, categoryAliasService, categorisationService,
-                categoryService, new ObjectMapper(), openAIClient, testProcessExecutor,
+                categoryService, embeddingClient, jdbcTemplate, new ObjectMapper(), openAIClient, testProcessExecutor,
                 userTranscriptRepository, videoMapper, whisperClient
             );
             testProcessExecutor.setOutput(SAMPLE_YTDLP_JSON);
@@ -359,6 +366,18 @@ class VideoServiceTest {
             // Verify -- separator before URL
             assertEquals("--", command[command.length - 2], "Second-to-last arg should be '--' separator");
             assertEquals(testUrl, command[command.length - 1], "Last arg should be the video URL");
+        }
+
+        @Test
+        @DisplayName("Prefers combined H.264 formats for TikTok audio extraction")
+        void downloadAudio_prefersH264FormatForTikTok() throws Exception {
+            String tiktokUrl = "https://www.tiktok.com/@creator/video/7670325080219471135";
+
+            videoService.downloadAudio(tiktokUrl);
+
+            List<String> command = Arrays.asList(testProcessExecutor.lastCommand());
+            assertTrue(command.contains("worst[vcodec^=h264][acodec!=none]"));
+            assertTrue(command.contains("tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com"));
         }
     }
 

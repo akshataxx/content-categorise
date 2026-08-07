@@ -39,7 +39,7 @@ public class AppleAppStoreConfiguration {
     /**
      * Monthly product ID
      */
-    private String monthlyProductId = "premium_monthly";
+    private String monthlyProductId = "scoop";
 
     /**
      * Get the App Store Server API base URL based on environment

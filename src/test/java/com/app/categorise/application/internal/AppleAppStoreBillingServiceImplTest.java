@@ -10,6 +10,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
 
+import java.lang.reflect.Field;
+
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
@@ -61,5 +63,24 @@ class AppleAppStoreBillingServiceImplTest {
                 new AppleAppStoreBillingServiceImpl(config, new ObjectMapper(), environment);
 
         assertDoesNotThrow(service::init);
+    }
+
+    @Test
+    void init_skipsAppleCredentialsWhenSubscriptionsAreDisabled() throws Exception {
+        config.setEnvironment("production");
+        config.setPrivateKeyPath("");
+
+        AppleAppStoreBillingServiceImpl service =
+                new AppleAppStoreBillingServiceImpl(config, new ObjectMapper(), environment);
+        setSubscriptionsEnabled(service, false);
+
+        assertDoesNotThrow(service::init);
+    }
+
+    private static void setSubscriptionsEnabled(AppleAppStoreBillingServiceImpl service, boolean enabled)
+            throws Exception {
+        Field field = AppleAppStoreBillingServiceImpl.class.getDeclaredField("subscriptionsEnabled");
+        field.setAccessible(true);
+        field.setBoolean(service, enabled);
     }
 }

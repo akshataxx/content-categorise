@@ -69,6 +69,8 @@ public class VideoService {
     private static final String USER_AGENT =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
+    private static final String TIKTOK_IMPERSONATION_TARGET = "Chrome-136:Macos-15";
+
     private final ProcessExecutor processExecutor;
 
     private final WhisperClient whisperClient;
@@ -156,13 +158,7 @@ public class VideoService {
         command.add("--dump-json");
         command.add("--no-download");
         command.add("--no-warnings");
-        command.add("--user-agent");
-        command.add(USER_AGENT);
-
-        if (VideoPlatform.fromUrl(videoUrl) == VideoPlatform.TIKTOK) {
-            command.add("--extractor-args");
-            command.add("tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com");
-        }
+        addPlatformRequestArguments(command, VideoPlatform.fromUrl(videoUrl));
 
         if (cookiesFile != null && new File(cookiesFile).exists()) {
             command.add("--cookies");
@@ -231,13 +227,7 @@ public class VideoService {
                 log.warn("FFmpeg location not configured or invalid; falling back to PATH resolution.");
             }
 
-            // TikTok-specific args for anti-bot measures (only needed for TikTok URLs)
-            if (platform == VideoPlatform.TIKTOK) {
-                command.add("--extractor-args");
-                command.add("tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com");
-            }
-            command.add("--user-agent");
-            command.add(USER_AGENT);
+            addPlatformRequestArguments(command, platform);
 
             if (cookiesFile != null && new File(cookiesFile).exists()) {
                 command.add("--cookies");
@@ -255,6 +245,10 @@ public class VideoService {
             command.add("mp3");
             command.add("--audio-quality");
             command.add("5");
+            if (platform == VideoPlatform.TIKTOK) {
+                // Keep metadata and audio in one authenticated/challenged yt-dlp process.
+                command.add("--write-info-json");
+            }
             command.add("-o");
             command.add(outputTemplate);
             command.add("--");
@@ -268,7 +262,10 @@ public class VideoService {
             log.info("[transcription] audio_downloaded size_kb={} elapsed_ms={}",
                 sizeKb, System.currentTimeMillis() - startMs);
 
-            return new ProcessedVideoFiles(audioFile, tempDir);
+            File metadataFile = platform == VideoPlatform.TIKTOK
+                ? new File(baseName + ".info.json")
+                : null;
+            return new ProcessedVideoFiles(audioFile, metadataFile, tempDir);
         } catch (Exception e) {
             deleteTempDirectory(tempDir);
             throw e;
@@ -277,6 +274,31 @@ public class VideoService {
 
     private void deleteTempDirectory(Path dir) {
         FileUtils.deleteRecursively(dir);
+    }
+
+    private VideoMetadata readDownloadedMetadata(File metadataFile, String videoUrl) {
+        try {
+            return objectMapper.readValue(metadataFile, VideoMetadata.class);
+        } catch (Exception e) {
+            log.error("[transcription] metadata_parse_failed url={} error={}",
+                LogSanitizer.sanitize(videoUrl), e.getMessage(), e);
+            throw new VideoProcessingException(USER_FACING_FETCH_ERROR, e);
+        }
+    }
+
+    private void addPlatformRequestArguments(List<String> command, VideoPlatform platform) {
+        if (platform == VideoPlatform.TIKTOK) {
+            // TikTok's challenge rejects the plain User-Agent header on some networks.
+            // curl-cffi (installed with yt-dlp) supplies a matching browser TLS fingerprint.
+            command.add("--impersonate");
+            command.add(TIKTOK_IMPERSONATION_TARGET);
+            command.add("--extractor-args");
+            command.add("tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com");
+            return;
+        }
+
+        command.add("--user-agent");
+        command.add(USER_AGENT);
     }
 
     // Transcribe audio using OpenAI Whisper API
@@ -304,14 +326,21 @@ public class VideoService {
     public CompletableFuture<TranscriptDtoWithAliases> processVideoAndCreateTranscript(String videoUrl, UUID userId) {
         return CompletableFuture.supplyAsync(() -> {
             try {
-                return _processVideoAndCreateTranscript(videoUrl, userId);
+                return processVideoAndCreateTranscriptSynchronously(videoUrl, userId);
             } catch (Exception e) {
                 throw new CompletionException(e);
             }
         }, mediaExecutor);
     }
 
-    private TranscriptDtoWithAliases _processVideoAndCreateTranscript(String videoUrl, UUID userId) throws Exception {
+    /**
+     * Runs the transcription pipeline on the caller's thread.
+     *
+     * Callers must use this only after they have already obtained a media worker.
+     * HTTP-facing callers should use {@link #processVideoAndCreateTranscript(String, UUID)}
+     * so the work is scheduled on the media executor exactly once.
+     */
+    public TranscriptDtoWithAliases processVideoAndCreateTranscriptSynchronously(String videoUrl, UUID userId) throws Exception {
         validateYtDlpUrl(videoUrl);
         long pipelineStartMs = System.currentTimeMillis();
         log.info("[transcription] starting url={} user={}", LogSanitizer.sanitize(videoUrl), userId);
@@ -327,6 +356,29 @@ public class VideoService {
                 baseTranscript.getId(), LogSanitizer.sanitize(baseTranscript.getVideoUrl()));
         } else {
             log.info("[transcription] cache_miss tier=1_url url={}", LogSanitizer.sanitize(videoUrl));
+            if (VideoPlatform.fromUrl(videoUrl) == VideoPlatform.TIKTOK) {
+                // TikTok challenges are session-sensitive. Download its audio and info JSON in
+                // one yt-dlp process instead of fetching metadata in a separate process first.
+                try (ProcessedVideoFiles files = downloadAudio(videoUrl)) {
+                    VideoMetadata metadata = readDownloadedMetadata(files.getMetadataFile(), videoUrl);
+                    VideoPlatform platform = metadata.getExtractor() != null
+                        ? VideoPlatform.fromExtractor(metadata.getExtractor())
+                        : VideoPlatform.TIKTOK;
+                    validateMetadata(metadata, videoUrl);
+                    validateDurationLimit(metadata, videoUrl);
+
+                    BaseTranscriptEntity canonicalMatch = findCanonicalMatch(platform, metadata.getId());
+                    if (canonicalMatch != null) {
+                        log.info("[transcription] cache_hit tier=2_canonical_after_download base_transcript_id={} platform={} video_id={} requested_url={}",
+                            canonicalMatch.getId(), platform, metadata.getId(),
+                            LogSanitizer.sanitize(videoUrl));
+                        baseTranscript = canonicalMatch;
+                    } else {
+                        baseTranscript = createBaseTranscriptFromDownload(
+                            videoUrl, metadata, platform, files);
+                    }
+                }
+            } else {
             // New transcript candidate — validate URL via metadata fetch, then check Tier-2 dedup
             VideoMetadata metadata = fetchMetadata(videoUrl);
 
@@ -352,16 +404,9 @@ public class VideoService {
                 validateDurationLimit(metadata, videoUrl);
 
                 try (ProcessedVideoFiles files = downloadAudio(videoUrl)) {
-                    String transcriptText = transcribeAudio(files.getAudioFile());
-                    validateTranscriptText(transcriptText, videoUrl);
-
-                    // Create new base transcript with canonical id populated
-                    BaseTranscriptEntity entity =
-                        videoMapper.createBaseTranscriptEntity(videoUrl, transcriptText, metadata, platform);
-                    baseTranscript = saveOrReuseOnConflict(entity, platform, metadata.getId(), videoUrl);
-                    log.info("[transcription] base_transcript_saved id={} platform={} video_id={} chars={}",
-                        baseTranscript.getId(), platform, metadata.getId(), transcriptText.length());
+                    baseTranscript = createBaseTranscriptFromDownload(videoUrl, metadata, platform, files);
                 }
+            }
             }
         }
 
@@ -430,6 +475,23 @@ public class VideoService {
             System.currentTimeMillis() - pipelineStartMs);
 
         return videoMapper.buildResponse(baseTranscript, userTranscript, category.getName(), alias);
+    }
+
+    private BaseTranscriptEntity createBaseTranscriptFromDownload(
+        String videoUrl,
+        VideoMetadata metadata,
+        VideoPlatform platform,
+        ProcessedVideoFiles files
+    ) {
+        String transcriptText = transcribeAudio(files.getAudioFile());
+        validateTranscriptText(transcriptText, videoUrl);
+
+        BaseTranscriptEntity entity =
+            videoMapper.createBaseTranscriptEntity(videoUrl, transcriptText, metadata, platform);
+        BaseTranscriptEntity saved = saveOrReuseOnConflict(entity, platform, metadata.getId(), videoUrl);
+        log.info("[transcription] base_transcript_saved id={} platform={} video_id={} chars={}",
+            saved.getId(), platform, metadata.getId(), transcriptText.length());
+        return saved;
     }
 
     /**

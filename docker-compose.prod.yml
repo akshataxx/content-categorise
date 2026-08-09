@@ -33,6 +33,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       APP_FFMPEG_LOCATION: /usr/bin/ffmpeg
       APP_YTDLP_LOCATION: /usr/bin/yt-dlp
+      APP_YTDLP_COOKIES_FILE: ${APP_YTDLP_COOKIES_FILE:-}
       JAVA_OPTS: -XX:InitialRAMPercentage=50 -XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError
       # Pass through environment variables from .env file
       OPENAI_API_KEY: ${OPENAI_API_KEY}
@@ -59,6 +60,7 @@ services:
     volumes:
       - ${FIREBASE_SERVICE_ACCOUNT_HOST_PATH:-/dev/null}:/app/secrets/firebase-service-account.json:ro
       - ${APPLE_PRIVATE_KEY_HOST_PATH:-/dev/null}:${APPLE_PRIVATE_KEY_PATH:-/app/secrets/apple-app-store-key.p8}:ro
+      - ${APP_YTDLP_COOKIES_HOST_PATH:-/dev/null}:${APP_YTDLP_COOKIES_FILE:-/app/secrets/yt-dlp-cookies.txt}:ro
     # App only exposed internally to Caddy reverse proxy
     expose:
       - "8081"

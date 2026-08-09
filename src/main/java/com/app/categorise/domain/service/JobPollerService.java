@@ -77,12 +77,11 @@ public class JobPollerService {
                 return;
             }
 
-            // Run the existing transcription pipeline
-            // processVideoAndCreateTranscript returns a CompletableFuture;
-            // .join() blocks since we're already on the media executor thread
-            TranscriptDtoWithAliases result = videoService.processVideoAndCreateTranscript(
-                    job.getVideoUrl(), job.getUserId()
-            ).join();
+            // This task already owns a media worker. Run the pipeline on it directly
+            // instead of queuing another media task and blocking on its completion.
+            TranscriptDtoWithAliases result = videoService.processVideoAndCreateTranscriptSynchronously(
+                job.getVideoUrl(), job.getUserId()
+            );
 
             // Mark completed with both baseTranscriptId (by URL lookup) and userTranscriptId
             jobService.markCompletedForUrl(job, job.getVideoUrl(), result.id());

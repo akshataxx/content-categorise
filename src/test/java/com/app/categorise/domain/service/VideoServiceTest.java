@@ -90,6 +90,7 @@ class VideoServiceTest {
         videoService = new VideoService(
                 "/usr/bin/ffmpeg",
                 "", // ytDlpLocation: blank → fallback to "yt-dlp"
+                "", // cookiesFile
                 4,
                 1,
                 10, // maxVideoDurationMinutes
@@ -259,6 +260,9 @@ class VideoServiceTest {
             videoService.fetchMetadata("https://www.tiktok.com/@user/video/123");
 
             List<String> cmdList = Arrays.asList(testProcessExecutor.lastCommand());
+            assertTrue(cmdList.contains("--impersonate"));
+            assertTrue(cmdList.contains("Chrome-136:Macos-15"));
+            assertFalse(cmdList.contains("--user-agent"));
             assertTrue(cmdList.contains("--extractor-args"));
             assertTrue(cmdList.contains("tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com"));
         }
@@ -351,7 +355,7 @@ class VideoServiceTest {
         }
 
         @Test
-        @DisplayName("Does NOT include --write-info-json in the command")
+        @DisplayName("Writes metadata JSON only for TikTok downloads")
         void downloadAudio_doesNotIncludeWriteInfoJson() throws Exception {
             // We need a mock to capture the command args for run()
             // Since TestProcessExecutor.run() is a no-op that doesn't capture args,
@@ -376,7 +380,11 @@ class VideoServiceTest {
             videoService.downloadAudio(tiktokUrl);
 
             List<String> command = Arrays.asList(testProcessExecutor.lastCommand());
+            assertTrue(command.contains("--impersonate"));
+            assertTrue(command.contains("Chrome-136:Macos-15"));
+            assertFalse(command.contains("--user-agent"));
             assertTrue(command.contains("worst[vcodec^=h264][acodec!=none]"));
+            assertTrue(command.contains("--write-info-json"));
             assertTrue(command.contains("tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com"));
         }
     }

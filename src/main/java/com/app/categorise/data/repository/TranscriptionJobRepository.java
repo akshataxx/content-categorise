@@ -94,4 +94,11 @@ public interface TranscriptionJobRepository extends JpaRepository<TranscriptionJ
     @Transactional
     @Query(value = "DELETE FROM transcription_jobs WHERE status = 'FAILED' AND updated_at < NOW() - INTERVAL '30 days'", nativeQuery = true)
     int deleteOldFailedJobs();
+
+    /**
+     * Delete all transcription jobs belonging to a user (e.g. on account deletion).
+     */
+    @Modifying
+    @Transactional
+    void deleteByUserId(UUID userId);
 }

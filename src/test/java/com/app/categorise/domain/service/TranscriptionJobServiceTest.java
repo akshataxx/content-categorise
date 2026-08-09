@@ -288,6 +288,103 @@ class TranscriptionJobServiceTest {
             // Should default to transient (retry)
             assertThat(job.getStatus()).isEqualTo(JobStatus.PENDING);
         }
+
+        @Test
+        @DisplayName("transient failure with retries remaining re-queues PENDING and never notifies")
+        void transientFailure_requeues_andDoesNotNotify() {
+            TranscriptionJobEntity job = jobWithStatus(JobStatus.PROCESSING);
+            job.setRetryCount(0);
+
+            Exception ex = new RuntimeException("Connection timeout while downloading");
+
+            service.handleFailure(job, ex);
+
+            assertThat(job.getStatus()).isEqualTo(JobStatus.PENDING);
+            verify(notificationService, never()).notifyJobFailed(any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("permanent failure marks FAILED and notifies once")
+        void permanentFailure_marksFailed_andNotifiesOnce() {
+            TranscriptionJobEntity job = jobWithStatus(JobStatus.PROCESSING);
+            job.setRetryCount(0);
+
+            Exception ex = new RuntimeException("login required for this content");
+
+            service.handleFailure(job, ex);
+
+            assertThat(job.getStatus()).isEqualTo(JobStatus.FAILED);
+            verify(notificationService, times(1))
+                    .notifyJobFailed(eq(job.getUserId()), eq(job.getId()), eq(ex.getMessage()));
+        }
+
+        @Test
+        @DisplayName("exhausted retries on a transient error notifies exactly once")
+        void exhaustedRetries_notifiesOnce() {
+            TranscriptionJobEntity job = jobWithStatus(JobStatus.PROCESSING);
+            job.setRetryCount(3); // at MAX_RETRIES
+
+            Exception ex = new RuntimeException("Connection timeout while downloading");
+
+            service.handleFailure(job, ex);
+
+            assertThat(job.getStatus()).isEqualTo(JobStatus.FAILED);
+            verify(notificationService, times(1)).notifyJobFailed(any(), any(), any());
+        }
+    }
+
+    @Nested
+    @DisplayName("markCompleted")
+    class MarkCompleted {
+
+        @Test
+        @DisplayName("notifies completion with the resolved base-transcript title")
+        void notifiesWithResolvedTitle() {
+            TranscriptionJobEntity job = jobWithStatus(JobStatus.PROCESSING);
+            job.setId(UUID.randomUUID());
+            UUID baseTranscriptId = UUID.randomUUID();
+            UUID userTranscriptId = UUID.randomUUID();
+
+            BaseTranscriptEntity base = new BaseTranscriptEntity();
+            base.setId(baseTranscriptId);
+            base.setTitle("Resolved Title");
+            when(baseTranscriptRepository.findById(baseTranscriptId)).thenReturn(Optional.of(base));
+
+            service.markCompleted(job, baseTranscriptId, userTranscriptId);
+
+            assertThat(job.getStatus()).isEqualTo(JobStatus.COMPLETED);
+            verify(notificationService, times(1))
+                    .notifyJobCompleted(job.getUserId(), job.getId(), baseTranscriptId, "Resolved Title");
+        }
+
+        @Test
+        @DisplayName("falls back to 'your video' title when the base transcript title is blank")
+        void fallsBackToYourVideoTitle() {
+            TranscriptionJobEntity job = jobWithStatus(JobStatus.PROCESSING);
+            job.setId(UUID.randomUUID());
+            UUID baseTranscriptId = UUID.randomUUID();
+
+            BaseTranscriptEntity base = new BaseTranscriptEntity();
+            base.setId(baseTranscriptId);
+            base.setTitle("   ");
+            when(baseTranscriptRepository.findById(baseTranscriptId)).thenReturn(Optional.of(base));
+
+            service.markCompleted(job, baseTranscriptId, UUID.randomUUID());
+
+            verify(notificationService).notifyJobCompleted(any(), any(), eq(baseTranscriptId), eq("your video"));
+        }
+
+        @Test
+        @DisplayName("does not notify when there is no base transcript id")
+        void doesNotNotifyWithoutBaseTranscript() {
+            TranscriptionJobEntity job = jobWithStatus(JobStatus.PROCESSING);
+            job.setId(UUID.randomUUID());
+
+            service.markCompleted(job, null, UUID.randomUUID());
+
+            assertThat(job.getStatus()).isEqualTo(JobStatus.COMPLETED);
+            verify(notificationService, never()).notifyJobCompleted(any(), any(), any(), any());
+        }
     }
 
     // --- Helpers ---

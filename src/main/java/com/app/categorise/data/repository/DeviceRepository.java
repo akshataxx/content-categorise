@@ -40,4 +40,11 @@ public interface DeviceRepository extends JpaRepository<DeviceEntity, UUID> {
     @Modifying
     @Transactional
     void deleteByDeviceId(String deviceId);
+
+    /**
+     * Delete all devices belonging to a user (e.g. on account deletion).
+     */
+    @Modifying
+    @Transactional
+    void deleteByUserId(UUID userId);
 }

@@ -157,9 +157,9 @@ class TranscriptServiceTest {
             when(embeddingClient.embed("breakfast")).thenReturn(originalEmbedding);
             when(openAIClient.expandSearchQuery("breakfast")).thenReturn("healthy quick breakfast recipe ideas");
             when(embeddingClient.embed("healthy quick breakfast recipe ideas")).thenReturn(expandedEmbedding);
-            when(userTranscriptRepository.searchByEmbedding(userId, originalEmbedding, "breakfast", 25, null))
+            when(userTranscriptRepository.searchByEmbedding(userId, originalEmbedding, "breakfast", 30, null))
                 .thenReturn(List.of(first));
-            when(userTranscriptRepository.searchByEmbedding(userId, expandedEmbedding, "breakfast", 25, null))
+            when(userTranscriptRepository.searchByEmbedding(userId, expandedEmbedding, "breakfast", 30, null))
                 .thenReturn(List.of(first, second));
 
             TranscriptDtoWithAliases firstDto = mock(TranscriptDtoWithAliases.class);
@@ -170,8 +170,8 @@ class TranscriptServiceTest {
             List<TranscriptDtoWithAliases> results = transcriptService.semanticSearch(userId, " breakfast ", 10, null);
 
             assertEquals(List.of(firstDto, secondDto), results);
-            verify(userTranscriptRepository).searchByEmbedding(userId, originalEmbedding, "breakfast", 25, null);
-            verify(userTranscriptRepository).searchByEmbedding(userId, expandedEmbedding, "breakfast", 25, null);
+            verify(userTranscriptRepository).searchByEmbedding(userId, originalEmbedding, "breakfast", 30, null);
+            verify(userTranscriptRepository).searchByEmbedding(userId, expandedEmbedding, "breakfast", 30, null);
         }
 
         @Test

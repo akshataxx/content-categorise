@@ -57,3 +57,6 @@ logs/
 
 # Claude Code
 .claude/
+
+# git worktrees (local, not tracked)
+.worktrees/

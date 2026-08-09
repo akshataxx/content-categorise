@@ -45,6 +45,7 @@ public class DeviceController {
         if (byToken.isPresent()) {
             DeviceEntity existing = byToken.get();
             existing.setDeviceId(request.deviceId());
+            existing.setActive(true);
             deviceRepository.save(existing);
             log.info("Updated existing device {} for user {} (token refresh)", existing.getId(), userId);
             return ResponseEntity.ok(new DeviceRegistrationResponse(existing.getId(), false));
@@ -55,6 +56,7 @@ public class DeviceController {
         if (byUserAndDevice.isPresent()) {
             DeviceEntity existing = byUserAndDevice.get();
             existing.setFcmToken(request.fcmToken());
+            existing.setActive(true);
             deviceRepository.save(existing);
             log.info("Updated token for device {} for user {} (token rotation)", existing.getId(), userId);
             return ResponseEntity.ok(new DeviceRegistrationResponse(existing.getId(), false));
@@ -89,15 +91,17 @@ public class DeviceController {
         if (deviceId != null && !deviceId.isBlank()) {
             deviceRepository.findByUserIdAndDeviceId(userId, deviceId)
                     .ifPresent(device -> {
-                        deviceRepository.delete(device);
-                        log.info("Unregistered device {} for user {}", device.getId(), userId);
+                        device.setActive(false);
+                        deviceRepository.save(device);
+                        log.info("Deactivated device {} for user {}", device.getId(), userId);
                     });
         } else {
             deviceRepository.findByFcmToken(fcmToken)
                     .filter(d -> d.getUserId().equals(userId))
                     .ifPresent(device -> {
-                        deviceRepository.delete(device);
-                        log.info("Unregistered device {} for user {}", device.getId(), userId);
+                        device.setActive(false);
+                        deviceRepository.save(device);
+                        log.info("Deactivated device {} for user {}", device.getId(), userId);
                     });
         }
         return ResponseEntity.noContent().build();

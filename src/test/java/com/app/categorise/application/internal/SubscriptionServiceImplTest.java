@@ -58,7 +58,7 @@ class SubscriptionServiceImplTest {
                         attackerUserId,
                         "orig-tx-1",
                         "tx-2",
-                        "premium_monthly",
+                        "scoop",
                         Instant.now().plusSeconds(3600)
                 ));
 
@@ -85,7 +85,7 @@ class SubscriptionServiceImplTest {
                         userId,
                         "orig-tx-1",
                         "tx-2",
-                        "premium_monthly",
+                        "scoop",
                         Instant.now().plusSeconds(3600)
                 ));
 

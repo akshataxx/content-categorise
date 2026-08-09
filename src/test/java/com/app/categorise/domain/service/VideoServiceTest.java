@@ -3,10 +3,11 @@ package com.app.categorise.domain.service;
 import com.app.categorise.api.dto.TranscriptDtoWithAliases;
 import com.app.categorise.application.mapper.VideoMapper;
 import com.app.categorise.data.client.whisper.WhisperClient;
-import com.app.categorise.data.client.openai.EmbeddingClient;
 import com.app.categorise.data.dto.VideoMetadata;
 import com.app.categorise.data.dto.TranscriptCategorisationResult;
+import com.app.categorise.data.client.openai.EmbeddingClient;
 import com.app.categorise.data.client.openai.OpenAIClient;
+import org.springframework.jdbc.core.JdbcTemplate;
 import com.app.categorise.data.entity.BaseTranscriptEntity;
 import com.app.categorise.data.entity.CategoryEntity;
 import com.app.categorise.data.entity.UserTranscriptEntity;
@@ -89,7 +90,6 @@ class VideoServiceTest {
         videoService = new VideoService(
                 "/usr/bin/ffmpeg",
                 "", // ytDlpLocation: blank → fallback to "yt-dlp"
-                "", // cookiesFile
                 4,
                 1,
                 10, // maxVideoDurationMinutes

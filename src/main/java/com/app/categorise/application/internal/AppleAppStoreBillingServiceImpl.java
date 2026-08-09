@@ -14,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -45,6 +46,9 @@ public class AppleAppStoreBillingServiceImpl implements AppleAppStoreBillingServ
     private final Environment environment;
     private PrivateKey privateKey;
 
+    @Value("${app.subscriptions.enabled:false}")
+    private boolean subscriptionsEnabled = true;
+
     public AppleAppStoreBillingServiceImpl(
             AppleAppStoreConfiguration config,
             ObjectMapper objectMapper,
@@ -60,6 +64,11 @@ public class AppleAppStoreBillingServiceImpl implements AppleAppStoreBillingServ
 
     @PostConstruct
     public void init() {
+        if (!subscriptionsEnabled) {
+            logger.info("Apple App Store Billing service disabled because subscriptions are unavailable");
+            return;
+        }
+
         boolean prodProfile = environment.acceptsProfiles(Profiles.of("prod"));
         try {
             if ("xcode-testing".equalsIgnoreCase(config.getEnvironment())) {

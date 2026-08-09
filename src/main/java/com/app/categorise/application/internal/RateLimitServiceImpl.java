@@ -10,6 +10,7 @@ import com.app.categorise.domain.model.RateLimitConfig;
 import com.app.categorise.domain.model.RateLimitResult;
 import com.app.categorise.domain.service.RateLimitService;
 import com.app.categorise.domain.service.SubscriptionService;
+import org.springframework.beans.factory.annotation.Value;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -41,6 +42,9 @@ public class RateLimitServiceImpl implements RateLimitService {
     private final UserTranscriptRepository transcriptRepository;
     private final RateLimitMapper mapper;
     private final SubscriptionService subscriptionService;
+
+    @Value("${app.subscriptions.enabled:false}")
+    private boolean subscriptionsEnabled = true;
 
     // Free-tier defaults
     static final int DEFAULT_TRANSCRIPTS_PER_MINUTE = 5;
@@ -127,7 +131,7 @@ public class RateLimitServiceImpl implements RateLimitService {
         }
 
         // No override — derive from subscription tier
-        boolean isPremium = subscriptionService.hasActivePremiumSubscription(userId);
+        boolean isPremium = !subscriptionsEnabled || subscriptionService.hasActivePremiumSubscription(userId);
         return tierDefaults(userId, isPremium);
     }
 

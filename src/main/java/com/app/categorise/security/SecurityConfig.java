@@ -47,7 +47,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // Allow ASYNC and ERROR dispatches without authentication (auth was done on initial request)
                 .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
-                .requestMatchers("/api/auth/**", "/").permitAll()
+                .requestMatchers("/api/auth/**", "/api/app-config", "/").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
                 .anyRequest().authenticated()
             );
@@ -57,4 +57,3 @@ public class SecurityConfig {
         return http.build();
     }
 }
-

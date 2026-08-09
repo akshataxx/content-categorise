@@ -20,6 +20,7 @@ import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -41,6 +42,9 @@ public class SubscriptionController {
     private final GooglePlayBillingService googlePlayBillingService;
     private final AppleAppStoreBillingService appleAppStoreBillingService;
     private final UsageService usageService;
+
+    @Value("${app.subscriptions.enabled:false}")
+    private boolean subscriptionsEnabled = true;
 
     public SubscriptionController(SubscriptionService subscriptionService,
                                  GooglePlayBillingService googlePlayBillingService,
@@ -76,6 +80,10 @@ public class SubscriptionController {
     public ResponseEntity<GooglePlayVerificationResponse> verifyGooglePlayPurchase(
             @Valid @RequestBody GooglePlayPurchaseVerificationRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
+
+        if (!subscriptionsEnabled) {
+            return ResponseEntity.ok(GooglePlayVerificationResponse.failure("Subscriptions are not available"));
+        }
 
         UUID userId = principal.getId();
         logger.info("Verifying Google Play purchase for user {}: productId={}", userId, request.getProductId());
@@ -141,6 +149,10 @@ public class SubscriptionController {
     public ResponseEntity<AppStoreVerificationResponse> verifyAppStorePurchase(
             @Valid @RequestBody AppStoreVerificationRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
+
+        if (!subscriptionsEnabled) {
+            return ResponseEntity.ok(AppStoreVerificationResponse.failure("Subscriptions are not available"));
+        }
 
         UUID userId = principal.getId();
         logger.info("Verifying App Store purchase for user {}: productId={}", userId, request.getProductId());

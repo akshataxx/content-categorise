@@ -37,17 +37,36 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Check if this yt-dlp version is already deployed
+      # A registry tag only proves an image was pushed. The server is the source
+      # of truth: a prior deploy could have failed, or a later app deploy could
+      # have replaced :latest.
+      - name: Read yt-dlp version running on Vultr
+        id: running_version
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VULTR_SSH_HOST }}
+          username: ${{ secrets.VULTR_SSH_USER }}
+          key: ${{ secrets.VULTR_SSH_PRIVATE_KEY }}
+          capture_stdout: true
+          script: |
+            set -eu
+            cd /root/content-backend
+            docker compose -f docker-compose.prod.yml exec -T app yt-dlp --version
+
+      - name: Decide whether the running server needs an update
         id: should_update
         run: |
-          YTDLP_VERSION="${{ steps.version_check.outputs.latest }}"
-          if docker manifest inspect ${{ env.IMAGE }}:ytdlp-${YTDLP_VERSION} > /dev/null 2>&1 \
-             && [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+          normalise() { echo "$1" | tr -d '[:space:]' | awk -F. '{printf "%d.%d.%d\\n", $1, $2, $3}'; }
+          LATEST=$(normalise "${{ steps.version_check.outputs.latest }}")
+          RUNNING=$(normalise "${{ steps.running_version.outputs.stdout }}")
+          echo "Latest on PyPI: $LATEST | Running on Vultr: $RUNNING"
+
+          if [ "$LATEST" = "$RUNNING" ] && [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
             echo "update=false" >> "$GITHUB_OUTPUT"
-            echo "Image for yt-dlp $YTDLP_VERSION already exists — skipping"
+            echo "Vultr already runs yt-dlp $LATEST — skipping"
           else
             echo "update=true" >> "$GITHUB_OUTPUT"
-            echo "No image found for yt-dlp $YTDLP_VERSION or manual trigger — will update"
+            echo "Vultr needs yt-dlp $LATEST — will update"
           fi
 
       - name: Pull currently deployed image
@@ -95,6 +114,12 @@ jobs:
           username: ${{ secrets.VULTR_SSH_USER }}
           key: ${{ secrets.VULTR_SSH_PRIVATE_KEY }}
           script: |
+            set -eu
             docker pull ghcr.io/${{ github.repository_owner }}/content-app:latest
             cd /root/content-backend
             docker compose -f docker-compose.prod.yml up -d app
+            normalise() { echo "$1" | tr -d '[:space:]' | awk -F. '{printf "%d.%d.%d\\n", $1, $2, $3}'; }
+            EXPECTED=$(normalise "${{ steps.version_check.outputs.latest }}")
+            ACTUAL=$(normalise "$(docker compose -f docker-compose.prod.yml exec -T app yt-dlp --version)")
+            echo "Expected: $EXPECTED | Running on Vultr: $ACTUAL"
+            test "$EXPECTED" = "$ACTUAL"

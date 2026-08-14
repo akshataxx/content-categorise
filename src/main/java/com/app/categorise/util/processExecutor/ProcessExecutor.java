@@ -9,8 +9,8 @@ import java.io.IOException;
 public interface ProcessExecutor {
     /**
      * Runs a shell command, captures its combined stdout/stderr output, and returns it as a String.
-     * Forcibly kills the process and throws if the timeout is exceeded.
-     * Throws if the process exits with a non-zero code (the captured output is included in the exception message).
+     * Forcibly kills the process and throws a {@link ProcessExecutionException} if the timeout is exceeded.
+     * Throws a {@link ProcessExecutionException} with bounded captured output if the process exits with a non-zero code.
      *
      * @param timeoutMinutes maximum time to wait for the process to finish
      * @param command        the command and its arguments

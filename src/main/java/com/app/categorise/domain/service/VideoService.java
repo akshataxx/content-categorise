@@ -69,8 +69,6 @@ public class VideoService {
     private static final String USER_AGENT =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
-    private static final String TIKTOK_IMPERSONATION_TARGET = "Chrome-136:Macos-15";
-
     private final ProcessExecutor processExecutor;
 
     private final WhisperClient whisperClient;
@@ -92,6 +90,7 @@ public class VideoService {
 
     private final BaseTranscriptRepository baseTranscriptRepository;
     private final UserTranscriptRepository userTranscriptRepository;
+    private final TikTokIngestionService tikTokIngestionService;
 
     private final String ffmpegLocation;
     private final String ytDlpLocation;
@@ -117,6 +116,7 @@ public class VideoService {
         ObjectMapper objectMapper,
         OpenAIClient openAIClient,
         ProcessExecutor processExecutor,
+        TikTokIngestionService tikTokIngestionService,
         UserTranscriptRepository userTranscriptRepository,
         VideoMapper videoMapper,
         WhisperClient whisperClient
@@ -137,6 +137,7 @@ public class VideoService {
         this.objectMapper = objectMapper;
         this.openAIClient = openAIClient;
         this.processExecutor = processExecutor;
+        this.tikTokIngestionService = tikTokIngestionService;
         this.userTranscriptRepository = userTranscriptRepository;
         this.whisperClient = whisperClient;
         this.videoMapper = videoMapper;
@@ -152,6 +153,16 @@ public class VideoService {
      */
     public VideoMetadata fetchMetadata(String videoUrl) {
         validateYtDlpUrl(videoUrl);
+        if (VideoPlatform.fromUrl(videoUrl) == VideoPlatform.TIKTOK) {
+            try (ProcessedVideoFiles files = tikTokIngestionService.ingest(videoUrl, metadata -> {
+                validateMetadata(metadata, videoUrl);
+                validateDurationLimit(metadata, videoUrl);
+            })) {
+                return files.metadata();
+            } catch (Exception e) {
+                throw new VideoProcessingException(USER_FACING_FETCH_ERROR, e);
+            }
+        }
         long startMs = System.currentTimeMillis();
         List<String> command = new ArrayList<>();
         command.add(ytDlpLocation);
@@ -211,6 +222,12 @@ public class VideoService {
     public ProcessedVideoFiles downloadAudio(String videoUrl) throws Exception {
         validateYtDlpUrl(videoUrl);
         VideoPlatform platform = VideoPlatform.fromUrl(videoUrl);
+        if (platform == VideoPlatform.TIKTOK) {
+            return tikTokIngestionService.ingest(videoUrl, metadata -> {
+                validateMetadata(metadata, videoUrl);
+                validateDurationLimit(metadata, videoUrl);
+            });
+        }
         Path tempDir = Files.createTempDirectory("media-" + UUID.randomUUID());
         long startMs = System.currentTimeMillis();
         try {
@@ -237,18 +254,12 @@ public class VideoService {
             command.add("-f");
             // TikTok's bytevc1/H.265 renditions can be labelled as AAC but contain no
             // audio stream. Prefer its combined H.264 rendition, verified with ffprobe.
-            command.add(platform == VideoPlatform.TIKTOK
-                ? "worst[vcodec^=h264][acodec!=none]"
-                : "worstaudio[acodec!=none]/worst[acodec!=none]");
+            command.add("worstaudio[acodec!=none]/worst[acodec!=none]");
             command.add("-x");
             command.add("--audio-format");
             command.add("mp3");
             command.add("--audio-quality");
             command.add("5");
-            if (platform == VideoPlatform.TIKTOK) {
-                // Keep metadata and audio in one authenticated/challenged yt-dlp process.
-                command.add("--write-info-json");
-            }
             command.add("-o");
             command.add(outputTemplate);
             command.add("--");
@@ -262,10 +273,7 @@ public class VideoService {
             log.info("[transcription] audio_downloaded size_kb={} elapsed_ms={}",
                 sizeKb, System.currentTimeMillis() - startMs);
 
-            File metadataFile = platform == VideoPlatform.TIKTOK
-                ? new File(baseName + ".info.json")
-                : null;
-            return new ProcessedVideoFiles(audioFile, metadataFile, tempDir);
+            return new ProcessedVideoFiles(audioFile, null, tempDir);
         } catch (Exception e) {
             deleteTempDirectory(tempDir);
             throw e;
@@ -287,16 +295,6 @@ public class VideoService {
     }
 
     private void addPlatformRequestArguments(List<String> command, VideoPlatform platform) {
-        if (platform == VideoPlatform.TIKTOK) {
-            // TikTok's challenge rejects the plain User-Agent header on some networks.
-            // curl-cffi (installed with yt-dlp) supplies a matching browser TLS fingerprint.
-            command.add("--impersonate");
-            command.add(TIKTOK_IMPERSONATION_TARGET);
-            command.add("--extractor-args");
-            command.add("tiktok:api_hostname=api22-normal-c-useast1a.tiktokv.com");
-            return;
-        }
-
         command.add("--user-agent");
         command.add(USER_AGENT);
     }
@@ -357,25 +355,20 @@ public class VideoService {
         } else {
             log.info("[transcription] cache_miss tier=1_url url={}", LogSanitizer.sanitize(videoUrl));
             if (VideoPlatform.fromUrl(videoUrl) == VideoPlatform.TIKTOK) {
-                // TikTok challenges are session-sensitive. Download its audio and info JSON in
-                // one yt-dlp process instead of fetching metadata in a separate process first.
-                try (ProcessedVideoFiles files = downloadAudio(videoUrl)) {
-                    VideoMetadata metadata = readDownloadedMetadata(files.getMetadataFile(), videoUrl);
-                    VideoPlatform platform = metadata.getExtractor() != null
-                        ? VideoPlatform.fromExtractor(metadata.getExtractor())
-                        : VideoPlatform.TIKTOK;
-                    validateMetadata(metadata, videoUrl);
-                    validateDurationLimit(metadata, videoUrl);
-
-                    BaseTranscriptEntity canonicalMatch = findCanonicalMatch(platform, metadata.getId());
-                    if (canonicalMatch != null) {
-                        log.info("[transcription] cache_hit tier=2_canonical_after_download base_transcript_id={} platform={} video_id={} requested_url={}",
-                            canonicalMatch.getId(), platform, metadata.getId(),
-                            LogSanitizer.sanitize(videoUrl));
-                        baseTranscript = canonicalMatch;
-                    } else {
-                        baseTranscript = createBaseTranscriptFromDownload(
-                            videoUrl, metadata, platform, files);
+                String videoId = tikTokIngestionService.resolveVideoId(videoUrl);
+                BaseTranscriptEntity canonicalMatch = findCanonicalMatch(VideoPlatform.TIKTOK, videoId);
+                if (canonicalMatch != null) {
+                    baseTranscript = canonicalMatch;
+                } else {
+                    try (ProcessedVideoFiles files = tikTokIngestionService.ingest(videoUrl, metadata -> {
+                        validateMetadata(metadata, videoUrl);
+                        validateDurationLimit(metadata, videoUrl);
+                    })) {
+                        VideoMetadata metadata = files.metadata();
+                        if (!videoId.equals(metadata.getId())) {
+                            throw new VideoProcessingException(USER_FACING_PROCESSING_ERROR);
+                        }
+                        baseTranscript = createBaseTranscriptFromDownload(videoUrl, metadata, VideoPlatform.TIKTOK, files);
                     }
                 }
             } else {

@@ -6,6 +6,7 @@ import com.app.categorise.api.dto.auth.RefreshTokenRequest;
 import com.app.categorise.api.dto.auth.RegisterRequest;
 import com.app.categorise.data.entity.UserEntity;
 import com.app.categorise.data.repository.UserRepository;
+import com.app.categorise.exception.InvalidRefreshTokenException;
 import com.app.categorise.security.jwt.JwtTokenProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -183,6 +184,57 @@ class AuthServiceTest {
             JwtAuthResponse res = authService.refreshAccessToken(req);
             assertEquals("new-access", res.getAccessToken());
             assertEquals("refresh", res.getRefreshToken());
+            verify(refreshTokenService).save(eq(uid), eq("refresh"), any(Instant.class));
+        }
+
+        @Test
+        void refresh_RevokedToken_ThrowsInvalidGrant() {
+            RefreshTokenRequest req = new RefreshTokenRequest("revoked");
+            when(refreshTokenService.isValid("revoked")).thenReturn(false);
+
+            assertThrows(InvalidRefreshTokenException.class, () -> authService.refreshAccessToken(req));
+        }
+
+        @Test
+        void refresh_DeletedUser_ThrowsInvalidGrant() {
+            RefreshTokenRequest req = new RefreshTokenRequest("refresh");
+            UUID uid = UUID.randomUUID();
+            when(refreshTokenService.isValid("refresh")).thenReturn(true);
+            when(tokenProvider.getUserIdFromJWT("refresh")).thenReturn(uid.toString());
+            when(userRepository.findById(uid)).thenReturn(Optional.empty());
+
+            assertThrows(InvalidRefreshTokenException.class, () -> authService.refreshAccessToken(req));
+        }
+
+        @Test
+        void refresh_BlankToken_ThrowsInvalidGrant() {
+            assertThrows(InvalidRefreshTokenException.class,
+                    () -> authService.refreshAccessToken(new RefreshTokenRequest(" ")));
+        }
+
+        @Test
+        void refresh_NullToken_ThrowsInvalidGrant() {
+            assertThrows(InvalidRefreshTokenException.class,
+                    () -> authService.refreshAccessToken(new RefreshTokenRequest(null)));
+        }
+
+        @Test
+        void refresh_MalformedToken_ThrowsInvalidGrant() {
+            when(refreshTokenService.isValid("malformed")).thenReturn(true);
+            when(tokenProvider.getUserIdFromJWT("malformed"))
+                    .thenThrow(new IllegalArgumentException("Malformed token"));
+
+            assertThrows(InvalidRefreshTokenException.class,
+                    () -> authService.refreshAccessToken(new RefreshTokenRequest("malformed")));
+        }
+
+        @Test
+        void refresh_RepositoryFault_Propagates() {
+            when(refreshTokenService.isValid("refresh"))
+                    .thenThrow(new IllegalStateException("Database unavailable"));
+
+            assertThrows(IllegalStateException.class,
+                    () -> authService.refreshAccessToken(new RefreshTokenRequest("refresh")));
         }
     }
 }

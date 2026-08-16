@@ -7,6 +7,7 @@ import com.app.categorise.api.dto.auth.RegisterRequest;
 import com.app.categorise.data.entity.UserEntity;
 import com.app.categorise.data.repository.UserRepository;
 import com.app.categorise.domain.model.User;
+import com.app.categorise.exception.InvalidRefreshTokenException;
 import com.app.categorise.security.jwt.JwtTokenProvider;
 import com.app.categorise.api.dto.auth.RefreshTokenRequest;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
@@ -14,6 +15,7 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.gson.GsonFactory;
+import io.jsonwebtoken.JwtException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -119,22 +121,32 @@ public class AuthService {
         return new JwtAuthResponse(accessToken, refreshToken);
     }
 
-    public JwtAuthResponse refreshAccessToken(RefreshTokenRequest req) throws Exception {
+    public JwtAuthResponse refreshAccessToken(RefreshTokenRequest req) {
         String incomingRefresh = req.getRefreshToken();
-        if (!refreshTokenService.isValid(incomingRefresh)) {
-            throw new Exception("Invalid refresh token");
+        if (incomingRefresh == null || incomingRefresh.isBlank()) {
+            throw new InvalidRefreshTokenException();
         }
 
-        String userIdStr = tokenProvider.getUserIdFromJWT(incomingRefresh);
-        UUID userId = UUID.fromString(userIdStr);
+        if (!refreshTokenService.isValid(incomingRefresh)) {
+            throw new InvalidRefreshTokenException();
+        }
+
+        UUID userId;
+        try {
+            userId = UUID.fromString(tokenProvider.getUserIdFromJWT(incomingRefresh));
+        } catch (JwtException | IllegalArgumentException exception) {
+            throw new InvalidRefreshTokenException(exception);
+        }
 
         UserEntity ue = userRepository.findById(userId)
-                           .orElseThrow(() -> new RuntimeException("User not found"));
+                           .orElseThrow(InvalidRefreshTokenException::new);
 
         User user = new User(ue.getId(), ue.getName(), ue.getEmail(), ue.getPictureUrl());
         Authentication auth = new UsernamePasswordAuthenticationToken(user, null, null);
 
         String newAccess = tokenProvider.generateToken(auth);
+        refreshTokenService.save(userId, incomingRefresh,
+                Instant.now().plusMillis(jwtRefreshExpirationInMs));
 
         return new JwtAuthResponse(newAccess, incomingRefresh);
     }

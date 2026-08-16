@@ -52,6 +52,7 @@ class VideoServiceTest {
     @Mock private OpenAIClient openAIClient;
     @Mock private EmbeddingClient embeddingClient;
     @Mock private JdbcTemplate jdbcTemplate;
+    @Mock private TikTokIngestionService tikTokIngestionService;
 
     private TestProcessExecutor testProcessExecutor;
     private VideoService videoService;
@@ -104,6 +105,7 @@ class VideoServiceTest {
                 new ObjectMapper(),
                 openAIClient,
                 testProcessExecutor,
+                tikTokIngestionService,
                 userTranscriptRepository,
                 videoMapper,
                 whisperClient
@@ -173,6 +175,7 @@ class VideoServiceTest {
                 "/usr/bin/ffmpeg", "/custom/path/yt-dlp", "", 4, 1, 10, Runnable::run,
                 baseTranscriptRepository, categoryAliasService, categorisationService,
                 categoryService, embeddingClient, jdbcTemplate, new ObjectMapper(), openAIClient, testProcessExecutor,
+                tikTokIngestionService,
                 userTranscriptRepository, videoMapper, whisperClient
             );
             testProcessExecutor.setOutput(SAMPLE_YTDLP_JSON);

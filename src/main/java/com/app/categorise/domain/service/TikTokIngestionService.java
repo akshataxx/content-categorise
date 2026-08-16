@@ -10,6 +10,8 @@ import com.app.categorise.util.FileUtils;
 import com.app.categorise.util.processExecutor.ProcessExecutionException;
 import com.app.categorise.util.processExecutor.ProcessExecutor;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -23,6 +25,8 @@ import java.util.function.Consumer;
 
 @Service
 public class TikTokIngestionService {
+    private static final Logger log = LoggerFactory.getLogger(TikTokIngestionService.class);
+
     private final String ffmpegLocation;
     private final String ytDlpLocation;
     private final int ytDlpTimeoutMinutes;
@@ -60,15 +64,27 @@ public class TikTokIngestionService {
         Path temporaryDirectory = createTemporaryDirectory();
         try {
             try {
-                return primary(submittedUrl, temporaryDirectory);
+                ProcessedVideoFiles files = primary(submittedUrl, temporaryDirectory);
+                log.info("event=tiktok_primary_success");
+                return files;
             } catch (ProcessExecutionException failure) {
                 if (failure.isTimedOut() || !challengeDetector.isChallenge(failure)) {
                     throw failure;
                 }
+                log.warn("event=tiktok_challenge_detected");
                 if (!properties.getEmbedFallback().isEnabled()) {
+                    log.warn("event=tiktok_fallback_failure reason=disabled");
                     throw new VideoProcessingException("TikTok is temporarily unavailable. Please try again later.", failure);
                 }
-                return fallback(videoId, temporaryDirectory, metadataValidator);
+                log.info("event=tiktok_fallback_attempted");
+                try {
+                    ProcessedVideoFiles files = fallback(videoId, temporaryDirectory, metadataValidator);
+                    log.info("event=tiktok_fallback_success");
+                    return files;
+                } catch (Exception fallbackFailure) {
+                    log.warn("event=tiktok_fallback_failure reason=processing_failed");
+                    throw fallbackFailure;
+                }
             }
         } catch (Exception e) {
             FileUtils.deleteRecursively(temporaryDirectory);

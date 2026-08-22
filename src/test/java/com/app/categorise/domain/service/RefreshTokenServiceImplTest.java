@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
@@ -50,6 +51,9 @@ class RefreshTokenServiceImplTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private TestEntityManager entityManager;
+
     @BeforeEach
     void addProductionTokenConstraint() {
         jdbcTemplate.execute("alter table refresh_tokens add constraint refresh_tokens_token_key unique (token)");
@@ -67,6 +71,7 @@ class RefreshTokenServiceImplTest {
 
         refreshTokenService.save(userId, token, extendedExpiry);
         refreshTokenRepository.flush();
+        entityManager.clear();
 
         assertThat(refreshTokenRepository.findAll())
                 .singleElement()
@@ -74,5 +79,23 @@ class RefreshTokenServiceImplTest {
                         RefreshTokenEntity::getToken,
                         RefreshTokenEntity::getExpiryDate)
                 .containsExactly(userId, token, extendedExpiry);
+    }
+
+    @Test
+    void revoke_DeletesOnlyThePresentedTokenAndIsIdempotent() {
+        String presentedToken = "presented-refresh-token";
+        String otherToken = "other-refresh-token";
+        Instant expiry = Instant.parse("2026-09-22T00:00:00Z");
+        refreshTokenService.save(UUID.randomUUID(), presentedToken, expiry);
+        refreshTokenService.save(UUID.randomUUID(), otherToken, expiry);
+        refreshTokenRepository.flush();
+
+        refreshTokenService.revoke(presentedToken);
+        refreshTokenService.revoke(presentedToken);
+        refreshTokenRepository.flush();
+        entityManager.clear();
+
+        assertThat(refreshTokenRepository.findByToken(presentedToken)).isEmpty();
+        assertThat(refreshTokenRepository.findByToken(otherToken)).isPresent();
     }
 }

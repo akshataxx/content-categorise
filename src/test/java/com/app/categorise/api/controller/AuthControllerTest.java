@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -101,6 +102,28 @@ class AuthControllerTest {
                             .content("{\"refreshToken\":\"expired\"}"))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.error").value("invalid_grant"));
+        }
+    }
+
+    @Nested
+    @DisplayName("/api/auth/revoke")
+    class Revoke {
+        @Test
+        void revoke_presentedToken_returns204() throws Exception {
+            mockMvc.perform(post("/api/auth/revoke")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"refreshToken\":\"presented-refresh-token\"}"))
+                    .andExpect(status().isNoContent());
+
+            verify(authService).revokeRefreshToken(new RefreshTokenRequest("presented-refresh-token"));
+        }
+
+        @Test
+        void revoke_unknownToken_returns204() throws Exception {
+            mockMvc.perform(post("/api/auth/revoke")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"refreshToken\":\"unknown-refresh-token\"}"))
+                    .andExpect(status().isNoContent());
         }
     }
 }

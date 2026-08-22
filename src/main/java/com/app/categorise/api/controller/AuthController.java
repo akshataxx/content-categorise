@@ -71,6 +71,12 @@ public class AuthController {
         return ResponseEntity.ok(tokens);
     }
 
+    @PostMapping("/revoke")
+    public ResponseEntity<Void> revokeToken(@RequestBody RefreshTokenRequest request) {
+        authService.revokeRefreshToken(request);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest req) {
         try {

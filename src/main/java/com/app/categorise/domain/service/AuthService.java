@@ -152,6 +152,10 @@ public class AuthService {
         return new JwtAuthResponse(newAccess, incomingRefresh);
     }
 
+    public void revokeRefreshToken(RefreshTokenRequest request) {
+        refreshTokenService.revoke(request.getRefreshToken());
+    }
+
     public JwtAuthResponse register(RegisterRequest req) {
         // Enforce uniqueness
         if (userRepository.findByEmail(req.getEmail()).isPresent()) {

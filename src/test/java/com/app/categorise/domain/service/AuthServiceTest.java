@@ -253,4 +253,14 @@ class AuthServiceTest {
             verifyNoInteractions(refreshTokenService);
         }
     }
+
+    @Nested
+    class RevokeTests {
+        @Test
+        void revoke_DelegatesPresentedRefreshToken() {
+            authService.revokeRefreshToken(new RefreshTokenRequest("presented-refresh-token"));
+
+            verify(refreshTokenService).revoke("presented-refresh-token");
+        }
+    }
 }

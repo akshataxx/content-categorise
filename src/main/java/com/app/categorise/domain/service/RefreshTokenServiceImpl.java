@@ -39,6 +39,14 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
 
     @Override
     @Transactional
+    public void revoke(String refreshToken) {
+        if (refreshToken != null && !refreshToken.isBlank()) {
+            repo.deleteByToken(refreshToken);
+        }
+    }
+
+    @Override
+    @Transactional
     public void deleteByUserId(UUID userId) {
         repo.deleteByUserId(userId);
     }

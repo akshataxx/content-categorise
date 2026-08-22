@@ -11,5 +11,8 @@ interface RefreshTokenService {
     boolean isValid(String refreshToken);
 
     @Transactional
+    void revoke(String refreshToken);
+
+    @Transactional
     void deleteByUserId(UUID userId);
 }

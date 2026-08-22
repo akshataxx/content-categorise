@@ -1,6 +1,7 @@
 package com.app.categorise.domain.service;
 
 import com.app.categorise.api.dto.auth.JwtAuthResponse;
+import com.app.categorise.api.dto.auth.GoogleAuthRequest;
 import com.app.categorise.api.dto.auth.LoginRequest;
 import com.app.categorise.api.dto.auth.RefreshTokenRequest;
 import com.app.categorise.api.dto.auth.RegisterRequest;
@@ -20,6 +21,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Instant;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -109,6 +113,36 @@ class AuthServiceTest {
 
             assertThrows(IllegalArgumentException.class, () -> authService.register(req));
         }
+    }
+
+    @Test
+    void googleAuthentication_DoesNotWriteCredentialsOrClientIdentityToStandardStreams() throws Exception {
+        String identityToken = "sensitive-google-identity-token";
+        String clientId = "sensitive-google-client-id";
+        java.lang.reflect.Field clientIdField = AuthService.class.getDeclaredField("googleClientId");
+        clientIdField.setAccessible(true);
+        clientIdField.set(authService, clientId);
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        PrintStream originalOut = System.out;
+        PrintStream originalErr = System.err;
+        GoogleAuthRequest request = new GoogleAuthRequest();
+        request.setIdToken(identityToken);
+
+        try {
+            System.setOut(new PrintStream(stdout, true, StandardCharsets.UTF_8));
+            System.setErr(new PrintStream(stderr, true, StandardCharsets.UTF_8));
+            assertThrows(Exception.class,
+                    () -> authService.authenticateWithGoogle(request));
+        } finally {
+            System.setOut(originalOut);
+            System.setErr(originalErr);
+        }
+
+        String output = stdout.toString(StandardCharsets.UTF_8)
+                + stderr.toString(StandardCharsets.UTF_8);
+        assertFalse(output.contains(identityToken));
+        assertFalse(output.contains(clientId));
     }
 
     @Nested

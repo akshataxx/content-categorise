@@ -23,6 +23,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.util.Collections;
@@ -30,6 +32,8 @@ import java.util.UUID;
 
 @Service
 public class AuthService {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
     @Autowired
     private UserRepository userRepository;
@@ -59,12 +63,9 @@ public class AuthService {
             .setAudience(Collections.singletonList(googleClientId))
             .build();
 
-        System.out.println("Google Client ID: " + googleClientId);
-        System.out.println("Google Auth Request: " + req.getIdToken());
-
         GoogleIdToken idToken = verifier.verify(req.getIdToken());
         if (idToken == null) {
-            System.out.println("Invalid Google ID token.");
+            log.warn("Google authentication rejected");
             throw new Exception("Invalid Google ID token.");
         }
 
@@ -75,8 +76,6 @@ public class AuthService {
         String pictureUrl = (String) payload.get("picture");
         String firstName = (String) payload.get("given_name");
         String lastName = (String) payload.get("family_name");
-
-        System.out.println("Validated User ID: " + userId);
 
         UserEntity userEntity = userRepository.findBySub(userId).orElseGet(() -> {
             // If a local account exists with the same email, link it by setting sub
@@ -108,7 +107,6 @@ public class AuthService {
         User user = new User(userEntity.getId(), userEntity.getName(), userEntity.getEmail(), userEntity.getPictureUrl());
 
         Authentication authentication = new UsernamePasswordAuthenticationToken(user, null, null);
-        System.out.println("Authentication: " + authentication);
 
         //issue both access and refresh tokens at the same time
         String accessToken = tokenProvider.generateToken(authentication);

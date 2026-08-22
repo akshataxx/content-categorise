@@ -104,6 +104,7 @@ public class AuthService {
         });
 
 
+        log.debug("Google authentication resolved internal userId={}", userEntity.getId());
         User user = new User(userEntity.getId(), userEntity.getName(), userEntity.getEmail(), userEntity.getPictureUrl());
 
         Authentication authentication = new UsernamePasswordAuthenticationToken(user, null, null);

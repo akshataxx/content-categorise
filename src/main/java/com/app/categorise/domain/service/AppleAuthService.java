@@ -97,7 +97,7 @@ public class AppleAuthService {
                 || appleSignInAudience.isBlank()
                 || audiences == null
                 || !audiences.contains(appleSignInAudience)) {
-            log.warn("Apple token audience mismatch");
+            log.warn("Audience mismatch — token audiences={}, expected='{}'", audiences, appleSignInAudience);
             throw new SecurityException("Invalid token audience");
         }
 
@@ -160,7 +160,7 @@ public class AppleAuthService {
             // Find the matching public key
             JWK jwk = jwkSet.getKeyByKeyId(keyId);
             if (jwk == null) {
-                log.error("No matching Apple public key");
+                log.error("No matching Apple public key for keyId: {}", keyId);
                 return false;
             }
 

@@ -170,6 +170,7 @@ class AuthServiceTest {
             req.setRefreshToken("refresh");
 
             UUID uid = UUID.randomUUID();
+            when(tokenProvider.validateRefreshToken("refresh")).thenReturn(true);
             when(refreshTokenService.isValid("refresh")).thenReturn(true);
             when(tokenProvider.getUserIdFromJWT("refresh")).thenReturn(uid.toString());
 
@@ -190,6 +191,7 @@ class AuthServiceTest {
         @Test
         void refresh_RevokedToken_ThrowsInvalidGrant() {
             RefreshTokenRequest req = new RefreshTokenRequest("revoked");
+            when(tokenProvider.validateRefreshToken("revoked")).thenReturn(true);
             when(refreshTokenService.isValid("revoked")).thenReturn(false);
 
             assertThrows(InvalidRefreshTokenException.class, () -> authService.refreshAccessToken(req));
@@ -199,6 +201,7 @@ class AuthServiceTest {
         void refresh_DeletedUser_ThrowsInvalidGrant() {
             RefreshTokenRequest req = new RefreshTokenRequest("refresh");
             UUID uid = UUID.randomUUID();
+            when(tokenProvider.validateRefreshToken("refresh")).thenReturn(true);
             when(refreshTokenService.isValid("refresh")).thenReturn(true);
             when(tokenProvider.getUserIdFromJWT("refresh")).thenReturn(uid.toString());
             when(userRepository.findById(uid)).thenReturn(Optional.empty());
@@ -220,6 +223,7 @@ class AuthServiceTest {
 
         @Test
         void refresh_MalformedToken_ThrowsInvalidGrant() {
+            when(tokenProvider.validateRefreshToken("malformed")).thenReturn(true);
             when(refreshTokenService.isValid("malformed")).thenReturn(true);
             when(tokenProvider.getUserIdFromJWT("malformed"))
                     .thenThrow(new IllegalArgumentException("Malformed token"));
@@ -230,11 +234,23 @@ class AuthServiceTest {
 
         @Test
         void refresh_RepositoryFault_Propagates() {
+            when(tokenProvider.validateRefreshToken("refresh")).thenReturn(true);
             when(refreshTokenService.isValid("refresh"))
                     .thenThrow(new IllegalStateException("Database unavailable"));
 
             assertThrows(IllegalStateException.class,
                     () -> authService.refreshAccessToken(new RefreshTokenRequest("refresh")));
+        }
+
+        @Test
+        void refresh_AccessPurposeToken_ThrowsInvalidGrantBeforeDatabaseLookup() {
+            when(tokenProvider.validateRefreshToken("access-token")).thenReturn(false);
+
+            assertThrows(InvalidRefreshTokenException.class,
+                    () -> authService.refreshAccessToken(new RefreshTokenRequest("access-token")));
+
+            verify(tokenProvider).validateRefreshToken("access-token");
+            verifyNoInteractions(refreshTokenService);
         }
     }
 }

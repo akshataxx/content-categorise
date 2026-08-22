@@ -127,7 +127,8 @@ public class AuthService {
             throw new InvalidRefreshTokenException();
         }
 
-        if (!refreshTokenService.isValid(incomingRefresh)) {
+        if (!tokenProvider.validateRefreshToken(incomingRefresh)
+                || !refreshTokenService.isValid(incomingRefresh)) {
             throw new InvalidRefreshTokenException();
         }
 

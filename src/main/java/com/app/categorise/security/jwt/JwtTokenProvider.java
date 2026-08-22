@@ -23,6 +23,9 @@ import java.util.Date;
 public class JwtTokenProvider {
 
     private static final Logger log = LoggerFactory.getLogger(JwtTokenProvider.class);
+    private static final String TOKEN_USE_CLAIM = "token_use";
+    private static final String ACCESS_TOKEN_USE = "access";
+    private static final String REFRESH_TOKEN_USE = "refresh";
 
     @Value("${app.jwtSecret}")
     private String jwtSecret;
@@ -50,6 +53,7 @@ public class JwtTokenProvider {
             .setSubject(userPrincipal.getId().toString())
             .setIssuedAt(new Date())
             .setExpiration(expiryDate)
+            .claim(TOKEN_USE_CLAIM, ACCESS_TOKEN_USE)
             .signWith(key, SignatureAlgorithm.HS512)
             .compact();
     }
@@ -64,6 +68,7 @@ public class JwtTokenProvider {
                 .setSubject(userPrincipal.getId().toString())
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
+                .claim(TOKEN_USE_CLAIM, REFRESH_TOKEN_USE)
                 .signWith(key, SignatureAlgorithm.HS512)
                 .compact();
     }
@@ -73,10 +78,18 @@ public class JwtTokenProvider {
         return claims.getSubject();
     }
 
-    public boolean validateToken(String authToken) {
+    public boolean validateAccessToken(String token) {
+        return validateTokenForUse(token, ACCESS_TOKEN_USE);
+    }
+
+    public boolean validateRefreshToken(String token) {
+        return validateTokenForUse(token, REFRESH_TOKEN_USE);
+    }
+
+    private boolean validateTokenForUse(String token, String expectedUse) {
         try {
-            Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(authToken);
-            return true;
+            Claims claims = Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token).getBody();
+            return expectedUse.equals(claims.get(TOKEN_USE_CLAIM, String.class));
         } catch (ExpiredJwtException ex) {
             log.debug("JWT token is expired: {}", ex.getMessage());
         } catch (SecurityException | MalformedJwtException ex) {
@@ -88,4 +101,4 @@ public class JwtTokenProvider {
         }
         return false;
     }
-} 
+}

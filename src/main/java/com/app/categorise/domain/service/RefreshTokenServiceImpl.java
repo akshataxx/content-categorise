@@ -19,6 +19,13 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
     @Override
     @Transactional
     public void save(UUID userId, String refreshToken, Instant expiry) {
+        RefreshTokenEntity existingToken = repo.findByToken(refreshToken).orElse(null);
+        if (existingToken != null) {
+            existingToken.setExpiryDate(expiry);
+            repo.save(existingToken);
+            return;
+        }
+
         repo.deleteByUserId(userId);
         repo.save(new RefreshTokenEntity(null, userId, refreshToken, expiry));
     }
@@ -28,6 +35,14 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
         return repo.findByToken(refreshToken)
                 .filter(rt -> rt.getExpiryDate().isAfter(Instant.now()))
                 .isPresent();
+    }
+
+    @Override
+    @Transactional
+    public void revoke(String refreshToken) {
+        if (refreshToken != null && !refreshToken.isBlank()) {
+            repo.deleteByToken(refreshToken);
+        }
     }
 
     @Override

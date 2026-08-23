@@ -16,10 +16,14 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
     @Autowired
     private AuthService authService;
@@ -29,13 +33,11 @@ public class AuthController {
 
     @PostMapping("/google")
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody GoogleAuthRequest req) {
-        System.out.println("POST /api/auth/google received");
         try {
             JwtAuthResponse tokens = authService.authenticateWithGoogle(req);
-            System.out.println("Tokens: " + tokens);
             return ResponseEntity.ok(tokens);
         } catch (Exception e) {
-            System.err.println("Error during authentication: " + e.getMessage());
+            log.warn("Google authentication failed: {}", e.getClass().getSimpleName());
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
@@ -48,19 +50,14 @@ public class AuthController {
     
     @PostMapping("/apple")
     public ResponseEntity<?> authenticateWithApple(@Valid @RequestBody AppleAuthRequest req) {
-        System.out.println("POST /api/auth/apple received");
-        System.out.println("Apple User ID: " + req.getUserIdentifier());
-        System.out.println("Email: " + req.getEmail());
         try {
             JwtAuthResponse tokens = appleAuthService.authenticateWithApple(req);
-            System.out.println("Apple auth successful, tokens generated");
             return ResponseEntity.ok(tokens);
         } catch (SecurityException e) {
-            System.err.println("Security error during Apple authentication: " + e.getMessage());
+            log.warn("Apple authentication rejected: {}", e.getClass().getSimpleName());
             return ResponseEntity.status(401).body(e.getMessage());
         } catch (Exception e) {
-            System.err.println("Error during Apple authentication: " + e.getMessage());
-            e.printStackTrace();
+            log.warn("Apple authentication failed: {}", e.getClass().getSimpleName());
             return ResponseEntity.badRequest().body("Apple authentication failed: " + e.getMessage());
         }
     }
@@ -69,6 +66,12 @@ public class AuthController {
     public ResponseEntity<JwtAuthResponse> refreshToken(@Valid @RequestBody RefreshTokenRequest req) throws Exception {
         JwtAuthResponse tokens = authService.refreshAccessToken(req);
         return ResponseEntity.ok(tokens);
+    }
+
+    @PostMapping("/revoke")
+    public ResponseEntity<Void> revokeToken(@RequestBody RefreshTokenRequest request) {
+        authService.revokeRefreshToken(request);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/register")

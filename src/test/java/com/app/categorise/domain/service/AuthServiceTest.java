@@ -1,11 +1,13 @@
 package com.app.categorise.domain.service;
 
 import com.app.categorise.api.dto.auth.JwtAuthResponse;
+import com.app.categorise.api.dto.auth.GoogleAuthRequest;
 import com.app.categorise.api.dto.auth.LoginRequest;
 import com.app.categorise.api.dto.auth.RefreshTokenRequest;
 import com.app.categorise.api.dto.auth.RegisterRequest;
 import com.app.categorise.data.entity.UserEntity;
 import com.app.categorise.data.repository.UserRepository;
+import com.app.categorise.exception.InvalidRefreshTokenException;
 import com.app.categorise.security.jwt.JwtTokenProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -19,6 +21,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Instant;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -110,6 +115,36 @@ class AuthServiceTest {
         }
     }
 
+    @Test
+    void googleAuthentication_DoesNotWriteCredentialsOrClientIdentityToStandardStreams() throws Exception {
+        String identityToken = "sensitive-google-identity-token";
+        String clientId = "sensitive-google-client-id";
+        java.lang.reflect.Field clientIdField = AuthService.class.getDeclaredField("googleClientId");
+        clientIdField.setAccessible(true);
+        clientIdField.set(authService, clientId);
+        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderr = new ByteArrayOutputStream();
+        PrintStream originalOut = System.out;
+        PrintStream originalErr = System.err;
+        GoogleAuthRequest request = new GoogleAuthRequest();
+        request.setIdToken(identityToken);
+
+        try {
+            System.setOut(new PrintStream(stdout, true, StandardCharsets.UTF_8));
+            System.setErr(new PrintStream(stderr, true, StandardCharsets.UTF_8));
+            assertThrows(Exception.class,
+                    () -> authService.authenticateWithGoogle(request));
+        } finally {
+            System.setOut(originalOut);
+            System.setErr(originalErr);
+        }
+
+        String output = stdout.toString(StandardCharsets.UTF_8)
+                + stderr.toString(StandardCharsets.UTF_8);
+        assertFalse(output.contains(identityToken));
+        assertFalse(output.contains(clientId));
+    }
+
     @Nested
     class LoginTests {
         @Test
@@ -169,6 +204,7 @@ class AuthServiceTest {
             req.setRefreshToken("refresh");
 
             UUID uid = UUID.randomUUID();
+            when(tokenProvider.validateRefreshToken("refresh")).thenReturn(true);
             when(refreshTokenService.isValid("refresh")).thenReturn(true);
             when(tokenProvider.getUserIdFromJWT("refresh")).thenReturn(uid.toString());
 
@@ -183,6 +219,82 @@ class AuthServiceTest {
             JwtAuthResponse res = authService.refreshAccessToken(req);
             assertEquals("new-access", res.getAccessToken());
             assertEquals("refresh", res.getRefreshToken());
+            verify(refreshTokenService).save(eq(uid), eq("refresh"), any(Instant.class));
+        }
+
+        @Test
+        void refresh_RevokedToken_ThrowsInvalidGrant() {
+            RefreshTokenRequest req = new RefreshTokenRequest("revoked");
+            when(tokenProvider.validateRefreshToken("revoked")).thenReturn(true);
+            when(refreshTokenService.isValid("revoked")).thenReturn(false);
+
+            assertThrows(InvalidRefreshTokenException.class, () -> authService.refreshAccessToken(req));
+        }
+
+        @Test
+        void refresh_DeletedUser_ThrowsInvalidGrant() {
+            RefreshTokenRequest req = new RefreshTokenRequest("refresh");
+            UUID uid = UUID.randomUUID();
+            when(tokenProvider.validateRefreshToken("refresh")).thenReturn(true);
+            when(refreshTokenService.isValid("refresh")).thenReturn(true);
+            when(tokenProvider.getUserIdFromJWT("refresh")).thenReturn(uid.toString());
+            when(userRepository.findById(uid)).thenReturn(Optional.empty());
+
+            assertThrows(InvalidRefreshTokenException.class, () -> authService.refreshAccessToken(req));
+        }
+
+        @Test
+        void refresh_BlankToken_ThrowsInvalidGrant() {
+            assertThrows(InvalidRefreshTokenException.class,
+                    () -> authService.refreshAccessToken(new RefreshTokenRequest(" ")));
+        }
+
+        @Test
+        void refresh_NullToken_ThrowsInvalidGrant() {
+            assertThrows(InvalidRefreshTokenException.class,
+                    () -> authService.refreshAccessToken(new RefreshTokenRequest(null)));
+        }
+
+        @Test
+        void refresh_MalformedToken_ThrowsInvalidGrant() {
+            when(tokenProvider.validateRefreshToken("malformed")).thenReturn(true);
+            when(refreshTokenService.isValid("malformed")).thenReturn(true);
+            when(tokenProvider.getUserIdFromJWT("malformed"))
+                    .thenThrow(new IllegalArgumentException("Malformed token"));
+
+            assertThrows(InvalidRefreshTokenException.class,
+                    () -> authService.refreshAccessToken(new RefreshTokenRequest("malformed")));
+        }
+
+        @Test
+        void refresh_RepositoryFault_Propagates() {
+            when(tokenProvider.validateRefreshToken("refresh")).thenReturn(true);
+            when(refreshTokenService.isValid("refresh"))
+                    .thenThrow(new IllegalStateException("Database unavailable"));
+
+            assertThrows(IllegalStateException.class,
+                    () -> authService.refreshAccessToken(new RefreshTokenRequest("refresh")));
+        }
+
+        @Test
+        void refresh_AccessPurposeToken_ThrowsInvalidGrantBeforeDatabaseLookup() {
+            when(tokenProvider.validateRefreshToken("access-token")).thenReturn(false);
+
+            assertThrows(InvalidRefreshTokenException.class,
+                    () -> authService.refreshAccessToken(new RefreshTokenRequest("access-token")));
+
+            verify(tokenProvider).validateRefreshToken("access-token");
+            verifyNoInteractions(refreshTokenService);
+        }
+    }
+
+    @Nested
+    class RevokeTests {
+        @Test
+        void revoke_DelegatesPresentedRefreshToken() {
+            authService.revokeRefreshToken(new RefreshTokenRequest("presented-refresh-token"));
+
+            verify(refreshTokenService).revoke("presented-refresh-token");
         }
     }
 }

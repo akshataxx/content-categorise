@@ -172,7 +172,7 @@ public class AppleAuthService {
             return signedJWT.verify(verifier);
 
         } catch (Exception e) {
-            log.error("Error verifying Apple token", e);
+            log.error("Apple token verification failed: {}", e.getClass().getSimpleName());
             return false;
         }
     }

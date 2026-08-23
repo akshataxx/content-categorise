@@ -6,6 +6,7 @@ import com.app.categorise.api.dto.auth.RefreshTokenRequest;
 import com.app.categorise.api.dto.auth.RegisterRequest;
 import com.app.categorise.domain.service.AppleAuthService;
 import com.app.categorise.domain.service.AuthService;
+import com.app.categorise.exception.InvalidRefreshTokenException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -19,8 +20,10 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 @WebMvcTest(AuthController.class)
 @AutoConfigureMockMvc(addFilters = false)
@@ -88,6 +91,39 @@ class AuthControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(req)))
                     .andExpect(status().isOk());
+        }
+
+        @Test
+        void refresh_invalidGrant_returns400WithMachineReadableCode() throws Exception {
+            when(authService.refreshAccessToken(any())).thenThrow(new InvalidRefreshTokenException());
+
+            mockMvc.perform(post("/api/auth/refresh")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"refreshToken\":\"expired\"}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error").value("invalid_grant"));
+        }
+    }
+
+    @Nested
+    @DisplayName("/api/auth/revoke")
+    class Revoke {
+        @Test
+        void revoke_presentedToken_returns204() throws Exception {
+            mockMvc.perform(post("/api/auth/revoke")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"refreshToken\":\"presented-refresh-token\"}"))
+                    .andExpect(status().isNoContent());
+
+            verify(authService).revokeRefreshToken(new RefreshTokenRequest("presented-refresh-token"));
+        }
+
+        @Test
+        void revoke_unknownToken_returns204() throws Exception {
+            mockMvc.perform(post("/api/auth/revoke")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"refreshToken\":\"unknown-refresh-token\"}"))
+                    .andExpect(status().isNoContent());
         }
     }
 }

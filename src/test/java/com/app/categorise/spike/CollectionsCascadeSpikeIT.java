@@ -39,6 +39,7 @@ class CollectionsCascadeSpikeIT {
         r.add("spring.datasource.username", postgres::getUsername);
         r.add("spring.datasource.password", postgres::getPassword);
         r.add("spring.flyway.enabled", () -> "true");
+        r.add("spring.flyway.locations", () -> "classpath:db/migration,classpath:db/spike");
         r.add("spring.jpa.hibernate.ddl-auto", () -> "none");
     }
 

@@ -16,7 +16,7 @@ Pass bar (apushpavannan, 5 October 2026): p90 under 500 ms on the server for lis
 | A: move one row among the first 50 loaded, collection of 5,000 | 1,000 | 0.2 | 0.3 | 0.4 | 1 each (n_tup_upd) | yes |
 | A: forced renumber of all 5,000 keys | 100 | 26.8 | 44.6 | 57.4 | 5,000 | yes |
 | B: full-list rewrite of 5,000 positions (array already on the server) | 100 | 20.5 | 39.5 | 52.3 | 5,000 | yes (database side only) |
-| Add at 4,999 with the collection row locked, count then insert | 300 | 3.7 | 7.0 | 7.9 | 1 | yes |
+| Add near the limit with the collection row locked, count then insert (outcome not checked per call: some calls may have been refusals at 5,000; the count of ~5,000 rows runs either way) | 300 | 3.7 | 7.0 | 7.9 | 0 or 1 | yes |
 | Remove with the collection row locked | 300 | 0.4 | 0.8 | 1.4 | 1 | yes |
 
 Gap exhaustion (A, `06_gap_exhaustion.sql`): 40 different rows moved, one at a time, to directly after the same anchor. Move 33 triggered one renumber (4,112 rows written); every move left the moved row as the anchor's successor (0 wrong); 5,000 rows, 5,000 distinct keys after.
@@ -50,7 +50,7 @@ Not tested, and who carries it:
 
 ## Blast radius: existing deletion paths with the new tables (run 2026-10-05)
 
-`src/test/java/com/app/categorise/spike/CollectionsCascadeSpikeIT.java`: a Spring Boot test on `pgvector/pgvector:pg15` with Flyway on (all real migrations V1–V27 plus the spike V28), calling the real, unchanged `TranscriptService.deleteTranscripts` and `UserService.deleteAccount`.
+`src/test/java/com/app/categorise/spike/CollectionsCascadeSpikeIT.java`: a Spring Boot test on `pgvector/pgvector:pg15` with Flyway on (all real migrations V1–V27 plus the spike V28, kept under src/test/resources/db/spike so Flyway never runs it outside this test), calling the real, unchanged `TranscriptService.deleteTranscripts` and `UserService.deleteAccount`.
 
 | Run | Result |
 |---|---|

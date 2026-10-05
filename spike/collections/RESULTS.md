@@ -47,3 +47,14 @@ Not tested, and who carries it:
 - The lock-order deadlock the arena judge found between create-with-initial-transcript and account deletion (static analysis only).
 - Hibernate's test schema emitting the cascades and the unique key (S2 in the candidate designs).
 - Real transcript sizes (8 KB is a guess).
+
+## Blast radius: existing deletion paths with the new tables (run 2026-10-05)
+
+`src/test/java/com/app/categorise/spike/CollectionsCascadeSpikeIT.java`: a Spring Boot test on `pgvector/pgvector:pg15` with Flyway on (all real migrations V1–V27 plus the spike V28), calling the real, unchanged `TranscriptService.deleteTranscripts` and `UserService.deleteAccount`.
+
+| Run | Result |
+|---|---|
+| V28 with `ON DELETE CASCADE` on collection_items → user_transcripts | 2 tests, 0 failures: bulk delete removes the memberships and keeps both collections; account delete succeeds, removes the person's collections and memberships, leaves another person's untouched |
+| Negative control: the same FK without the cascade | 2 errors, both `DataIntegrityViolationException` (`violates foreign key constraint "collection_items_user_transcript_id_fkey"`), raised at commit, not wrapped as `TranscriptDeletionException`: the app would return a 500 |
+
+So the existing deletion code needs no change for R10/R11 as long as the membership FK cascades in the database; account delete works even without its own collections line, because `users ON DELETE CASCADE` and the transcript cascade cover it. Hibernate's test schema (Flyway off) was not used here, so whether `ddl-auto=create` emits the cascade is still untested.
